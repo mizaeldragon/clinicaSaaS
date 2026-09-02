@@ -1,0 +1,752 @@
+// ============================================================================
+//  SaaS Multiempresa — Beleza, Estética e Clínicas
+//  Estratégia multi-tenant: shared database + discriminator column (companyId)
+//  Todas as entidades de domínio carregam companyId e índices compostos.
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+//  ENUMS
+// ============================================================================
+
+enum UserRole {
+  SUPER_ADMIN
+  COMPANY_ADMIN
+  MANAGER
+  RECEPTIONIST
+  PROFESSIONAL
+}
+
+enum ModuleKey {
+  appointments
+  customers
+  professionals
+  services
+  financial
+  commissions
+  resources
+  rentals
+  reports
+  notifications
+}
+
+enum CompanyStatus {
+  ACTIVE
+  TRIALING
+  SUSPENDED
+  CANCELED
+}
+
+enum CompanyType {
+  AESTHETIC_CLINIC
+  BEAUTY_SALON
+  NAIL_STUDIO
+  BROW_STUDIO
+  BARBERSHOP
+  BEAUTY_SPACE
+  SPECIALIZED_CLINIC
+  BEAUTY_COWORKING
+  OTHER
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+enum BillingInterval {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELED
+  NO_SHOW
+}
+
+enum ResourceStatus {
+  AVAILABLE
+  IN_USE
+  MAINTENANCE
+  INACTIVE
+}
+
+enum RentalStatus {
+  ACTIVE
+  ENDED
+  OVERDUE
+  CANCELED
+}
+
+enum RentalBillingCycle {
+  HOURLY
+  DAILY
+  WEEKLY
+  MONTHLY
+  CUSTOM
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+enum TransactionOrigin {
+  APPOINTMENT
+  RENTAL
+  PRODUCT
+  MANUAL
+  OTHER
+}
+
+enum PaymentMethod {
+  CASH
+  PIX
+  CREDIT_CARD
+  DEBIT_CARD
+  BANK_TRANSFER
+  OTHER
+}
+
+enum PaymentStatus {
+  PAID
+  PARTIAL
+  PENDING
+  CANCELED
+}
+
+enum CommissionType {
+  PERCENTAGE
+  FIXED
+}
+
+enum CommissionStatus {
+  PENDING
+  PAID
+  CANCELED
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  WHATSAPP
+}
+
+enum NotificationEvent {
+  APPOINTMENT_CREATED
+  APPOINTMENT_REMINDER
+  APPOINTMENT_CANCELED
+  PAYMENT_OVERDUE
+  RENTAL_DUE
+  CUSTOMER_CREATED
+  SYSTEM
+}
+
+// ============================================================================
+//  NÚCLEO SAAS
+// ============================================================================
+
+model Plan {
+  id                  String   @id @default(uuid())
+  name                String
+  slug                String   @unique
+  description         String?
+  price               Decimal  @db.Decimal(10, 2)
+  billingInterval     BillingInterval @default(MONTHLY)
+  trialDays           Int      @default(14)
+  maxUsers            Int?
+  maxProfessionals    Int?
+  maxAppointmentsMonth Int?
+  modules             ModuleKey[]
+  isActive            Boolean  @default(true)
+  isPublic            Boolean  @default(true)
+  sortOrder           Int      @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+model Company {
+  id            String        @id @default(uuid())
+  name          String
+  slug          String        @unique
+  legalName     String?
+  document      String?
+  type          CompanyType   @default(OTHER)
+  status        CompanyStatus @default(TRIALING)
+  email         String?
+  phone         String?
+  whatsapp      String?
+  addressStreet String?
+  addressNumber String?
+  addressCity   String?
+  addressState  String?
+  addressZip    String?
+  logoUrl       String?
+  primaryColor  String        @default("#7C3AED")
+  timezone      String        @default("America/Sao_Paulo")
+  onboardingCompleted Boolean @default(false)
+  onboardingAnswers   Json?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  subscription           Subscription?
+  modules                CompanyModule[]
+  businessHours          BusinessHour[]
+  users                  User[]
+  customers              Customer[]
+  professionals          Professional[]
+  serviceCategories      ServiceCategory[]
+  services               Service[]
+  appointments           Appointment[]
+  resourceCategories     ResourceCategory[]
+  resources              Resource[]
+  rentals                Rental[]
+  rentalPayments         RentalPayment[]
+  expenseCategories      ExpenseCategory[]
+  financialTransactions  FinancialTransaction[]
+  commissions            Commission[]
+  notifications          Notification[]
+  auditLogs              AuditLog[]
+
+  @@index([status])
+  @@map("companies")
+}
+
+model Subscription {
+  id                 String             @id @default(uuid())
+  companyId          String             @unique
+  planId             String
+  status             SubscriptionStatus @default(TRIALING)
+  startedAt          DateTime           @default(now())
+  trialEndsAt        DateTime?
+  currentPeriodStart DateTime           @default(now())
+  currentPeriodEnd   DateTime?
+  canceledAt         DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  plan    Plan    @relation(fields: [planId], references: [id])
+
+  @@index([status])
+  @@map("subscriptions")
+}
+
+model CompanyModule {
+  id        String    @id @default(uuid())
+  companyId String
+  module    ModuleKey
+  enabled   Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, module])
+  @@index([companyId, enabled])
+  @@map("company_modules")
+}
+
+model BusinessHour {
+  id        String  @id @default(uuid())
+  companyId String
+  weekday   Int // 0 = domingo ... 6 = sábado
+  opensAt   String // "09:00"
+  closesAt  String // "19:00"
+  isClosed  Boolean @default(false)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, weekday])
+  @@map("business_hours")
+}
+
+model User {
+  id           String    @id @default(uuid())
+  companyId    String?
+  name         String
+  email        String
+  passwordHash String
+  phone        String?
+  avatarUrl    String?
+  role         UserRole  @default(COMPANY_ADMIN)
+  permissions  String[]  @default([])
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  company       Company?       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  professional  Professional?
+  refreshTokens RefreshToken[]
+  auditLogs     AuditLog[]
+  notifications Notification[]
+
+  @@unique([companyId, email])
+  @@index([email])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  userAgent String?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// ============================================================================
+//  OPERAÇÃO
+// ============================================================================
+
+model Customer {
+  id           String    @id @default(uuid())
+  companyId    String
+  name         String
+  phone        String?
+  whatsapp     String?
+  email        String?
+  birthDate    DateTime?
+  document     String?
+  notes        String?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  company      Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
+  transactions FinancialTransaction[]
+
+  @@index([companyId, name])
+  @@index([companyId, phone])
+  @@map("customers")
+}
+
+model Professional {
+  id                String   @id @default(uuid())
+  companyId         String
+  userId            String?  @unique
+  name              String
+  email             String?
+  phone             String?
+  avatarUrl         String?
+  bio               String?
+  specialties       String[] @default([])
+  color             String   @default("#7C3AED")
+  commissionType    CommissionType?
+  commissionValue   Decimal? @db.Decimal(10, 2)
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  company      Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user         User?                  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  workingHours WorkingHour[]
+  timeOffs     TimeOff[]
+  services     ProfessionalService[]
+  appointments Appointment[]
+  commissions  Commission[]
+  rentals      Rental[]
+
+  @@index([companyId, isActive])
+  @@map("professionals")
+}
+
+model WorkingHour {
+  id             String  @id @default(uuid())
+  companyId      String
+  professionalId String
+  weekday        Int
+  startsAt       String // "09:00"
+  endsAt         String // "18:00"
+  breakStart     String?
+  breakEnd       String?
+  isOff          Boolean @default(false)
+
+  professional Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@unique([professionalId, weekday])
+  @@index([companyId])
+  @@map("working_hours")
+}
+
+model TimeOff {
+  id             String   @id @default(uuid())
+  companyId      String
+  professionalId String
+  startsAt       DateTime
+  endsAt         DateTime
+  reason         String?
+  createdAt      DateTime @default(now())
+
+  professional Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, professionalId, startsAt])
+  @@map("time_offs")
+}
+
+model ServiceCategory {
+  id        String   @id @default(uuid())
+  companyId String
+  name      String
+  color     String   @default("#7C3AED")
+  icon      String?
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  services Service[]
+
+  @@unique([companyId, name])
+  @@map("service_categories")
+}
+
+model Service {
+  id                 String   @id @default(uuid())
+  companyId          String
+  categoryId         String?
+  name               String
+  description        String?
+  price              Decimal  @db.Decimal(10, 2)
+  durationMinutes    Int
+  bufferMinutes      Int      @default(0)
+  commissionType     CommissionType?
+  commissionValue    Decimal? @db.Decimal(10, 2)
+  resourceCategoryId String?
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  company             Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  category            ServiceCategory?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  requiredResourceCat ResourceCategory?     @relation(fields: [resourceCategoryId], references: [id], onDelete: SetNull)
+  professionals       ProfessionalService[]
+  appointmentServices AppointmentService[]
+  commissions         Commission[]
+
+  @@index([companyId, isActive])
+  @@index([companyId, categoryId])
+  @@map("services")
+}
+
+model ProfessionalService {
+  id              String   @id @default(uuid())
+  companyId       String
+  professionalId  String
+  serviceId       String
+  customPrice     Decimal? @db.Decimal(10, 2)
+  customDuration  Int?
+  commissionType  CommissionType?
+  commissionValue Decimal? @db.Decimal(10, 2)
+
+  professional Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  service      Service      @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([professionalId, serviceId])
+  @@index([companyId])
+  @@map("professional_services")
+}
+
+model Appointment {
+  id             String            @id @default(uuid())
+  companyId      String
+  customerId     String
+  professionalId String?
+  roomId         String?
+  resourceId     String?
+  startsAt       DateTime
+  endsAt         DateTime
+  durationMinutes Int
+  status         AppointmentStatus @default(SCHEDULED)
+  totalPrice     Decimal           @db.Decimal(10, 2) @default(0)
+  notes          String?
+  canceledReason String?
+  canceledAt     DateTime?
+  completedAt    DateTime?
+  createdById    String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  company      Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer     Customer               @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  professional Professional?          @relation(fields: [professionalId], references: [id], onDelete: SetNull)
+  room         Resource?              @relation("AppointmentRoom", fields: [roomId], references: [id], onDelete: SetNull)
+  resource     Resource?              @relation("AppointmentResource", fields: [resourceId], references: [id], onDelete: SetNull)
+  services     AppointmentService[]
+  transactions FinancialTransaction[]
+  commissions  Commission[]
+
+  @@index([companyId, startsAt])
+  @@index([companyId, professionalId, startsAt])
+  @@index([companyId, status])
+  @@index([companyId, customerId])
+  @@map("appointments")
+}
+
+model AppointmentService {
+  id              String   @id @default(uuid())
+  companyId       String
+  appointmentId   String
+  serviceId       String
+  name            String
+  price           Decimal  @db.Decimal(10, 2)
+  durationMinutes Int
+  quantity        Int      @default(1)
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  service     Service     @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+
+  @@index([companyId, appointmentId])
+  @@map("appointment_services")
+}
+
+// ============================================================================
+//  RECURSOS E ALUGUEL
+// ============================================================================
+
+model ResourceCategory {
+  id        String   @id @default(uuid())
+  companyId String
+  name      String
+  isRoom    Boolean  @default(false)
+  icon      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  resources Resource[]
+  services  Service[]
+
+  @@unique([companyId, name])
+  @@map("resource_categories")
+}
+
+model Resource {
+  id          String         @id @default(uuid())
+  companyId   String
+  categoryId  String?
+  name        String
+  description String?
+  status      ResourceStatus @default(AVAILABLE)
+  isRentable  Boolean        @default(false)
+  hourlyRate  Decimal?       @db.Decimal(10, 2)
+  dailyRate   Decimal?       @db.Decimal(10, 2)
+  weeklyRate  Decimal?       @db.Decimal(10, 2)
+  monthlyRate Decimal?       @db.Decimal(10, 2)
+  isActive    Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  company             Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  category            ResourceCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  appointmentsAsRoom  Appointment[]     @relation("AppointmentRoom")
+  appointmentsAsRes   Appointment[]     @relation("AppointmentResource")
+  rentals             Rental[]
+
+  @@index([companyId, status])
+  @@index([companyId, categoryId])
+  @@map("resources")
+}
+
+model Rental {
+  id             String             @id @default(uuid())
+  companyId      String
+  resourceId     String
+  professionalId String?
+  renterName     String
+  renterPhone    String?
+  renterEmail    String?
+  startsAt       DateTime
+  endsAt         DateTime?
+  amount         Decimal            @db.Decimal(10, 2)
+  billingCycle   RentalBillingCycle @default(MONTHLY)
+  dueDay         Int? // dia do mês para vencimento
+  status         RentalStatus       @default(ACTIVE)
+  notes          String?
+  lastGeneratedAt DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  company      Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  resource     Resource        @relation(fields: [resourceId], references: [id], onDelete: Restrict)
+  professional Professional?   @relation(fields: [professionalId], references: [id], onDelete: SetNull)
+  payments     RentalPayment[]
+
+  @@index([companyId, status])
+  @@index([companyId, resourceId])
+  @@map("rentals")
+}
+
+model RentalPayment {
+  id            String        @id @default(uuid())
+  companyId     String
+  rentalId      String
+  referenceMonth String // "2026-09"
+  dueDate       DateTime
+  amount        Decimal       @db.Decimal(10, 2)
+  paidAmount    Decimal       @db.Decimal(10, 2) @default(0)
+  paidAt        DateTime?
+  status        PaymentStatus @default(PENDING)
+  paymentMethod PaymentMethod?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  company      Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  rental       Rental                 @relation(fields: [rentalId], references: [id], onDelete: Cascade)
+  transactions FinancialTransaction[]
+
+  @@unique([rentalId, referenceMonth])
+  @@index([companyId, status, dueDate])
+  @@map("rental_payments")
+}
+
+// ============================================================================
+//  FINANCEIRO
+// ============================================================================
+
+model ExpenseCategory {
+  id        String   @id @default(uuid())
+  companyId String
+  name      String
+  color     String   @default("#EF4444")
+  createdAt DateTime @default(now())
+
+  company      Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  transactions FinancialTransaction[]
+
+  @@unique([companyId, name])
+  @@map("expense_categories")
+}
+
+model FinancialTransaction {
+  id              String            @id @default(uuid())
+  companyId       String
+  type            TransactionType
+  origin          TransactionOrigin @default(MANUAL)
+  description     String
+  amount          Decimal           @db.Decimal(10, 2)
+  paidAmount      Decimal           @db.Decimal(10, 2) @default(0)
+  paymentMethod   PaymentMethod?
+  paymentStatus   PaymentStatus     @default(PENDING)
+  dueDate         DateTime?
+  paidAt          DateTime?
+  competenceDate  DateTime          @default(now())
+  categoryId      String?
+  customerId      String?
+  appointmentId   String?
+  rentalPaymentId String?
+  notes           String?
+  createdById     String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  company       Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  category      ExpenseCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  customer      Customer?        @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  appointment   Appointment?     @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  rentalPayment RentalPayment?   @relation(fields: [rentalPaymentId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, type, competenceDate])
+  @@index([companyId, paymentStatus, dueDate])
+  @@map("financial_transactions")
+}
+
+model Commission {
+  id             String           @id @default(uuid())
+  companyId      String
+  professionalId String
+  appointmentId  String?
+  serviceId      String?
+  baseAmount     Decimal          @db.Decimal(10, 2)
+  type           CommissionType
+  value          Decimal          @db.Decimal(10, 2)
+  amount         Decimal          @db.Decimal(10, 2)
+  status         CommissionStatus @default(PENDING)
+  referenceMonth String
+  paidAt         DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  company      Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  professional Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  appointment  Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  service      Service?     @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, professionalId, referenceMonth])
+  @@index([companyId, status])
+  @@map("commissions")
+}
+
+// ============================================================================
+//  NOTIFICAÇÕES E AUDITORIA
+// ============================================================================
+
+model Notification {
+  id        String              @id @default(uuid())
+  companyId String
+  userId    String?
+  channel   NotificationChannel @default(IN_APP)
+  event     NotificationEvent   @default(SYSTEM)
+  title     String
+  message   String
+  data      Json?
+  readAt    DateTime?
+  sentAt    DateTime?
+  createdAt DateTime            @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, userId, readAt])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  companyId String
+  userId    String?
+  userName  String?
+  action    String
+  entity    String
+  entityId  String?
+  before    Json?
+  after     Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, createdAt])
+  @@index([companyId, entity, entityId])
+  @@map("audit_logs")
+}

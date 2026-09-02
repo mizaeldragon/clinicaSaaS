@@ -1,0 +1,86 @@
+import { format, formatDistanceToNow, isToday, isTomorrow, isYesterday, parseISO } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+
+export function toDate(value: string | Date | null | undefined): Date | null {
+  if (!value) return null;
+  return typeof value === 'string' ? parseISO(value) : value;
+}
+
+export const currency = (value: number | string | null | undefined): string =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value ?? 0));
+
+export const compactCurrency = (value: number | null | undefined): string => {
+  const n = Number(value ?? 0);
+  if (Math.abs(n) >= 1000) {
+    return `R$ ${new Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 }).format(n)}`;
+  }
+  return currency(n);
+};
+
+export const percent = (value: number | null | undefined, digits = 1): string =>
+  `${Number(value ?? 0).toFixed(digits).replace('.', ',')}%`;
+
+export const number = (value: number | null | undefined): string =>
+  new Intl.NumberFormat('pt-BR').format(Number(value ?? 0));
+
+export function dateLabel(value: string | Date | null | undefined): string {
+  const date = toDate(value);
+  if (!date) return '—';
+  return format(date, "dd 'de' MMM 'de' yyyy", { locale: ptBR });
+}
+
+export function shortDate(value: string | Date | null | undefined): string {
+  const date = toDate(value);
+  if (!date) return '—';
+  return format(date, 'dd/MM/yyyy', { locale: ptBR });
+}
+
+export function timeLabel(value: string | Date | null | undefined): string {
+  const date = toDate(value);
+  if (!date) return '—';
+  return format(date, 'HH:mm');
+}
+
+export function dateTimeLabel(value: string | Date | null | undefined): string {
+  const date = toDate(value);
+  if (!date) return '—';
+  return format(date, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
+}
+
+export function relativeDay(value: string | Date | null | undefined): string {
+  const date = toDate(value);
+  if (!date) return '—';
+  if (isToday(date)) return 'Hoje';
+  if (isTomorrow(date)) return 'Amanhã';
+  if (isYesterday(date)) return 'Ontem';
+  return format(date, "EEEE, dd 'de' MMMM", { locale: ptBR });
+}
+
+export function fromNow(value: string | Date | null | undefined): string {
+  const date = toDate(value);
+  if (!date) return '—';
+  return formatDistanceToNow(date, { addSuffix: true, locale: ptBR });
+}
+
+export function weekdayName(weekday: number, short = false): string {
+  const names = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+  const shortNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  return short ? shortNames[weekday] : names[weekday];
+}
+
+export function phoneMask(value?: string | null): string {
+  if (!value) return '—';
+  const digits = value.replace(/\D/g, '');
+  if (digits.length === 11) return digits.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+  if (digits.length === 10) return digits.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+  return value;
+}
+
+export function monthKey(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+export function monthLabel(key: string): string {
+  const [year, month] = key.split('-').map(Number);
+  return format(new Date(year, month - 1, 1), "MMMM 'de' yyyy", { locale: ptBR });
+}
