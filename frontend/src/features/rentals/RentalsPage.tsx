@@ -50,6 +50,8 @@ import { useAuthStore } from '@/stores/auth.store';
 import { BILLING_CYCLE, PAYMENT_METHOD } from '@/config/labels';
 import { currency, monthLabel, shortDate } from '@/lib/format';
 import type { PaymentMethod, RentalPayment } from '@/types';
+import { ShiftBoard } from './ShiftBoard';
+import { ShiftSettings } from './ShiftSettings';
 
 const EMPTY = {
   resourceId: '',
@@ -145,11 +147,17 @@ export function RentalsPage() {
         </div>
       ) : null}
 
-      <Tabs defaultValue="contracts">
-        <TabsList>
+      <Tabs defaultValue="shifts">
+        <TabsList className="flex-wrap">
+          <TabsTrigger value="shifts">Turnos do dia</TabsTrigger>
           <TabsTrigger value="contracts">Contratos</TabsTrigger>
           <TabsTrigger value="payments">Cobranças</TabsTrigger>
+          <TabsTrigger value="settings">Configuração</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="shifts">
+          <ShiftBoard />
+        </TabsContent>
 
         <TabsContent value="contracts">
           <Card>
@@ -331,6 +339,9 @@ export function RentalsPage() {
               <EmptyState icon={Wallet} title="Nenhuma cobrança gerada" />
             )}
           </Card>
+        </TabsContent>
+        <TabsContent value="settings">
+          <ShiftSettings />
         </TabsContent>
       </Tabs>
 

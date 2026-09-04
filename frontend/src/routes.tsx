@@ -15,6 +15,7 @@ import { ProfessionalsPage } from '@/features/professionals/ProfessionalsPage';
 import { ProfessionalDetailPage } from '@/features/professionals/ProfessionalDetailPage';
 import { ResourcesPage } from '@/features/resources/ResourcesPage';
 import { RentalsPage } from '@/features/rentals/RentalsPage';
+import { MyShiftsPage } from '@/features/rentals/MyShiftsPage';
 import { FinancialPage } from '@/features/financial/FinancialPage';
 import { CommissionsPage } from '@/features/commissions/CommissionsPage';
 import { ReportsPage } from '@/features/reports/ReportsPage';
@@ -23,6 +24,7 @@ import { AdminOverviewPage } from '@/features/admin/AdminOverviewPage';
 import { AdminCompaniesPage } from '@/features/admin/AdminCompaniesPage';
 import { AdminPlansPage } from '@/features/admin/AdminPlansPage';
 import { NotFoundPage } from '@/features/misc/NotFoundPage';
+import { PublicBookingPage } from '@/features/public/PublicBookingPage';
 
 export function AppRoutes() {
   return (
@@ -30,6 +32,9 @@ export function AppRoutes() {
       <Route path="/" element={<Navigate to="/app" replace />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/cadastro" element={<RegisterPage />} />
+
+      {/* Página pública de agendamento — sem login */}
+      <Route path="/e/:slug" element={<PublicBookingPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route path="/onboarding" element={<OnboardingPage />} />
@@ -61,6 +66,7 @@ export function AppRoutes() {
 
           <Route element={<ModuleRoute module="rentals" />}>
             <Route path="alugueis" element={<RentalsPage />} />
+            <Route path="meus-turnos" element={<MyShiftsPage />} />
           </Route>
 
           <Route element={<ModuleRoute module="financial" />}>

@@ -5,6 +5,7 @@ import { Topbar } from './Topbar';
 import { useRealtime } from '@/hooks/useRealtime';
 import { useAuthStore } from '@/stores/auth.store';
 import { NAV_ITEMS } from '@/config/navigation';
+import { isNavItemVisible } from '@/lib/nav';
 import { cn } from '@/lib/utils';
 
 export function AppLayout() {
@@ -13,6 +14,7 @@ export function AppLayout() {
   const refreshContext = useAuthStore((s) => s.refreshContext);
   const hasModule = useAuthStore((s) => s.hasModule);
   const can = useAuthStore((s) => s.can);
+  const role = useAuthStore((s) => s.user?.role);
 
   useRealtime();
 
@@ -26,11 +28,9 @@ export function AppLayout() {
   }, [location.pathname]);
 
   // Barra inferior no mobile com os 4 itens mais usados.
-  const mobileItems = NAV_ITEMS.filter((item) => {
-    if (item.module && !hasModule(item.module)) return false;
-    if (item.permission && !can(item.permission)) return false;
-    return true;
-  }).slice(0, 5);
+  const mobileItems = NAV_ITEMS.filter((item) =>
+    isNavItemVisible(item, { role, hasModule, can }),
+  ).slice(0, 5);
 
   return (
     <div className="min-h-screen bg-background">

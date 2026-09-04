@@ -16,6 +16,7 @@ import type {
   FinancialTransaction,
   Notification,
   Paginated,
+  PaymentStatus,
   Plan,
   Professional,
   Rental,
@@ -864,6 +865,176 @@ export function useAdminMutations() {
       mutationFn: (id: string) => api.delete(`/admin/plans/${id}`),
       onSuccess: () => {
         toast.success('Plano removido');
+        invalidate();
+      },
+      onError: handleError,
+    }),
+  };
+}
+
+/* ---------------------------------------------------------------- Turnos */
+export const useShifts = () => useApiQuery<any[]>(['shifts'], '/shifts');
+
+export const useShiftPrices = () =>
+  useApiQuery<{
+    shifts: { id: string; name: string; startsAt: string; endsAt: string }[];
+    resources: {
+      id: string;
+      name: string;
+      category: { id: string; name: string } | null;
+      dailyRate: number | null;
+      shiftPrices: { shiftId: string; price: number | null }[];
+    }[];
+  }>(['shift-prices'], '/shifts/prices');
+
+export function useShiftMutations() {
+  const qc = useQueryClient();
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['shifts'] });
+    qc.invalidateQueries({ queryKey: ['shift-prices'] });
+  };
+
+  return {
+    create: useMutation({
+      mutationFn: (body: Record<string, unknown>) => api.post('/shifts', body),
+      onSuccess: () => {
+        toast.success('Turno criado');
+        invalidate();
+      },
+      onError: handleError,
+    }),
+    update: useMutation({
+      mutationFn: ({ id, ...body }: Record<string, unknown> & { id: string }) =>
+        api.patch(`/shifts/${id}`, body),
+      onSuccess: () => {
+        toast.success('Turno atualizado');
+        invalidate();
+      },
+      onError: handleError,
+    }),
+    remove: useMutation({
+      mutationFn: (id: string) => api.delete(`/shifts/${id}`),
+      onSuccess: () => {
+        toast.success('Turno removido');
+        invalidate();
+      },
+      onError: handleError,
+    }),
+    seedDefaults: useMutation({
+      mutationFn: () => api.post('/shifts/defaults'),
+      onSuccess: () => {
+        toast.success('Turnos Manhã, Tarde e Noite criados');
+        invalidate();
+      },
+      onError: handleError,
+    }),
+    setPrices: useMutation({
+      mutationFn: (body: { resourceId: string; prices: { shiftId: string; price: number }[] }) =>
+        api.put('/shifts/prices', body),
+      onSuccess: () => {
+        toast.success('Preços salvos');
+        invalidate();
+      },
+      onError: handleError,
+    }),
+  };
+}
+
+/* ------------------------------------------------------ Reservas de turno */
+export interface RentalBooking {
+  id: string;
+  date: string;
+  startsAt: string;
+  endsAt: string;
+  kind: 'SHIFT' | 'DAILY';
+  price: number;
+  paidAmount: number;
+  status: 'RESERVED' | 'CONFIRMED' | 'CANCELED';
+  paymentStatus: PaymentStatus;
+  notes: string | null;
+  resource: { id: string; name: string; category: { id: string; name: string } | null };
+  professional: { id: string; name: string; color: string; avatarUrl: string | null; phone: string | null };
+  shift: { id: string; name: string; startsAt: string; endsAt: string } | null;
+}
+
+export const useBookings = (params: Record<string, unknown> = {}) =>
+  useApiQuery<Paginated<RentalBooking> & { totals: { status: string; amount: number; paidAmount: number }[] }>(
+    ['bookings', params],
+    '/rentals/bookings',
+    params,
+  );
+
+export const useDayMap = (date: string) =>
+  useApiQuery<{
+    date: string;
+    shifts: { id: string; name: string; startsAt: string; endsAt: string }[];
+    resources: {
+      id: string;
+      name: string;
+      category: { id: string; name: string } | null;
+      daily: RentalBooking | null;
+      shifts: { shiftId: string; booking: RentalBooking | null }[];
+    }[];
+  }>(['day-map', date], '/rentals/bookings/day-map', { date });
+
+export const useBookingStats = () =>
+  useApiQuery<{
+    bookingsToday: number;
+    bookingsNext30Days: number;
+    pendingCount: number;
+    pendingAmount: number;
+    revenueNext30Days: number;
+  }>(['booking-stats'], '/rentals/bookings/stats');
+
+export function useBookingMutations() {
+  const qc = useQueryClient();
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['bookings'] });
+    qc.invalidateQueries({ queryKey: ['day-map'] });
+    qc.invalidateQueries({ queryKey: ['booking-stats'] });
+    qc.invalidateQueries({ queryKey: ['appointments'] });
+    qc.invalidateQueries({ queryKey: ['financial-dashboard'] });
+  };
+
+  return {
+    create: useMutation({
+      mutationFn: (body: Record<string, unknown>) =>
+        api.post<{ created: RentalBooking[]; skipped: { date: string; reason: string }[] }>(
+          '/rentals/bookings',
+          body,
+        ),
+      onSuccess: (data) => {
+        const skipped = data.skipped.length;
+        toast.success(
+          `${data.created.length} turno(s) reservado(s)` +
+            (skipped ? ` · ${skipped} dia(s) já ocupado(s)` : ''),
+        );
+        invalidate();
+      },
+      onError: handleError,
+    }),
+    update: useMutation({
+      mutationFn: ({ id, ...body }: Record<string, unknown> & { id: string }) =>
+        api.patch(`/rentals/bookings/${id}`, body),
+      onSuccess: () => {
+        toast.success('Reserva atualizada');
+        invalidate();
+      },
+      onError: handleError,
+    }),
+    pay: useMutation({
+      mutationFn: ({ id, ...body }: { id: string; amount: number; paymentMethod: string }) =>
+        api.post(`/rentals/bookings/${id}/pay`, body),
+      onSuccess: () => {
+        toast.success('Pagamento do turno registrado');
+        invalidate();
+      },
+      onError: handleError,
+    }),
+    remove: useMutation({
+      mutationFn: (id: string) => api.delete(`/rentals/bookings/${id}`),
+      onSuccess: () => {
+        toast.success('Reserva excluída');
         invalidate();
       },
       onError: handleError,

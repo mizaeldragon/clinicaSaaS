@@ -14,6 +14,7 @@ import { addMonths, dueDateFor, startOfDay } from '../../shared/utils/datetime';
 import { SOCKET_EVENTS, emitToCompany } from '../../websocket/io';
 import { notificationsService } from '../notifications/notifications.service';
 import { logger } from '../../shared/utils/logger';
+import { bookingsService } from './bookings.service';
 import type {
   CreateRentalDTO,
   ListPaymentsDTO,
@@ -145,7 +146,13 @@ export const rentalsService = {
 
     await prisma.resource.update({ where: { id: dto.resourceId }, data: { status: 'IN_USE' } });
 
-    if (generateFirstCharge) {
+    // Contrato de turno recorrente ("toda terça de manhã") ocupa a agenda e é
+    // cobrado por reserva; o contrato tradicional gera as parcelas periódicas.
+    const isShiftContract = Boolean(rental.shiftId && rental.weekdays.length > 0);
+
+    if (isShiftContract) {
+      await bookingsService.generateFromContracts();
+    } else if (generateFirstCharge) {
       await this.generateChargesForRental(companyId, rental.id);
     }
 

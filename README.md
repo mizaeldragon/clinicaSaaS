@@ -69,24 +69,50 @@ Painel em `http://localhost:5173` (o Vite já faz proxy de `/api` e `/socket.io`
 | Recepcionista | `recepcao@clinicabella.com` | `bella@12345` | Permissões restritas (sem usuários/configuração) |
 | Profissional | `juliana@clinicabella.com` | `bella@12345` | Enxerga apenas a própria agenda e comissões |
 | Studio pequeno | `lu@studionails.com` | `studio@12345` | Plano Starter — **só agenda, clientes e serviços** |
+| Espaço compartilhado | `marcia@marciavaz.com.br` | `marcia@12345` | **Aluguel por turno** + link público de agendamento |
+| Locatária | `ana@marciavaz.com.br` | `marcia@12345` | Aluga turnos e enxerga só os próprios turnos e agenda |
 | Super admin do SaaS | `admin@saas.com` | `admin@12345` | Painel da plataforma (empresas, planos, MRR) |
 
 Comparar o login da *Clínica Bella* com o do *Studio Nails Lu* mostra a arquitetura
 modular na prática: o menu, as rotas e o dashboard mudam conforme os módulos ativos.
+
+### Espaço compartilhado (aluguel por turno + agendamento público)
+
+O *Espaço Márcia Vaz* demonstra o cenário de coworking de beleza:
+
+- 3 áreas — salão de cabelo e mesas de manicure **alugadas por turno**, e a sala de
+  estética onde a dona atende;
+- turnos fixos (Manhã / Tarde / Noite) com **preço por espaço × turno**;
+- contratos recorrentes ("toda terça e quinta de manhã") que geram as reservas sozinhos;
+- **link público**: `http://localhost:5173/e/espaco-marcia-vaz`
+
+No link, a cliente escolhe o serviço e o sistema mostra **quem está no espaço naquele
+dia** — a disponibilidade das locatárias vem dos turnos que elas alugaram. O
+atendimento de uma locatária **não entra no caixa do espaço**: a dona fatura o turno,
+a profissional cobra a própria cliente.
 
 ---
 
 ## Testes
 
 ```bash
-cd backend && npm run test:smoke
+cd backend && npm run test:e2e
 ```
 
-Suíte end-to-end contra a API rodando (42 verificações): autenticação e rotação de
-refresh token, **isolamento entre empresas**, feature flags de módulos, prevenção de
-conflitos de agenda (profissional, sala, horário de funcionamento), finalização de
-atendimento gerando receita e comissão, dashboards, aluguéis, permissões por papel,
-painel do super admin e onboarding.
+Reseta o banco, recria o seed e roda as duas suítes end-to-end contra a API
+(**74 verificações**):
+
+**`test:smoke` (43)** — autenticação e rotação de refresh token, **isolamento entre
+empresas**, feature flags de módulos, prevenção de conflitos de agenda, finalização
+de atendimento gerando receita e comissão, dashboards, aluguéis, permissões por
+papel, painel do super admin e onboarding.
+
+**`test:shared-space` (31)** — turnos e preços, reserva sem sobreposição, **página
+pública sem login**, "profissional do dia" saindo do aluguel, agendamento pelo link,
+**caixa separado** (receita da locatária não entra no da empresa), sala alugada
+protegendo a agenda e o painel restrito da locatária.
+
+As suítes esperam o seed limpo — rode sempre pelo `test:e2e`.
 
 ```bash
 cd backend && npm run typecheck && npm run lint

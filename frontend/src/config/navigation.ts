@@ -13,7 +13,7 @@ import {
   LayoutDashboard,
   type LucideIcon,
 } from 'lucide-react';
-import type { ModuleKey } from '@/types';
+import type { ModuleKey, UserRole } from '@/types';
 
 export interface NavItem {
   label: string;
@@ -21,8 +21,10 @@ export interface NavItem {
   icon: LucideIcon;
   /** Só aparece se o módulo estiver ativo para a empresa. */
   module?: ModuleKey;
-  /** Só aparece se o usuário tiver a permissão. */
-  permission?: string;
+  /** Só aparece se o usuário tiver alguma destas permissões. */
+  permission?: string | string[];
+  /** Quando definido, restringe o item a estes papéis. */
+  roles?: UserRole[];
   group: 'operação' | 'gestão' | 'configuração';
 }
 
@@ -81,6 +83,15 @@ export const NAV_ITEMS: NavItem[] = [
     module: 'rentals',
     permission: 'rentals:view',
     group: 'gestão',
+  },
+  {
+    label: 'Meus turnos',
+    to: '/app/meus-turnos',
+    icon: KeyRound,
+    module: 'rentals',
+    permission: 'rentals:view_own',
+    roles: ['PROFESSIONAL'],
+    group: 'operação',
   },
   {
     label: 'Financeiro',

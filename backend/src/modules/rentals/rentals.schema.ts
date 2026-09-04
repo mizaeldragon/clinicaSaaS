@@ -13,6 +13,8 @@ export const createRentalSchema = z
     amount: z.coerce.number().min(0.01, 'Informe o valor do aluguel'),
     billingCycle: z.nativeEnum(RentalBillingCycle).default(RentalBillingCycle.MONTHLY),
     dueDay: z.coerce.number().int().min(1).max(31).nullable().optional(),
+    shiftId: z.string().uuid().nullable().optional(),
+    weekdays: z.array(z.coerce.number().int().min(0).max(6)).max(7).default([]),
     notes: z.string().max(1000).nullable().optional(),
     /** Gera imediatamente a primeira cobrança do contrato. */
     generateFirstCharge: z.boolean().default(true),
@@ -31,6 +33,8 @@ export const updateRentalSchema = z.object({
   amount: z.coerce.number().min(0.01).optional(),
   billingCycle: z.nativeEnum(RentalBillingCycle).optional(),
   dueDay: z.coerce.number().int().min(1).max(31).nullable().optional(),
+  shiftId: z.string().uuid().nullable().optional(),
+  weekdays: z.array(z.coerce.number().int().min(0).max(6)).max(7).optional(),
   status: z.nativeEnum(RentalStatus).optional(),
   notes: z.string().max(1000).nullable().optional(),
 });

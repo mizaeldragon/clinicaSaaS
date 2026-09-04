@@ -6,6 +6,7 @@ import { prisma } from '../shared/database/prisma';
 import { tenantContext } from '../shared/database/tenantContext';
 import { notificationsService } from '../modules/notifications/notifications.service';
 import { rentalsService } from '../modules/rentals/rentals.service';
+import { bookingsService } from '../modules/rentals/bookings.service';
 
 const connection = getRedisConnection();
 
@@ -70,6 +71,11 @@ async function handleRentals(job: Job) {
   if (job.name === JOB_NAMES.generateRentalCharges) {
     const result = await rentalsService.generateAllCharges();
     logger.info(result, 'Cobranças de aluguel geradas');
+    return;
+  }
+  if (job.name === JOB_NAMES.generateShiftBookings) {
+    const result = await bookingsService.generateFromContracts();
+    logger.info(result, 'Reservas de turno geradas a partir dos contratos');
     return;
   }
   if (job.name === JOB_NAMES.markOverdueRentals) {

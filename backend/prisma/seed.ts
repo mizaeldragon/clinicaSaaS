@@ -549,12 +549,391 @@ async function seedSmallStudio() {
   console.log('✔ Empresa "Studio Nails Lu" criada (lu@studionails.com / studio@12345)');
 }
 
+
+function startOfToday(): Date {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function addDays(date: Date, days: number): Date {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
+}
+
+function toMinutes(time: string): number {
+  const [hours, minutes] = time.split(':').map(Number);
+  return hours * 60 + minutes;
+}
+
+/**
+ * Espaço compartilhado de beleza — o cenário da Márcia:
+ * 3 áreas, aluguel por turno e link público de agendamento em que
+ * "a profissional do dia" sai de quem alugou o turno.
+ */
+async function seedSharedSpace() {
+  const slug = 'espaco-marcia-vaz';
+  const existing = await prisma.company.findUnique({ where: { slug } });
+  if (existing) {
+    console.log('• Espaço Márcia Vaz já existe — pulando');
+    return;
+  }
+
+  const plan = await prisma.plan.findUniqueOrThrow({ where: { slug: 'business' } });
+  const passwordHash = await bcrypt.hash('marcia@12345', 10);
+
+  const company = await prisma.company.create({
+    data: {
+      name: 'Espaço Márcia Vaz',
+      slug,
+      type: 'BEAUTY_COWORKING',
+      status: 'ACTIVE',
+      email: 'contato@marciavaz.com.br',
+      phone: '(11) 3555-1000',
+      whatsapp: '(11) 99555-1000',
+      addressStreet: 'Rua das Acácias',
+      addressNumber: '240',
+      addressCity: 'São Paulo',
+      addressState: 'SP',
+      primaryColor: '#4B7C5B',
+      onboardingCompleted: true,
+      publicBookingEnabled: true,
+      publicRequiresApproval: false,
+      publicDescription:
+        'Um espaço planejado para profissionais da beleza que buscam estrutura, conforto e praticidade para atender seus clientes.',
+      subscription: {
+        create: { planId: plan.id, status: 'ACTIVE', currentPeriodEnd: addDays(new Date(), 30) },
+      },
+      modules: { create: ALL_MODULES.map((module) => ({ module, enabled: true })) },
+      businessHours: { create: BUSINESS_HOURS },
+    },
+  });
+
+  const companyId = company.id;
+
+  await prisma.user.create({
+    data: {
+      companyId,
+      name: 'Márcia Vaz',
+      email: 'marcia@marciavaz.com.br',
+      passwordHash,
+      role: 'COMPANY_ADMIN',
+      phone: '(11) 99555-1000',
+    },
+  });
+
+  // ------------------------------------------------------------------ turnos
+  const shifts = await Promise.all(
+    [
+      { name: 'Manhã', startsAt: '08:00', endsAt: '12:00', sortOrder: 1 },
+      { name: 'Tarde', startsAt: '13:00', endsAt: '18:00', sortOrder: 2 },
+      { name: 'Noite', startsAt: '18:00', endsAt: '22:00', sortOrder: 3 },
+    ].map((shift) => prisma.shift.create({ data: { ...shift, companyId } })),
+  );
+
+  const [morning, afternoon, night] = shifts;
+
+  // -------------------------------------------------------- áreas do espaço
+  const hairCategory = await prisma.resourceCategory.create({
+    data: { companyId, name: 'Salão de beleza', isRoom: true },
+  });
+  const nailCategory = await prisma.resourceCategory.create({
+    data: { companyId, name: 'Mesas de manicure', isRoom: false },
+  });
+  const aestheticCategory = await prisma.resourceCategory.create({
+    data: { companyId, name: 'Sala de estética', isRoom: true },
+  });
+
+  const hairRoom = await prisma.resource.create({
+    data: {
+      companyId,
+      name: 'Salão — estação de cabelo',
+      description: 'Cadeira, lavatório e equipamentos. Sem procedimentos químicos.',
+      categoryId: hairCategory.id,
+      isRentable: true,
+      dailyRate: 180,
+    },
+  });
+
+  const nailTables = await Promise.all(
+    ['Mesa de manicure 01', 'Mesa de manicure 02'].map((name) =>
+      prisma.resource.create({
+        data: {
+          companyId,
+          name,
+          categoryId: nailCategory.id,
+          isRentable: true,
+          dailyRate: 120,
+        },
+      }),
+    ),
+  );
+
+  // A sala de estética é onde a própria Márcia atende — não entra para aluguel.
+  const aestheticRoom = await prisma.resource.create({
+    data: {
+      companyId,
+      name: 'Sala de estética',
+      description: 'Ambiente exclusivo e estruturado para estética corporal.',
+      categoryId: aestheticCategory.id,
+      isRentable: false,
+    },
+  });
+
+  // Preço por espaço × turno
+  const shiftPrices: { resourceId: string; shiftId: string; price: number }[] = [
+    { resourceId: hairRoom.id, shiftId: morning.id, price: 90 },
+    { resourceId: hairRoom.id, shiftId: afternoon.id, price: 110 },
+    { resourceId: hairRoom.id, shiftId: night.id, price: 80 },
+  ];
+  for (const table of nailTables) {
+    shiftPrices.push(
+      { resourceId: table.id, shiftId: morning.id, price: 60 },
+      { resourceId: table.id, shiftId: afternoon.id, price: 70 },
+      { resourceId: table.id, shiftId: night.id, price: 55 },
+    );
+  }
+  await prisma.resourceShiftPrice.createMany({
+    data: shiftPrices.map((price) => ({ ...price, companyId })),
+  });
+
+  // ----------------------------------------------------------- serviços
+  const categories = await Promise.all(
+    [
+      { name: 'Cabelo', color: '#8B5CF6' },
+      { name: 'Unhas', color: '#EC4899' },
+      { name: 'Estética', color: '#4B7C5B' },
+    ].map((c) => prisma.serviceCategory.create({ data: { ...c, companyId } })),
+  );
+  const categoryId = Object.fromEntries(categories.map((c) => [c.name, c.id]));
+
+  const services = await Promise.all(
+    [
+      { name: 'Corte', price: 80, durationMinutes: 60, category: 'Cabelo' },
+      { name: 'Escova', price: 70, durationMinutes: 45, category: 'Cabelo' },
+      { name: 'Lavagem + finalização', price: 50, durationMinutes: 30, category: 'Cabelo' },
+      { name: 'Manicure', price: 45, durationMinutes: 45, category: 'Unhas' },
+      { name: 'Pedicure', price: 55, durationMinutes: 60, category: 'Unhas' },
+      { name: 'Limpeza de pele', price: 180, durationMinutes: 90, category: 'Estética' },
+      { name: 'Massagem modeladora', price: 160, durationMinutes: 60, category: 'Estética' },
+    ].map((s) =>
+      prisma.service.create({
+        data: {
+          companyId,
+          name: s.name,
+          price: s.price,
+          durationMinutes: s.durationMinutes,
+          categoryId: categoryId[s.category],
+        },
+      }),
+    ),
+  );
+
+  const byName = (name: string) => services.find((s) => s.name === name)!;
+
+  // ------------------------------------------------------- profissionais
+  // Márcia é da casa: a receita dela entra no caixa da empresa.
+  const marcia = await prisma.professional.create({
+    data: {
+      companyId,
+      name: 'Márcia Vaz',
+      specialties: ['Estética facial', 'Estética corporal'],
+      color: '#4B7C5B',
+      phone: '(11) 99555-1000',
+      revenueOwner: 'COMPANY',
+      publicBookingEnabled: true,
+    },
+  });
+
+  await prisma.workingHour.createMany({
+    data: [1, 2, 3, 4, 5].map((weekday) => ({
+      companyId,
+      professionalId: marcia.id,
+      weekday,
+      startsAt: '09:00',
+      endsAt: '18:00',
+      breakStart: '12:00',
+      breakEnd: '13:00',
+      isOff: false,
+    })),
+  });
+
+  // Locatárias: alugam o espaço e cobram as próprias clientes.
+  const ana = await prisma.professional.create({
+    data: {
+      companyId,
+      name: 'Ana Ribeiro',
+      specialties: ['Cabelo'],
+      color: '#8B5CF6',
+      phone: '(11) 98111-2020',
+      revenueOwner: 'PROFESSIONAL',
+      publicBookingEnabled: true,
+    },
+  });
+
+  const bia = await prisma.professional.create({
+    data: {
+      companyId,
+      name: 'Bia Nunes',
+      specialties: ['Unhas'],
+      color: '#EC4899',
+      phone: '(11) 98111-3030',
+      revenueOwner: 'PROFESSIONAL',
+      publicBookingEnabled: true,
+    },
+  });
+
+  await prisma.user.createMany({
+    data: [
+      {
+        companyId,
+        name: 'Ana Ribeiro',
+        email: 'ana@marciavaz.com.br',
+        passwordHash,
+        role: 'PROFESSIONAL' as const,
+      },
+      {
+        companyId,
+        name: 'Bia Nunes',
+        email: 'bia@marciavaz.com.br',
+        passwordHash,
+        role: 'PROFESSIONAL' as const,
+      },
+    ],
+  });
+
+  const anaUser = await prisma.user.findFirstOrThrow({ where: { email: 'ana@marciavaz.com.br' } });
+  const biaUser = await prisma.user.findFirstOrThrow({ where: { email: 'bia@marciavaz.com.br' } });
+  await prisma.professional.update({ where: { id: ana.id }, data: { userId: anaUser.id } });
+  await prisma.professional.update({ where: { id: bia.id }, data: { userId: biaUser.id } });
+
+  // Quem faz o quê
+  await prisma.professionalService.createMany({
+    data: [
+      ...['Corte', 'Escova', 'Lavagem + finalização'].map((name) => ({
+        companyId,
+        professionalId: ana.id,
+        serviceId: byName(name).id,
+      })),
+      ...['Manicure', 'Pedicure'].map((name) => ({
+        companyId,
+        professionalId: bia.id,
+        serviceId: byName(name).id,
+      })),
+      ...['Limpeza de pele', 'Massagem modeladora'].map((name) => ({
+        companyId,
+        professionalId: marcia.id,
+        serviceId: byName(name).id,
+      })),
+    ],
+  });
+
+  // --------------------------------------------- contratos e reservas de turno
+  // Ana aluga a estação de cabelo toda terça e quinta de manhã.
+  await prisma.rental.create({
+    data: {
+      companyId,
+      resourceId: hairRoom.id,
+      professionalId: ana.id,
+      renterName: 'Ana Ribeiro',
+      renterPhone: '(11) 98111-2020',
+      startsAt: startOfToday(),
+      amount: 90,
+      billingCycle: 'WEEKLY',
+      shiftId: morning.id,
+      weekdays: [2, 4],
+      status: 'ACTIVE',
+    },
+  });
+
+  // Bia aluga a mesa 01 nas tardes de quarta e sexta.
+  await prisma.rental.create({
+    data: {
+      companyId,
+      resourceId: nailTables[0].id,
+      professionalId: bia.id,
+      renterName: 'Bia Nunes',
+      renterPhone: '(11) 98111-3030',
+      startsAt: startOfToday(),
+      amount: 70,
+      billingCycle: 'WEEKLY',
+      shiftId: afternoon.id,
+      weekdays: [3, 5],
+      status: 'ACTIVE',
+    },
+  });
+
+  // Reservas concretas dos próximos 21 dias, a partir dos contratos.
+  const contracts = [
+    { professionalId: ana.id, resourceId: hairRoom.id, shift: morning, weekdays: [2, 4], price: 90 },
+    { professionalId: bia.id, resourceId: nailTables[0].id, shift: afternoon, weekdays: [3, 5], price: 70 },
+  ];
+
+  let bookings = 0;
+  for (let offset = 0; offset < 21; offset += 1) {
+    const date = startOfToday();
+    date.setDate(date.getDate() + offset);
+
+    for (const contract of contracts) {
+      if (!contract.weekdays.includes(date.getDay())) continue;
+
+      const startsAt = new Date(date);
+      startsAt.setMinutes(toMinutes(contract.shift.startsAt));
+      const endsAt = new Date(date);
+      endsAt.setMinutes(toMinutes(contract.shift.endsAt));
+
+      await prisma.rentalBooking.create({
+        data: {
+          companyId,
+          resourceId: contract.resourceId,
+          professionalId: contract.professionalId,
+          shiftId: contract.shift.id,
+          kind: 'SHIFT',
+          date,
+          startsAt,
+          endsAt,
+          price: contract.price,
+          status: 'CONFIRMED',
+          paymentStatus: offset < 7 ? 'PAID' : 'PENDING',
+          paidAmount: offset < 7 ? contract.price : 0,
+          paymentMethod: offset < 7 ? 'PIX' : null,
+          paidAt: offset < 7 ? date : null,
+        },
+      });
+      bookings += 1;
+    }
+  }
+
+  // Algumas clientes já cadastradas
+  await prisma.customer.createMany({
+    data: [
+      { name: 'Helena Prado', phone: '(11) 97000-1111' },
+      { name: 'Isabela Moreira', phone: '(11) 97000-2222' },
+    ].map((c) => ({ ...c, companyId })),
+  });
+
+  await prisma.expenseCategory.createMany({
+    data: ['Aluguel do imóvel', 'Energia', 'Produtos', 'Marketing'].map((name) => ({
+      companyId,
+      name,
+    })),
+  });
+
+  console.log(`✔ "Espaço Márcia Vaz" criado — 3 áreas, 3 turnos e ${bookings} reservas`);
+  console.log('  Dona:       marcia@marciavaz.com.br / marcia@12345');
+  console.log('  Locatárias: ana@marciavaz.com.br e bia@marciavaz.com.br / marcia@12345');
+  console.log(`  Link público: /e/${slug}`);
+}
+
+
 async function main() {
   console.log('\n🌱 Populando o banco...\n');
   await seedPlans();
   await seedSuperAdmin();
   await seedDemoCompany();
   await seedSmallStudio();
+  await seedSharedSpace();
   console.log('\n✅ Seed concluído\n');
 }
 

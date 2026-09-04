@@ -3,6 +3,7 @@ import { Sparkles, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth.store';
 import { NAV_ITEMS, type NavItem } from '@/config/navigation';
+import { isNavItemVisible } from '@/lib/nav';
 import { Button } from '@/components/ui/button';
 
 const GROUP_LABELS: Record<NavItem['group'], string> = {
@@ -24,12 +25,9 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const company = useAuthStore((s) => s.company);
   const hasModule = useAuthStore((s) => s.hasModule);
   const can = useAuthStore((s) => s.can);
+  const role = useAuthStore((s) => s.user?.role);
 
-  const items = NAV_ITEMS.filter((item) => {
-    if (item.module && !hasModule(item.module)) return false;
-    if (item.permission && !can(item.permission)) return false;
-    return true;
-  });
+  const items = NAV_ITEMS.filter((item) => isNavItemVisible(item, { role, hasModule, can }));
 
   const groups = ['operação', 'gestão', 'configuração'] as const;
 

@@ -158,6 +158,9 @@ export interface Professional {
   color: string;
   commissionType: CommissionType | null;
   commissionValue: number | null;
+  /** PROFESSIONAL = locatária: aluga o espaço e cobra as próprias clientes. */
+  revenueOwner?: 'COMPANY' | 'PROFESSIONAL';
+  publicBookingEnabled?: boolean;
   isActive: boolean;
   workingHours?: WorkingHour[];
   timeOffs?: { id: string; startsAt: string; endsAt: string; reason: string | null }[];

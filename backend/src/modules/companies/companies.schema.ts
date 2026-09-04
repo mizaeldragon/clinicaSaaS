@@ -22,6 +22,9 @@ export const updateCompanySchema = z.object({
     .regex(/^#([0-9a-fA-F]{6})$/, 'Cor deve estar no formato #RRGGBB')
     .optional(),
   timezone: z.string().max(60).optional(),
+  publicBookingEnabled: z.boolean().optional(),
+  publicDescription: z.string().max(600).nullable().optional(),
+  publicRequiresApproval: z.boolean().optional(),
 });
 
 export const businessHoursSchema = z.object({

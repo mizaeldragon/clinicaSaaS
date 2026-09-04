@@ -22,6 +22,8 @@ export const createProfessionalSchema = z.object({
   color: z.string().regex(/^#([0-9a-fA-F]{6})$/).default('#7C3AED'),
   commissionType: z.nativeEnum(CommissionType).nullable().optional(),
   commissionValue: z.coerce.number().min(0).nullable().optional(),
+  revenueOwner: z.enum(['COMPANY', 'PROFESSIONAL']).optional(),
+  publicBookingEnabled: z.boolean().optional(),
   serviceIds: z.array(z.string().uuid()).optional(),
   workingHours: z.array(workingHourSchema).optional(),
 });

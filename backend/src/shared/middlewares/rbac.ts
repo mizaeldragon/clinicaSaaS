@@ -32,6 +32,8 @@ export const PERMISSIONS = {
   resourcesManage: 'resources:manage',
 
   rentalsView: 'rentals:view',
+  /** A locatária enxerga apenas os próprios turnos alugados. */
+  rentalsViewOwn: 'rentals:view_own',
   rentalsManage: 'rentals:manage',
 
   reportsView: 'reports:view',
@@ -80,6 +82,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     PERMISSIONS.customersView,
     PERMISSIONS.servicesView,
     PERMISSIONS.commissionsView,
+    PERMISSIONS.rentalsViewOwn,
   ],
 };
 

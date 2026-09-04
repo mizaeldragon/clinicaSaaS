@@ -10,7 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input, Textarea } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox, Label } from '@/components/ui/primitives';
+import { Checkbox, Label, Switch } from '@/components/ui/primitives';
 import {
   Select,
   SelectContent,
@@ -32,6 +32,8 @@ const EMPTY = {
   color: COLORS[0],
   commissionType: 'NONE',
   commissionValue: '',
+  revenueOwner: 'COMPANY' as 'COMPANY' | 'PROFESSIONAL',
+  publicBookingEnabled: true,
 };
 
 export function ProfessionalDialog({
@@ -63,6 +65,8 @@ export function ProfessionalDialog({
         color: professional.color,
         commissionType: professional.commissionType ?? 'NONE',
         commissionValue: professional.commissionValue ? String(professional.commissionValue) : '',
+        revenueOwner: professional.revenueOwner ?? 'COMPANY',
+        publicBookingEnabled: professional.publicBookingEnabled ?? true,
       });
       setSpecialties(professional.specialties ?? []);
       setServiceIds(professional.services?.map((s) => s.serviceId) ?? []);
@@ -74,7 +78,7 @@ export function ProfessionalDialog({
     setSpecialtyInput('');
   }, [open, professional]);
 
-  function set<K extends keyof typeof form>(key: K, value: string) {
+  function set<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
@@ -89,6 +93,8 @@ export function ProfessionalDialog({
       color: form.color,
       specialties,
       serviceIds,
+      revenueOwner: form.revenueOwner,
+      publicBookingEnabled: form.publicBookingEnabled,
       commissionType: form.commissionType === 'NONE' ? null : form.commissionType,
       commissionValue:
         form.commissionType === 'NONE' || !form.commissionValue ? null : Number(form.commissionValue),
@@ -194,7 +200,45 @@ export function ProfessionalDialog({
             </div>
           </div>
 
-          {hasCommissions ? (
+          <div className="space-y-3 rounded-xl border p-4">
+            <div className="space-y-1.5">
+              <Label>Vínculo com o espaço</Label>
+              <Select
+                value={form.revenueOwner}
+                onValueChange={(v) => set('revenueOwner', v as 'COMPANY' | 'PROFESSIONAL')}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="COMPANY">Equipe da casa — receita entra no meu caixa</SelectItem>
+                  <SelectItem value="PROFESSIONAL">
+                    Locatária — aluga o espaço e cobra as próprias clientes
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {form.revenueOwner === 'PROFESSIONAL'
+                  ? 'A disponibilidade dela vem dos turnos que ela alugar, e os atendimentos dela não entram no seu financeiro.'
+                  : 'A jornada de trabalho define a disponibilidade e os atendimentos entram no seu financeiro.'}
+              </p>
+            </div>
+
+            <label className="flex cursor-pointer items-center justify-between gap-3">
+              <span className="text-sm">
+                Aparece no link público de agendamento
+                <span className="block text-xs text-muted-foreground">
+                  Clientes podem marcar horário com ela pelo link do espaço.
+                </span>
+              </span>
+              <Switch
+                checked={form.publicBookingEnabled}
+                onCheckedChange={(checked) => set('publicBookingEnabled', checked)}
+              />
+            </label>
+          </div>
+
+          {hasCommissions && form.revenueOwner === 'COMPANY' ? (
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label>Comissão padrão</Label>

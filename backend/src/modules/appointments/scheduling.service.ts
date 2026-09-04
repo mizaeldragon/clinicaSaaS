@@ -113,6 +113,84 @@ export async function assertNoConflicts(target: SlotTarget, client: TxClient = p
   }
 }
 
+/** Reservas de turno que ocupam o espaço. */
+const OCCUPYING_BOOKING_STATUSES = ['RESERVED', 'CONFIRMED'] as const;
+
+/** Ausência (férias, consulta) vale tanto para a equipe própria quanto para locatárias. */
+export async function assertNoTimeOff(
+  professionalId: string,
+  startsAt: Date,
+  endsAt: Date,
+  client: TxClient = prisma,
+): Promise<void> {
+  const timeOff = await client.timeOff.findFirst({
+    where: { professionalId, startsAt: { lt: endsAt }, endsAt: { gt: startsAt } },
+  });
+
+  if (timeOff) {
+    throw new ScheduleConflictError('O profissional está ausente neste período', {
+      timeOff: { startsAt: timeOff.startsAt, endsAt: timeOff.endsAt, reason: timeOff.reason },
+    });
+  }
+}
+
+/**
+ * O espaço não pode receber atendimento quando está alugado para outra
+ * profissional naquele turno.
+ */
+export async function assertResourceNotRented(
+  resourceIds: string[],
+  professionalId: string | null,
+  startsAt: Date,
+  endsAt: Date,
+  client: TxClient = prisma,
+): Promise<void> {
+  if (resourceIds.length === 0) return;
+
+  const booking = await client.rentalBooking.findFirst({
+    where: {
+      resourceId: { in: resourceIds },
+      status: { in: [...OCCUPYING_BOOKING_STATUSES] },
+      startsAt: { lt: endsAt },
+      endsAt: { gt: startsAt },
+      ...(professionalId ? { professionalId: { not: professionalId } } : {}),
+    },
+    include: { resource: { select: { name: true } }, professional: { select: { name: true } } },
+  });
+
+  if (booking) {
+    throw new ScheduleConflictError(
+      `O espaço "${booking.resource.name}" está alugado para ${booking.professional.name} neste horário`,
+    );
+  }
+}
+
+/**
+ * Locatária só atende dentro do turno que alugou — é o turno, e não uma jornada
+ * fixa, que define a disponibilidade dela.
+ */
+export async function assertRenterHasShift(
+  professional: { id: string; name: string },
+  startsAt: Date,
+  endsAt: Date,
+  client: TxClient = prisma,
+): Promise<void> {
+  const booking = await client.rentalBooking.findFirst({
+    where: {
+      professionalId: professional.id,
+      status: { in: [...OCCUPYING_BOOKING_STATUSES] },
+      startsAt: { lte: startsAt },
+      endsAt: { gte: endsAt },
+    },
+  });
+
+  if (!booking) {
+    throw new ScheduleConflictError(
+      `${professional.name} não tem turno reservado que cubra este horário`,
+    );
+  }
+}
+
 /** Valida jornada de trabalho e ausências do profissional. */
 export async function assertProfessionalAvailable(
   professionalId: string,

@@ -85,10 +85,18 @@ const run = async () => {
   const roomId = resources.data.data[0].id;
   const customerId = bellaCustomers.data.data[0].id;
 
-  // Próxima terça-feira às 10:00
-  const start = new Date();
-  start.setDate(start.getDate() + ((9 - start.getDay()) % 7 || 7));
-  start.setHours(10, 0, 0, 0);
+  // Próxima terça-feira, no primeiro horário realmente livre do profissional.
+  const day = new Date();
+  day.setDate(day.getDate() + ((9 - day.getDay()) % 7 || 7));
+  day.setHours(12, 0, 0, 0);
+
+  const grid = await api(
+    `/appointments/availability?professionalId=${professionalId}&date=${day.toISOString()}&durationMinutes=${shortService.durationMinutes}`,
+    { token: bella.accessToken },
+  );
+  const freeSlot = grid.data.find((slot) => slot.available);
+  check('grade de horários encontra slot livre', Boolean(freeSlot));
+  const start = new Date(freeSlot.startsAt);
 
   const created = await api('/appointments', {
     method: 'POST',
@@ -154,7 +162,7 @@ const run = async () => {
     `/appointments/availability?professionalId=${professionalId}&date=${start.toISOString()}&durationMinutes=45`,
     { token: bella.accessToken },
   );
-  const taken = slots.data.find((s) => s.time === '10:00');
+  const taken = slots.data.find((s) => s.time === freeSlot.time);
   check('grade de horários marca o slot ocupado', taken && taken.available === false);
 
   console.log('\n=== 5. Finalização: financeiro + comissão ===');
@@ -225,7 +233,7 @@ const run = async () => {
 
   console.log('\n=== 9. Painel Super Admin ===');
   const metrics = await api('/admin/metrics', { token: superAdmin.accessToken });
-  check('métricas globais', metrics.status === 200 && metrics.data.companies.total === 2);
+  check('métricas globais', metrics.status === 200 && metrics.data.companies.total >= 3);
   check('MRR calculado', metrics.data.mrr > 0);
   const denied = await api('/admin/metrics', { token: bella.accessToken });
   check('admin de empresa não acessa painel do SaaS', denied.status === 403);

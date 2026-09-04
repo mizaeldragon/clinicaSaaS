@@ -102,7 +102,42 @@ Cada módulo do backend segue o mesmo contrato:
 - `AppointmentService` — N serviços por atendimento (preço e duração congelados no agendamento).
 - `ResourceCategory` / `Resource` — recurso genérico com status (AVAILABLE/IN_USE/MAINTENANCE/INACTIVE).
 
-### 4.3 Aluguel e financeiro
+### 4.3 Aluguel por turno e espaço compartilhado
+
+Dois formatos de locação coexistem:
+
+- **Contrato tradicional** (`Rental` + `RentalPayment`): mesa alugada por mês, com
+  parcelas recorrentes.
+- **Turno / diária** (`Shift` + `RentalBooking`): a profissional aluga *aquele*
+  espaço, *naquele* dia e turno. É o formato dos espaços compartilhados.
+
+Peças:
+
+- `Shift` — turnos fixos vendidos pela empresa (Manhã 08–12, Tarde 13–18, Noite 18–22).
+- `ResourceShiftPrice` — preço de cada turno em cada espaço (a estação de cabelo
+  à noite pode custar menos que de manhã).
+- `RentalBooking` — a ocupação concreta: espaço + profissional + dia + turno, com
+  preço e status de pagamento próprios. **É o que bloqueia a agenda.**
+- `Rental.shiftId` + `Rental.weekdays` — contrato recorrente ("toda terça e quinta
+  de manhã") do qual um job diário deriva as reservas futuras.
+
+**Quem alugou o turno é a profissional do dia.** Essa é a ligação entre o módulo de
+aluguel e a agenda pública: a disponibilidade que aparece no link vem dos turnos
+reservados, não de uma jornada fixa.
+
+### 4.4 Dono da receita
+
+`Professional.revenueOwner` separa dois papéis dentro do mesmo espaço:
+
+| Valor | Quem é | Ao finalizar um atendimento |
+|---|---|---|
+| `COMPANY` | equipe da casa | gera receita e comissão para a empresa |
+| `PROFESSIONAL` | locatária | **nada** entra no caixa da empresa — ela cobra as próprias clientes e a empresa fatura só o turno |
+
+A disponibilidade também muda: equipe própria usa `WorkingHour`; locatária usa os
+`RentalBooking` dela.
+
+### 4.5 Financeiro
 - `Rental` — contrato: recurso, responsável (profissional ou nome livre), período, valor, `billingCycle` (HOUR/DAY/WEEK/MONTH/CUSTOM), dia de vencimento, status.
 - `RentalPayment` — parcelas geradas automaticamente pelo worker de recorrência.
 - `FinancialTransaction` — receita/despesa unificada, com `paymentMethod`, `paymentStatus`, valor pago/pendente e origem (appointment, rental, avulso).
@@ -110,7 +145,7 @@ Cada módulo do backend segue o mesmo contrato:
 - `Commission` — gerada na finalização do atendimento; percentual ou valor fixo; status de pagamento.
 - `Notification` — canal (IN_APP/EMAIL/WHATSAPP), evento, payload, lida/enviada.
 
-### 4.4 Regras de integridade multi-tenant
+### 4.6 Regras de integridade multi-tenant
 Todas as tabelas de domínio possuem `companyId` + índice composto
 `(companyId, <campo de busca>)`. Chaves únicas são sempre compostas com
 `companyId` (ex.: `@@unique([companyId, email])`), permitindo que duas empresas
@@ -124,7 +159,10 @@ Ao criar/alterar um agendamento o serviço valida, dentro de uma transação:
 2. Horário de funcionamento da empresa.
 3. Sobreposição de intervalo `[start, end)` para **profissional**, **sala** e **recurso**
    (`start < other.end && end > other.start`), ignorando cancelados/no-show.
-4. Limite de agendamentos do plano.
+4. **Espaço alugado**: a sala não aceita atendimento de outra profissional durante
+   um turno reservado.
+5. **Locatária**: o atendimento precisa cair dentro de um turno que ela alugou.
+6. Limite de agendamentos do plano.
 
 ## 6. Segurança
 
@@ -136,9 +174,10 @@ stack em produção.
 
 ## 7. Assíncrono
 
-- **BullMQ/Redis**: `reminders` (lembrete 24h/1h antes), `rentals` (geração de
-  cobranças recorrentes e marcação de atraso — cron diário), `notifications`
-  (envio), `reports` (processamento pesado).
+- **BullMQ/Redis**: `reminders` (lembrete 24h/1h antes), `rentals` (cobranças
+  recorrentes às 03:00, geração das reservas de turno dos contratos recorrentes
+  às 03:15 e marcação de atraso às 03:30), `notifications` (envio), `reports`
+  (processamento pesado).
 - **Socket.IO**: salas `company:{id}` e `professional:{id}`; eventos
   `appointment.created|updated|deleted`, `resource.status.changed`,
   `notification.created`.
@@ -155,3 +194,25 @@ stack em produção.
 | 6 | Aluguéis e cobranças recorrentes |
 | 7 | Planos, assinaturas, feature flags, painel Super Admin |
 | 8 | Notificações, Redis, BullMQ, WebSockets |
+
+## 9. Agendamento público (`/e/{slug}`)
+
+Rotas **sem autenticação**, montadas em `/api/v1/public/:slug`. O slug da empresa
+resolve o tenant e abre o `AsyncLocalStorage` — o mesmo isolamento do resto da API
+vale aqui.
+
+Fluxo da cliente: **serviço → data → profissional/horário → dados → confirmação.**
+
+A lista de profissionais de um dia é montada assim:
+
+- equipe própria (`revenueOwner = COMPANY`) → janelas da jornada de trabalho;
+- locatárias (`revenueOwner = PROFESSIONAL`) → janelas dos turnos alugados naquele dia.
+
+Depois subtrai ausências e agendamentos existentes, recorta pelo horário de
+funcionamento e devolve os slots livres. Um agendamento criado para uma locatária
+já nasce vinculado à sala que ela alugou.
+
+Proteções: rate limit próprio (120 req/min para navegar, 8 agendamentos a cada
+10 min), revalidação do slot no momento da confirmação (dois cliques simultâneos
+não geram overbooking) e a página só responde quando `Company.publicBookingEnabled`
+está ligado.

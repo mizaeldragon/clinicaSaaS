@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Check, Plus, Save, ShieldCheck, Trash2, UserPlus } from 'lucide-react';
+import { Check, Copy, ExternalLink, Plus, Save, ShieldCheck, Trash2, UserPlus } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Input, Textarea } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader, TBody, TD, TH, THead, TR, Table } from '@/components/ui/data';
 import { EmptyState, PageLoader } from '@/components/ui/feedback';
@@ -43,6 +43,7 @@ import {
   useUsers,
 } from '@/api/queries';
 import { useAuthStore } from '@/stores/auth.store';
+import { toast } from 'sonner';
 import { applyBrandColor } from '@/lib/utils';
 import { currency, dateTimeLabel, weekdayName } from '@/lib/format';
 import type { UserRole } from '@/types';
@@ -84,6 +85,11 @@ export function SettingsPage() {
     primaryColor: '#7C3AED',
   });
   const [hours, setHours] = useState(DEFAULT_HOURS);
+  const [publicSettings, setPublicSettings] = useState({
+    publicBookingEnabled: false,
+    publicRequiresApproval: false,
+    publicDescription: '',
+  });
 
   const [userDialog, setUserDialog] = useState(false);
   const [userForm, setUserForm] = useState({
@@ -105,6 +111,12 @@ export function SettingsPage() {
       addressCity: company.addressCity ?? '',
       addressState: company.addressState ?? '',
       primaryColor: company.primaryColor ?? '#7C3AED',
+    });
+
+    setPublicSettings({
+      publicBookingEnabled: Boolean(company.publicBookingEnabled),
+      publicRequiresApproval: Boolean(company.publicRequiresApproval),
+      publicDescription: company.publicDescription ?? '',
     });
 
     if (company.businessHours?.length) {
@@ -253,6 +265,111 @@ export function SettingsPage() {
                 <Save />
                 Salvar alterações
               </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Link público de agendamento</CardTitle>
+              <CardDescription>
+                Uma página para suas clientes marcarem horário sozinhas — com você e com as
+                profissionais que alugam o espaço
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <label className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                <div>
+                  <p className="text-sm font-medium">Ativar página pública</p>
+                  <p className="text-xs text-muted-foreground">
+                    Enquanto estiver desligado, o link responde como indisponível.
+                  </p>
+                </div>
+                <Switch
+                  checked={publicSettings.publicBookingEnabled}
+                  disabled={!isAdmin}
+                  onCheckedChange={(checked) =>
+                    setPublicSettings((p) => ({ ...p, publicBookingEnabled: checked }))
+                  }
+                />
+              </label>
+
+              <label className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                <div>
+                  <p className="text-sm font-medium">Exigir sua confirmação</p>
+                  <p className="text-xs text-muted-foreground">
+                    O agendamento entra como pendente até você confirmar.
+                  </p>
+                </div>
+                <Switch
+                  checked={publicSettings.publicRequiresApproval}
+                  disabled={!isAdmin}
+                  onCheckedChange={(checked) =>
+                    setPublicSettings((p) => ({ ...p, publicRequiresApproval: checked }))
+                  }
+                />
+              </label>
+
+              <div className="space-y-1.5">
+                <Label>Apresentação do espaço</Label>
+                <Textarea
+                  rows={3}
+                  maxLength={600}
+                  placeholder="Um espaço planejado para profissionais da beleza..."
+                  value={publicSettings.publicDescription}
+                  onChange={(e) =>
+                    setPublicSettings((p) => ({ ...p, publicDescription: e.target.value }))
+                  }
+                />
+              </div>
+
+              {company?.slug ? (
+                <div className="space-y-1.5">
+                  <Label>Endereço do link</Label>
+                  <div className="flex gap-2">
+                    <Input readOnly value={`${window.location.origin}/e/${company.slug}`} />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        void navigator.clipboard
+                          .writeText(`${window.location.origin}/e/${company.slug}`)
+                          .then(() => toast.success('Link copiado'))
+                          .catch(() => toast.error('Não foi possível copiar'));
+                      }}
+                    >
+                      <Copy />
+                      Copiar
+                    </Button>
+                    <Button type="button" variant="outline" asChild>
+                      <a href={`/e/${company.slug}`} target="_blank" rel="noreferrer">
+                        <ExternalLink />
+                        Abrir
+                      </a>
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Compartilhe na bio do Instagram ou no WhatsApp.
+                  </p>
+                </div>
+              ) : null}
+
+              {isAdmin ? (
+                <Button
+                  loading={companyMutations.update.isPending}
+                  onClick={async () => {
+                    await companyMutations.update
+                      .mutateAsync({
+                        ...publicSettings,
+                        publicDescription: publicSettings.publicDescription || null,
+                      })
+                      .catch(() => undefined);
+                    await refreshContext().catch(() => undefined);
+                  }}
+                >
+                  <Save />
+                  Salvar página pública
+                </Button>
+              ) : null}
             </CardContent>
           </Card>
 

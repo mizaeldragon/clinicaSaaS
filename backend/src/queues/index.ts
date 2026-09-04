@@ -16,6 +16,7 @@ export const JOB_NAMES = {
   sendNotification: 'notification.send',
   generateRentalCharges: 'rental.generate-charges',
   markOverdueRentals: 'rental.mark-overdue',
+  generateShiftBookings: 'rental.generate-shift-bookings',
   buildReport: 'report.build',
 } as const;
 
@@ -77,6 +78,13 @@ export async function registerRepeatableJobs(): Promise<void> {
     JOB_NAMES.markOverdueRentals,
     {},
     { repeat: { pattern: '30 3 * * *' }, jobId: 'cron:mark-overdue-rentals' },
+  );
+
+  // Todo dia às 03:15: estende as reservas dos contratos de turno recorrentes.
+  await rentals.add(
+    JOB_NAMES.generateShiftBookings,
+    {},
+    { repeat: { pattern: '15 3 * * *' }, jobId: 'cron:generate-shift-bookings' },
   );
 
   logger.info('Jobs recorrentes registrados');

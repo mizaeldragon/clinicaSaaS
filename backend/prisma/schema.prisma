@@ -79,6 +79,11 @@ enum AppointmentStatus {
   NO_SHOW
 }
 
+enum AppointmentSource {
+  INTERNAL
+  PUBLIC
+}
+
 enum ResourceStatus {
   AVAILABLE
   IN_USE
@@ -141,6 +146,26 @@ enum CommissionStatus {
   CANCELED
 }
 
+/// Define de quem é a receita do atendimento.
+/// COMPANY: entra no caixa da empresa (equipe própria).
+/// PROFESSIONAL: a profissional aluga o espaço e cobra as próprias clientes —
+/// a empresa fatura apenas o aluguel do turno.
+enum RevenueOwner {
+  COMPANY
+  PROFESSIONAL
+}
+
+enum RentalBookingKind {
+  SHIFT
+  DAILY
+}
+
+enum RentalBookingStatus {
+  RESERVED
+  CONFIRMED
+  CANCELED
+}
+
 enum NotificationChannel {
   IN_APP
   EMAIL
@@ -162,22 +187,22 @@ enum NotificationEvent {
 // ============================================================================
 
 model Plan {
-  id                  String   @id @default(uuid())
-  name                String
-  slug                String   @unique
-  description         String?
-  price               Decimal  @db.Decimal(10, 2)
-  billingInterval     BillingInterval @default(MONTHLY)
-  trialDays           Int      @default(14)
-  maxUsers            Int?
-  maxProfessionals    Int?
+  id                   String          @id @default(uuid())
+  name                 String
+  slug                 String          @unique
+  description          String?
+  price                Decimal         @db.Decimal(10, 2)
+  billingInterval      BillingInterval @default(MONTHLY)
+  trialDays            Int             @default(14)
+  maxUsers             Int?
+  maxProfessionals     Int?
   maxAppointmentsMonth Int?
-  modules             ModuleKey[]
-  isActive            Boolean  @default(true)
-  isPublic            Boolean  @default(true)
-  sortOrder           Int      @default(0)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  modules              ModuleKey[]
+  isActive             Boolean         @default(true)
+  isPublic             Boolean         @default(true)
+  sortOrder            Int             @default(0)
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
 
   subscriptions Subscription[]
 
@@ -185,47 +210,56 @@ model Plan {
 }
 
 model Company {
-  id            String        @id @default(uuid())
-  name          String
-  slug          String        @unique
-  legalName     String?
-  document      String?
-  type          CompanyType   @default(OTHER)
-  status        CompanyStatus @default(TRIALING)
-  email         String?
-  phone         String?
-  whatsapp      String?
-  addressStreet String?
-  addressNumber String?
-  addressCity   String?
-  addressState  String?
-  addressZip    String?
-  logoUrl       String?
-  primaryColor  String        @default("#7C3AED")
-  timezone      String        @default("America/Sao_Paulo")
-  onboardingCompleted Boolean @default(false)
+  id                  String        @id @default(uuid())
+  name                String
+  slug                String        @unique
+  legalName           String?
+  document            String?
+  type                CompanyType   @default(OTHER)
+  status              CompanyStatus @default(TRIALING)
+  email               String?
+  phone               String?
+  whatsapp            String?
+  addressStreet       String?
+  addressNumber       String?
+  addressCity         String?
+  addressState        String?
+  addressZip          String?
+  logoUrl             String?
+  primaryColor        String        @default("#7C3AED")
+  timezone            String        @default("America/Sao_Paulo")
+  onboardingCompleted Boolean       @default(false)
   onboardingAnswers   Json?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
 
-  subscription           Subscription?
-  modules                CompanyModule[]
-  businessHours          BusinessHour[]
-  users                  User[]
-  customers              Customer[]
-  professionals          Professional[]
-  serviceCategories      ServiceCategory[]
-  services               Service[]
-  appointments           Appointment[]
-  resourceCategories     ResourceCategory[]
-  resources              Resource[]
-  rentals                Rental[]
-  rentalPayments         RentalPayment[]
-  expenseCategories      ExpenseCategory[]
-  financialTransactions  FinancialTransaction[]
-  commissions            Commission[]
-  notifications          Notification[]
-  auditLogs              AuditLog[]
+  /// Página pública de agendamento (/e/{slug})
+  publicBookingEnabled   Boolean @default(false)
+  publicDescription      String?
+  publicRequiresApproval Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subscription          Subscription?
+  modules               CompanyModule[]
+  businessHours         BusinessHour[]
+  shifts                Shift[]
+  rentalBookings        RentalBooking[]
+  resourceShiftPrices   ResourceShiftPrice[]
+  users                 User[]
+  customers             Customer[]
+  professionals         Professional[]
+  serviceCategories     ServiceCategory[]
+  services              Service[]
+  appointments          Appointment[]
+  resourceCategories    ResourceCategory[]
+  resources             Resource[]
+  rentals               Rental[]
+  rentalPayments        RentalPayment[]
+  expenseCategories     ExpenseCategory[]
+  financialTransactions FinancialTransaction[]
+  commissions           Commission[]
+  notifications         Notification[]
+  auditLogs             AuditLog[]
 
   @@index([status])
   @@map("companies")
@@ -307,14 +341,14 @@ model User {
 }
 
 model RefreshToken {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   userId    String
-  tokenHash String   @unique
+  tokenHash String    @unique
   expiresAt DateTime
   revokedAt DateTime?
   userAgent String?
   ip        String?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -327,18 +361,18 @@ model RefreshToken {
 // ============================================================================
 
 model Customer {
-  id           String    @id @default(uuid())
-  companyId    String
-  name         String
-  phone        String?
-  whatsapp     String?
-  email        String?
-  birthDate    DateTime?
-  document     String?
-  notes        String?
-  isActive     Boolean   @default(true)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id        String    @id @default(uuid())
+  companyId String
+  name      String
+  phone     String?
+  whatsapp  String?
+  email     String?
+  birthDate DateTime?
+  document  String?
+  notes     String?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   company      Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
   appointments Appointment[]
@@ -350,30 +384,38 @@ model Customer {
 }
 
 model Professional {
-  id                String   @id @default(uuid())
-  companyId         String
-  userId            String?  @unique
-  name              String
-  email             String?
-  phone             String?
-  avatarUrl         String?
-  bio               String?
-  specialties       String[] @default([])
-  color             String   @default("#7C3AED")
-  commissionType    CommissionType?
-  commissionValue   Decimal? @db.Decimal(10, 2)
-  isActive          Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id              String          @id @default(uuid())
+  companyId       String
+  userId          String?         @unique
+  name            String
+  email           String?
+  phone           String?
+  avatarUrl       String?
+  bio             String?
+  specialties     String[]        @default([])
+  color           String          @default("#7C3AED")
+  commissionType  CommissionType?
+  commissionValue Decimal?        @db.Decimal(10, 2)
 
-  company      Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  user         User?                  @relation(fields: [userId], references: [id], onDelete: SetNull)
-  workingHours WorkingHour[]
-  timeOffs     TimeOff[]
-  services     ProfessionalService[]
-  appointments Appointment[]
-  commissions  Commission[]
-  rentals      Rental[]
+  /// Quando PROFESSIONAL, é uma locatária: cobra as próprias clientes e a
+  /// empresa fatura apenas o aluguel do turno.
+  revenueOwner         RevenueOwner @default(COMPANY)
+  /// Aparece na página pública de agendamento.
+  publicBookingEnabled Boolean      @default(true)
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company        Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user           User?                 @relation(fields: [userId], references: [id], onDelete: SetNull)
+  workingHours   WorkingHour[]
+  timeOffs       TimeOff[]
+  services       ProfessionalService[]
+  appointments   Appointment[]
+  commissions    Commission[]
+  rentals        Rental[]
+  rentalBookings RentalBooking[]
 
   @@index([companyId, isActive])
   @@map("professionals")
@@ -431,20 +473,20 @@ model ServiceCategory {
 }
 
 model Service {
-  id                 String   @id @default(uuid())
+  id                 String          @id @default(uuid())
   companyId          String
   categoryId         String?
   name               String
   description        String?
-  price              Decimal  @db.Decimal(10, 2)
+  price              Decimal         @db.Decimal(10, 2)
   durationMinutes    Int
-  bufferMinutes      Int      @default(0)
+  bufferMinutes      Int             @default(0)
   commissionType     CommissionType?
-  commissionValue    Decimal? @db.Decimal(10, 2)
+  commissionValue    Decimal?        @db.Decimal(10, 2)
   resourceCategoryId String?
-  isActive           Boolean  @default(true)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  isActive           Boolean         @default(true)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
 
   company             Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
   category            ServiceCategory?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
@@ -459,14 +501,14 @@ model Service {
 }
 
 model ProfessionalService {
-  id              String   @id @default(uuid())
+  id              String          @id @default(uuid())
   companyId       String
   professionalId  String
   serviceId       String
-  customPrice     Decimal? @db.Decimal(10, 2)
+  customPrice     Decimal?        @db.Decimal(10, 2)
   customDuration  Int?
   commissionType  CommissionType?
-  commissionValue Decimal? @db.Decimal(10, 2)
+  commissionValue Decimal?        @db.Decimal(10, 2)
 
   professional Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
   service      Service      @relation(fields: [serviceId], references: [id], onDelete: Cascade)
@@ -477,24 +519,26 @@ model ProfessionalService {
 }
 
 model Appointment {
-  id             String            @id @default(uuid())
-  companyId      String
-  customerId     String
-  professionalId String?
-  roomId         String?
-  resourceId     String?
-  startsAt       DateTime
-  endsAt         DateTime
+  id              String            @id @default(uuid())
+  companyId       String
+  customerId      String
+  professionalId  String?
+  roomId          String?
+  resourceId      String?
+  startsAt        DateTime
+  endsAt          DateTime
   durationMinutes Int
-  status         AppointmentStatus @default(SCHEDULED)
-  totalPrice     Decimal           @db.Decimal(10, 2) @default(0)
-  notes          String?
-  canceledReason String?
-  canceledAt     DateTime?
-  completedAt    DateTime?
-  createdById    String?
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  status          AppointmentStatus @default(SCHEDULED)
+  totalPrice      Decimal           @default(0) @db.Decimal(10, 2)
+  notes           String?
+  canceledReason  String?
+  canceledAt      DateTime?
+  completedAt     DateTime?
+  /// INTERNAL quando criado no painel, PUBLIC quando veio da página de agendamento.
+  source          AppointmentSource @default(INTERNAL)
+  createdById     String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
   company      Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
   customer     Customer               @relation(fields: [customerId], references: [id], onDelete: Restrict)
@@ -513,14 +557,14 @@ model Appointment {
 }
 
 model AppointmentService {
-  id              String   @id @default(uuid())
+  id              String  @id @default(uuid())
   companyId       String
   appointmentId   String
   serviceId       String
   name            String
-  price           Decimal  @db.Decimal(10, 2)
+  price           Decimal @db.Decimal(10, 2)
   durationMinutes Int
-  quantity        Int      @default(1)
+  quantity        Int     @default(1)
 
   appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
   service     Service     @relation(fields: [serviceId], references: [id], onDelete: Restrict)
@@ -566,11 +610,13 @@ model Resource {
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
-  company             Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  category            ResourceCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  appointmentsAsRoom  Appointment[]     @relation("AppointmentRoom")
-  appointmentsAsRes   Appointment[]     @relation("AppointmentResource")
-  rentals             Rental[]
+  company            Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  category           ResourceCategory?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  appointmentsAsRoom Appointment[]        @relation("AppointmentRoom")
+  appointmentsAsRes  Appointment[]        @relation("AppointmentResource")
+  rentals            Rental[]
+  rentalBookings     RentalBooking[]
+  shiftPrices        ResourceShiftPrice[]
 
   @@index([companyId, status])
   @@index([companyId, categoryId])
@@ -578,28 +624,36 @@ model Resource {
 }
 
 model Rental {
-  id             String             @id @default(uuid())
-  companyId      String
-  resourceId     String
-  professionalId String?
-  renterName     String
-  renterPhone    String?
-  renterEmail    String?
-  startsAt       DateTime
-  endsAt         DateTime?
-  amount         Decimal            @db.Decimal(10, 2)
-  billingCycle   RentalBillingCycle @default(MONTHLY)
-  dueDay         Int? // dia do mês para vencimento
-  status         RentalStatus       @default(ACTIVE)
-  notes          String?
+  id              String             @id @default(uuid())
+  companyId       String
+  resourceId      String
+  professionalId  String?
+  renterName      String
+  renterPhone     String?
+  renterEmail     String?
+  startsAt        DateTime
+  endsAt          DateTime?
+  amount          Decimal            @db.Decimal(10, 2)
+  billingCycle    RentalBillingCycle @default(MONTHLY)
+  dueDay          Int? // dia do mês para vencimento
+  status          RentalStatus       @default(ACTIVE)
+  notes           String?
   lastGeneratedAt DateTime?
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
+
+  /// Contrato recorrente de turno: "toda terça e quinta de manhã".
+  /// weekdays vazio = contrato tradicional (só cobrança, sem ocupar agenda).
+  shiftId  String?
+  weekdays Int[]   @default([])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   company      Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
   resource     Resource        @relation(fields: [resourceId], references: [id], onDelete: Restrict)
   professional Professional?   @relation(fields: [professionalId], references: [id], onDelete: SetNull)
+  shift        Shift?          @relation(fields: [shiftId], references: [id], onDelete: SetNull)
   payments     RentalPayment[]
+  bookings     RentalBooking[]
 
   @@index([companyId, status])
   @@index([companyId, resourceId])
@@ -607,18 +661,18 @@ model Rental {
 }
 
 model RentalPayment {
-  id            String        @id @default(uuid())
-  companyId     String
-  rentalId      String
+  id             String         @id @default(uuid())
+  companyId      String
+  rentalId       String
   referenceMonth String // "2026-09"
-  dueDate       DateTime
-  amount        Decimal       @db.Decimal(10, 2)
-  paidAmount    Decimal       @db.Decimal(10, 2) @default(0)
-  paidAt        DateTime?
-  status        PaymentStatus @default(PENDING)
-  paymentMethod PaymentMethod?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  dueDate        DateTime
+  amount         Decimal        @db.Decimal(10, 2)
+  paidAmount     Decimal        @default(0) @db.Decimal(10, 2)
+  paidAt         DateTime?
+  status         PaymentStatus  @default(PENDING)
+  paymentMethod  PaymentMethod?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
   company      Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
   rental       Rental                 @relation(fields: [rentalId], references: [id], onDelete: Cascade)
@@ -627,6 +681,82 @@ model RentalPayment {
   @@unique([rentalId, referenceMonth])
   @@index([companyId, status, dueDate])
   @@map("rental_payments")
+}
+
+/// Turnos fixos vendidos pela empresa (Manhã, Tarde, Noite).
+model Shift {
+  id        String   @id @default(uuid())
+  companyId String
+  name      String
+  startsAt  String // "08:00"
+  endsAt    String // "12:00"
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company  Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  prices   ResourceShiftPrice[]
+  bookings RentalBooking[]
+  rentals  Rental[]
+
+  @@unique([companyId, name])
+  @@index([companyId, isActive])
+  @@map("shifts")
+}
+
+/// Preço de um turno em um recurso específico (sala de cabelo à noite ≠ de manhã).
+model ResourceShiftPrice {
+  id         String  @id @default(uuid())
+  companyId  String
+  resourceId String
+  shiftId    String
+  price      Decimal @db.Decimal(10, 2)
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  resource Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  shift    Shift    @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+
+  @@unique([resourceId, shiftId])
+  @@index([companyId])
+  @@map("resource_shift_prices")
+}
+
+/// Ocupação concreta de um espaço por uma profissional em um dia/turno.
+/// É o que bloqueia a agenda e o que define a "profissional do dia" na página pública.
+model RentalBooking {
+  id             String              @id @default(uuid())
+  companyId      String
+  resourceId     String
+  professionalId String
+  rentalId       String? // quando gerado por um contrato recorrente
+  shiftId        String? // nulo quando é diária
+  kind           RentalBookingKind   @default(SHIFT)
+  date           DateTime // dia de referência (00:00 local)
+  startsAt       DateTime
+  endsAt         DateTime
+  price          Decimal             @db.Decimal(10, 2)
+  status         RentalBookingStatus @default(CONFIRMED)
+  paymentStatus  PaymentStatus       @default(PENDING)
+  paidAmount     Decimal             @default(0) @db.Decimal(10, 2)
+  paymentMethod  PaymentMethod?
+  paidAt         DateTime?
+  notes          String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  company      Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  resource     Resource               @relation(fields: [resourceId], references: [id], onDelete: Restrict)
+  professional Professional           @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  rental       Rental?                @relation(fields: [rentalId], references: [id], onDelete: SetNull)
+  shift        Shift?                 @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  transactions FinancialTransaction[]
+
+  @@index([companyId, date])
+  @@index([companyId, resourceId, startsAt])
+  @@index([companyId, professionalId, startsAt])
+  @@index([companyId, paymentStatus])
+  @@map("rental_bookings")
 }
 
 // ============================================================================
@@ -654,7 +784,7 @@ model FinancialTransaction {
   origin          TransactionOrigin @default(MANUAL)
   description     String
   amount          Decimal           @db.Decimal(10, 2)
-  paidAmount      Decimal           @db.Decimal(10, 2) @default(0)
+  paidAmount      Decimal           @default(0) @db.Decimal(10, 2)
   paymentMethod   PaymentMethod?
   paymentStatus   PaymentStatus     @default(PENDING)
   dueDate         DateTime?
@@ -664,6 +794,7 @@ model FinancialTransaction {
   customerId      String?
   appointmentId   String?
   rentalPaymentId String?
+  rentalBookingId String?
   notes           String?
   createdById     String?
   createdAt       DateTime          @default(now())
@@ -674,6 +805,7 @@ model FinancialTransaction {
   customer      Customer?        @relation(fields: [customerId], references: [id], onDelete: SetNull)
   appointment   Appointment?     @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
   rentalPayment RentalPayment?   @relation(fields: [rentalPaymentId], references: [id], onDelete: SetNull)
+  rentalBooking RentalBooking?   @relation(fields: [rentalBookingId], references: [id], onDelete: SetNull)
 
   @@index([companyId, type, competenceDate])
   @@index([companyId, paymentStatus, dueDate])

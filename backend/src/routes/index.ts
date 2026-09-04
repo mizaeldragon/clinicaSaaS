@@ -12,6 +12,9 @@ import { professionalsRoutes } from '../modules/professionals/professionals.rout
 import { appointmentsRoutes } from '../modules/appointments/appointments.routes';
 import { resourcesRoutes } from '../modules/resources/resources.routes';
 import { rentalsRoutes } from '../modules/rentals/rentals.routes';
+import { bookingsRoutes } from '../modules/rentals/bookings.routes';
+import { shiftsRoutes } from '../modules/shifts/shifts.routes';
+import { publicRoutes } from '../modules/public/public.routes';
 import { financialRoutes } from '../modules/financial/financial.routes';
 import { commissionsRoutes } from '../modules/commissions/commissions.routes';
 import { reportsRoutes } from '../modules/reports/reports.routes';
@@ -29,6 +32,9 @@ routes.get('/health', (_req, res) => {
 
 routes.use('/auth', authRoutes);
 
+// Página pública de agendamento — sem login, isolada pelo slug da empresa.
+routes.use('/public/:slug', publicRoutes);
+
 // ------------------------------------------------------------- autenticado
 const secured = Router();
 secured.use(authenticate, tenantMiddleware);
@@ -42,6 +48,9 @@ secured.use('/services', servicesRoutes);
 secured.use('/professionals', professionalsRoutes);
 secured.use('/appointments', appointmentsRoutes);
 secured.use('/resources', resourcesRoutes);
+secured.use('/shifts', shiftsRoutes);
+// Antes de /rentals para que "bookings" não caia na rota /rentals/:id.
+secured.use('/rentals/bookings', bookingsRoutes);
 secured.use('/rentals', rentalsRoutes);
 secured.use('/financial', financialRoutes);
 secured.use('/commissions', commissionsRoutes);

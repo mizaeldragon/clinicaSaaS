@@ -16,7 +16,10 @@ import { financialService } from '../financial/financial.service';
 import { notificationsService } from '../notifications/notifications.service';
 import {
   assertNoConflicts,
+  assertNoTimeOff,
   assertProfessionalAvailable,
+  assertRenterHasShift,
+  assertResourceNotRented,
   assertWithinBusinessHours,
   findConflicts,
 } from './scheduling.service';
@@ -279,10 +282,23 @@ export const appointmentsService = {
       });
 
       if (dto.status === 'COMPLETED') {
-        if (modules.includes(ModuleKey.financial)) {
+        // Atendimento de locatária não entra no caixa da empresa: ela cobra as
+        // próprias clientes e a empresa fatura apenas o aluguel do turno.
+        const owner = updated.professionalId
+          ? (
+              await tx.professional.findFirst({
+                where: { id: updated.professionalId },
+                select: { revenueOwner: true },
+              })
+            )?.revenueOwner
+          : 'COMPANY';
+
+        const belongsToCompany = owner !== 'PROFESSIONAL';
+
+        if (belongsToCompany && modules.includes(ModuleKey.financial)) {
           await financialService.registerAppointmentIncome(tx, companyId, updated, dto.payment, userId);
         }
-        if (modules.includes(ModuleKey.commissions) && updated.professionalId) {
+        if (belongsToCompany && modules.includes(ModuleKey.commissions) && updated.professionalId) {
           await commissionsService.generateForAppointment(tx, companyId, updated.id);
         }
       }
@@ -444,17 +460,36 @@ async function validateSlot(
   await assertWithinBusinessHours(target.startsAt, target.endsAt, tx);
 
   if (target.professionalId) {
-    await assertProfessionalAvailable(target.professionalId, target.startsAt, target.endsAt, tx);
+    const professional = await tx.professional.findFirst({ where: { id: target.professionalId } });
+    if (!professional) throw new NotFoundError('Profissional');
+
+    await assertNoTimeOff(professional.id, target.startsAt, target.endsAt, tx);
+
+    if (professional.revenueOwner === 'PROFESSIONAL') {
+      // Locatária: quem define a disponibilidade é o turno alugado.
+      await assertRenterHasShift(professional, target.startsAt, target.endsAt, tx);
+    } else {
+      await assertProfessionalAvailable(professional.id, target.startsAt, target.endsAt, tx);
+    }
   }
 
-  if (target.roomId || target.resourceId) {
-    const ids = [target.roomId, target.resourceId].filter(Boolean) as string[];
-    const resources = await tx.resource.findMany({ where: { id: { in: ids } } });
+  const resourceIds = [target.roomId, target.resourceId].filter(Boolean) as string[];
+
+  if (resourceIds.length > 0) {
+    const resources = await tx.resource.findMany({ where: { id: { in: resourceIds } } });
     for (const resource of resources) {
       if (resource.status === 'MAINTENANCE' || resource.status === 'INACTIVE') {
         throw new ConflictError(`O recurso "${resource.name}" está indisponível (${resource.status})`);
       }
     }
+
+    await assertResourceNotRented(
+      resourceIds,
+      target.professionalId,
+      target.startsAt,
+      target.endsAt,
+      tx,
+    );
   }
 
   await assertNoConflicts(target, tx);

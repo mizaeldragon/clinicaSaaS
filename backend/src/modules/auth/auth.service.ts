@@ -43,6 +43,26 @@ interface AuthResult {
   company: Awaited<ReturnType<typeof getCompanyContext>>;
 }
 
+/**
+ * Locatária cobra as próprias clientes: comissão não faz sentido para ela,
+ * então a permissão sai do conjunto (some do menu e da API).
+ */
+function permissionsFor(
+  role: UserRole,
+  custom: string[],
+  professional?: { revenueOwner?: string } | null,
+): string[] {
+  const permissions = resolvePermissions(role, custom);
+
+  if (professional?.revenueOwner === 'PROFESSIONAL') {
+    // Locatária: sem comissão, mas com acesso aos próprios turnos.
+    return permissions.filter((permission) => !permission.startsWith('commissions:'));
+  }
+
+  // Quem não aluga não tem turnos para acompanhar.
+  return permissions.filter((permission) => permission !== 'rentals:view_own');
+}
+
 async function issueSession(
   user: {
     id: string;
@@ -52,11 +72,11 @@ async function issueSession(
     avatarUrl: string | null;
     permissions: string[];
     companyId: string | null;
-    professional?: { id: string } | null;
+    professional?: { id: string; revenueOwner?: string } | null;
   },
   meta: SessionMeta,
 ): Promise<AuthResult> {
-  const permissions = resolvePermissions(user.role, user.permissions);
+  const permissions = permissionsFor(user.role, user.permissions, user.professional);
 
   const payload: AccessTokenPayload = {
     sub: user.id,
@@ -103,7 +123,10 @@ export const authService = {
     const users = await tenantContext.runAsSystem(() =>
       prisma.user.findMany({
         where: { email: dto.email, isActive: true },
-        include: { professional: { select: { id: true } }, company: { select: { slug: true, status: true } } },
+        include: {
+          professional: { select: { id: true, revenueOwner: true } },
+          company: { select: { slug: true, status: true } },
+        },
       }),
     );
 
@@ -221,7 +244,7 @@ export const authService = {
         include: {
           user: {
             include: {
-              professional: { select: { id: true } },
+              professional: { select: { id: true, revenueOwner: true } },
               company: { select: { status: true } },
             },
           },
@@ -290,7 +313,9 @@ export const authService = {
     const user = await tenantContext.runAsSystem(() =>
       prisma.user.findUnique({
         where: { id: userId },
-        include: { professional: { select: { id: true, name: true, avatarUrl: true } } },
+        include: {
+          professional: { select: { id: true, name: true, avatarUrl: true, revenueOwner: true } },
+        },
       }),
     );
 
@@ -305,7 +330,7 @@ export const authService = {
         email: user.email,
         role: user.role,
         avatarUrl: user.avatarUrl,
-        permissions: resolvePermissions(user.role, user.permissions),
+        permissions: permissionsFor(user.role, user.permissions, user.professional),
         companyId: user.companyId,
         professional: user.professional,
       },
