@@ -50,10 +50,27 @@ const WHERE_OPERATIONS = new Set([
 
 const CREATE_OPERATIONS = new Set(['create', 'createMany']);
 
+/**
+ * Modelos que, além da empresa, pertencem a uma *carteira*: ou são da casa
+ * (`ownerProfessionalId = null`) ou de uma locatária. A locadora enxerga apenas
+ * a carteira da casa; cada locatária, apenas a sua.
+ */
+const PORTFOLIO_MODELS = new Set<string>(['Customer', 'Appointment']);
+
 function mergeWhere(where: unknown, companyId: string): Record<string, unknown> {
   const current = (where ?? {}) as Record<string, unknown>;
   if (current.companyId !== undefined) return current;
   return { ...current, companyId };
+}
+
+/**
+ * Recorte de carteira. Só entra em campos escalares, então continua válido em
+ * `findUnique`/`update`/`delete` (extended where unique do Prisma).
+ */
+function mergeOwner(where: unknown, ownerProfessionalId: string | null): Record<string, unknown> {
+  const current = (where ?? {}) as Record<string, unknown>;
+  if (current.ownerProfessionalId !== undefined) return current;
+  return { ...current, ownerProfessionalId };
 }
 
 function injectCompanyId<T>(data: T, companyId: string): T {
@@ -91,9 +108,17 @@ function buildClient() {
           }
 
           const nextArgs = { ...(args ?? {}) } as Record<string, unknown>;
+          const scope = tenantContext.scope;
+          const scoped = PORTFOLIO_MODELS.has(model) && scope.kind !== 'all';
 
           if (WHERE_OPERATIONS.has(operation)) {
             nextArgs.where = mergeWhere(nextArgs.where, companyId);
+            if (scoped) {
+              nextArgs.where = mergeOwner(
+                nextArgs.where,
+                scope.kind === 'professional' ? scope.professionalId : null,
+              );
+            }
           }
 
           if (CREATE_OPERATIONS.has(operation) && nextArgs.data) {
@@ -102,6 +127,12 @@ function buildClient() {
 
           if (operation === 'upsert') {
             nextArgs.where = mergeWhere(nextArgs.where, companyId);
+            if (scoped) {
+              nextArgs.where = mergeOwner(
+                nextArgs.where,
+                scope.kind === 'professional' ? scope.professionalId : null,
+              );
+            }
             if (nextArgs.create) nextArgs.create = injectCompanyId(nextArgs.create, companyId);
           }
 

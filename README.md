@@ -87,9 +87,28 @@ O *Espaço Márcia Vaz* demonstra o cenário de coworking de beleza:
 - **link público**: `http://localhost:5173/e/espaco-marcia-vaz`
 
 No link, a cliente escolhe o serviço e o sistema mostra **quem está no espaço naquele
-dia** — a disponibilidade das locatárias vem dos turnos que elas alugaram. O
-atendimento de uma locatária **não entra no caixa do espaço**: a dona fatura o turno,
-a profissional cobra a própria cliente.
+dia** — a disponibilidade das locatárias vem dos turnos que elas alugaram.
+
+#### Cada uma com a sua carteira
+
+A dona aluga imóvel mobiliado; o que acontece dentro dele é negócio de quem
+alugou. O sistema trata isso como um segundo nível de isolamento, dentro da
+mesma empresa:
+
+| | A dona (estética + locação) | Cada locatária |
+|---|---|---|
+| Agenda | só os atendimentos dela | só os dela |
+| Clientes | só a carteira da estética | só a carteira dela |
+| Caixa | serviços dela + aluguéis recebidos | fora do sistema da dona |
+| Sobre quem aluga, vê | espaço, turno, dia e se pagou | — |
+
+A dona **não vê** a agenda, as clientes nem o faturamento de quem aluga — e uma
+locatária não vê os da outra. Na agenda da dona os turnos alugados aparecem como
+ocupação ("Salão · Manhã · Ana Ribeiro · pago"), nunca como atendimento.
+
+Como as salas são físicas e compartilhadas, o motor de conflitos continua
+enxergando tudo: uma agenda invisível segue ocupando o espaço, e a mensagem de
+conflito que volta é genérica, sem nome de profissional nem de cliente.
 
 ---
 
@@ -100,17 +119,19 @@ cd backend && npm run test:e2e
 ```
 
 Reseta o banco, recria o seed e roda as duas suítes end-to-end contra a API
-(**74 verificações**):
+(**83 verificações**):
 
 **`test:smoke` (43)** — autenticação e rotação de refresh token, **isolamento entre
 empresas**, feature flags de módulos, prevenção de conflitos de agenda, finalização
 de atendimento gerando receita e comissão, dashboards, aluguéis, permissões por
 papel, painel do super admin e onboarding.
 
-**`test:shared-space` (31)** — turnos e preços, reserva sem sobreposição, **página
+**`test:shared-space` (40)** — turnos e preços, reserva sem sobreposição, **página
 pública sem login**, "profissional do dia" saindo do aluguel, agendamento pelo link,
 **caixa separado** (receita da locatária não entra no da empresa), sala alugada
-protegendo a agenda e o painel restrito da locatária.
+protegendo a agenda, painel restrito da locatária e a **parede entre carteiras**:
+a dona não vê as clientes nem os agendamentos de quem aluga (nem pelo id direto),
+uma locatária não vê a outra, e ninguém escreve na agenda alheia.
 
 As suítes esperam o seed limpo — rode sempre pelo `test:e2e`.
 
@@ -154,6 +175,11 @@ frontend/src/
 
 Feature flags (`CompanyModule`) são validados no servidor via `requireModule(...)`.
 O frontend esconde o menu, mas quem decide o acesso é a API.
+
+A mesma extension aplica um segundo recorte, agora **dentro** da empresa: a
+*carteira* (`ownerProfessionalId`), que separa o negócio da casa do negócio de
+cada profissional que aluga o espaço. Detalhes em
+[docs/ARQUITETURA.md](docs/ARQUITETURA.md#45-carteira--o-segundo-nível-de-isolamento).
 
 ---
 

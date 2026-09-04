@@ -26,6 +26,7 @@ import { MonthGrid } from './MonthGrid';
 import { MobileAgenda } from './MobileAgenda';
 import { AppointmentDialog } from './AppointmentDialog';
 import { AppointmentDetail } from './AppointmentDetail';
+import { RentedShiftsBand } from './RentedShiftsBand';
 import type { Appointment } from '@/types';
 
 type View = 'day' | 'week' | 'month';
@@ -203,6 +204,8 @@ export function AgendaPage() {
           </Button>
         </Card>
       ) : null}
+
+      <RentedShiftsBand days={days} from={range.from} to={range.to} />
 
       {isLoading ? (
         <Skeleton className="h-[560px] rounded-xl" />

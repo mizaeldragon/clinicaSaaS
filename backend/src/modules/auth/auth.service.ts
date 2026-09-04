@@ -15,7 +15,7 @@ import {
   hashRefreshToken,
   signAccessToken,
 } from '../../shared/utils/jwt';
-import { resolvePermissions } from '../../shared/middlewares/rbac';
+import { PERMISSIONS, resolvePermissions } from '../../shared/middlewares/rbac';
 import { uniqueSlug } from '../../shared/utils/slug';
 import { env } from '../../config/env';
 import { CORE_MODULES, DEFAULT_BUSINESS_HOURS } from '../companies/company.constants';
@@ -44,8 +44,10 @@ interface AuthResult {
 }
 
 /**
- * Locatária cobra as próprias clientes: comissão não faz sentido para ela,
- * então a permissão sai do conjunto (some do menu e da API).
+ * A locatária aluga o espaço e toca o próprio negócio dentro dele: precisa
+ * gerenciar a agenda e as clientes dela. O recorte de carteira (ver
+ * `PortfolioScope`) garante que essas permissões só alcancem o que é dela —
+ * comissão, por outro lado, não faz sentido para quem cobra a própria cliente.
  */
 function permissionsFor(
   role: UserRole,
@@ -55,8 +57,12 @@ function permissionsFor(
   const permissions = resolvePermissions(role, custom);
 
   if (professional?.revenueOwner === 'PROFESSIONAL') {
-    // Locatária: sem comissão, mas com acesso aos próprios turnos.
-    return permissions.filter((permission) => !permission.startsWith('commissions:'));
+    const own = new Set(
+      permissions.filter((permission) => !permission.startsWith('commissions:')),
+    );
+    own.add(PERMISSIONS.appointmentsManage);
+    own.add(PERMISSIONS.customersManage);
+    return [...own];
   }
 
   // Quem não aluga não tem turnos para acompanhar.
@@ -84,6 +90,7 @@ async function issueSession(
     role: user.role,
     permissions,
     professionalId: user.professional?.id ?? null,
+    isRenter: user.professional?.revenueOwner === 'PROFESSIONAL',
   };
 
   const accessToken = signAccessToken(payload);

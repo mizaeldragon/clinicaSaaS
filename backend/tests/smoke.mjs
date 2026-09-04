@@ -90,8 +90,10 @@ const run = async () => {
   day.setDate(day.getDate() + ((9 - day.getDay()) % 7 || 7));
   day.setHours(12, 0, 0, 0);
 
+  // A sala entra na consulta: o slot precisa estar livre para o profissional
+  // *e* para a sala em que o atendimento vai acontecer.
   const grid = await api(
-    `/appointments/availability?professionalId=${professionalId}&date=${day.toISOString()}&durationMinutes=${shortService.durationMinutes}`,
+    `/appointments/availability?professionalId=${professionalId}&roomId=${roomId}&date=${day.toISOString()}&durationMinutes=${shortService.durationMinutes}`,
     { token: bella.accessToken },
   );
   const freeSlot = grid.data.find((slot) => slot.available);

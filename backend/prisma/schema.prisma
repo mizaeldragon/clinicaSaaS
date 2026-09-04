@@ -371,15 +371,22 @@ model Customer {
   document  String?
   notes     String?
   isActive  Boolean   @default(true)
+
+  /// Carteira: null = cliente da casa; preenchido = cliente de uma locatária.
+  /// A locadora não enxerga a carteira de quem aluga o espaço dela.
+  ownerProfessionalId String?
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  company      Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  appointments Appointment[]
-  transactions FinancialTransaction[]
+  company           Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  ownerProfessional Professional?          @relation("CustomerPortfolio", fields: [ownerProfessionalId], references: [id], onDelete: SetNull)
+  appointments      Appointment[]
+  transactions      FinancialTransaction[]
 
   @@index([companyId, name])
   @@index([companyId, phone])
+  @@index([companyId, ownerProfessionalId])
   @@map("customers")
 }
 
@@ -416,6 +423,9 @@ model Professional {
   commissions    Commission[]
   rentals        Rental[]
   rentalBookings RentalBooking[]
+  /// Carteira própria (quando locatária): clientes e atendimentos que são dela.
+  ownedCustomers    Customer[]    @relation("CustomerPortfolio")
+  ownedAppointments Appointment[] @relation("AppointmentPortfolio")
 
   @@index([companyId, isActive])
   @@map("professionals")
@@ -536,13 +546,17 @@ model Appointment {
   completedAt     DateTime?
   /// INTERNAL quando criado no painel, PUBLIC quando veio da página de agendamento.
   source          AppointmentSource @default(INTERNAL)
+  /// Carteira: null = atendimento da casa; preenchido = atendimento de uma
+  /// locatária (não entra no caixa nem na agenda da locadora).
+  ownerProfessionalId String?
   createdById     String?
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
-  company      Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  customer     Customer               @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  professional Professional?          @relation(fields: [professionalId], references: [id], onDelete: SetNull)
+  company           Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer          Customer      @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  professional      Professional? @relation(fields: [professionalId], references: [id], onDelete: SetNull)
+  ownerProfessional Professional? @relation("AppointmentPortfolio", fields: [ownerProfessionalId], references: [id], onDelete: SetNull)
   room         Resource?              @relation("AppointmentRoom", fields: [roomId], references: [id], onDelete: SetNull)
   resource     Resource?              @relation("AppointmentResource", fields: [resourceId], references: [id], onDelete: SetNull)
   services     AppointmentService[]
@@ -553,6 +567,7 @@ model Appointment {
   @@index([companyId, professionalId, startsAt])
   @@index([companyId, status])
   @@index([companyId, customerId])
+  @@index([companyId, ownerProfessionalId, startsAt])
   @@map("appointments")
 }
 

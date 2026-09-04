@@ -196,23 +196,35 @@ const run = async () => {
   });
   check('horário ocupado não aceita segundo agendamento', retry.status === 409, JSON.stringify(retry.data));
 
-  const agenda = await api(
-    `/appointments?from=${tuesday.toISOString().slice(0, 10)}T00:00:00.000Z&to=${tuesday.toISOString().slice(0, 10)}T23:59:59.000Z`,
-    { token: marcia.accessToken },
+  const ana = await login('ana@marciavaz.com.br', 'marcia@12345');
+  const day = tuesday.toISOString().slice(0, 10);
+  const range = `from=${day}T00:00:00.000Z&to=${day}T23:59:59.000Z`;
+
+  const ownerAgenda = await api(`/appointments?${range}`, { token: marcia.accessToken });
+  check(
+    'agendamento da locatária NÃO aparece para a dona do espaço',
+    !ownerAgenda.data.data.some((a) => a.customer.name === 'Cliente da Ana'),
+    JSON.stringify(ownerAgenda.data.data.map((a) => a.customer.name)),
   );
-  const created = agenda.data.data.find((a) => a.customer.name === 'Cliente da Ana');
-  check('aparece na agenda da dona do espaço', Boolean(created));
+
+  const anaDay = await api(`/appointments?${range}`, { token: ana.accessToken });
+  const created = anaDay.data.data.find((a) => a.customer.name === 'Cliente da Ana');
+  check('aparece na agenda da própria locatária', Boolean(created));
   check('atendimento ocupa a sala alugada', created?.room?.id === hairRoom.id, JSON.stringify(created?.room));
 
   console.log('\n=== 6. Caixa separado ===');
   const completed = await api(`/appointments/${created.id}/status`, {
     method: 'PATCH',
-    token: marcia.accessToken,
+    token: ana.accessToken,
     body: { status: 'COMPLETED', payment: { method: 'PIX', paid: true } },
   });
-  check('finaliza o atendimento da locatária', completed.status === 200);
+  check(
+    'locatária finaliza o próprio atendimento',
+    completed.status === 200,
+    JSON.stringify(completed.data),
+  );
 
-  const detail = await api(`/appointments/${created.id}`, { token: marcia.accessToken });
+  const detail = await api(`/appointments/${created.id}`, { token: ana.accessToken });
   check(
     'receita da locatária NÃO entra no caixa do espaço',
     detail.data.transactions.length === 0,
@@ -276,11 +288,13 @@ const run = async () => {
 
   const outsideShift = new Date(tuesday);
   outsideShift.setHours(15, 0, 0, 0);
+  const anaCustomers = await api('/customers', { token: ana.accessToken });
+  const anaClient = anaCustomers.data.data.find((c) => c.name === 'Cliente da Ana');
   const anaOutside = await api('/appointments', {
     method: 'POST',
-    token: marcia.accessToken,
+    token: ana.accessToken,
     body: {
-      customerId: helena.id,
+      customerId: anaClient.id,
       professionalId: anaSlots.professional.id,
       startsAt: outsideShift.toISOString(),
       services: [{ serviceId: services.data.data.find((s) => s.name === 'Corte').id, quantity: 1 }],
@@ -293,7 +307,6 @@ const run = async () => {
   );
 
   console.log('\n=== 8. Painel da locatária ===');
-  const ana = await login('ana@marciavaz.com.br', 'marcia@12345');
   const anaBookings = await api('/rentals/bookings', { token: ana.accessToken });
   const onlyHers = anaBookings.data.data.every((b) => b.professional.name === 'Ana Ribeiro');
   check('locatária vê só os próprios turnos', onlyHers && anaBookings.data.data.length > 0);
@@ -304,6 +317,69 @@ const run = async () => {
 
   const forbidden = await api('/financial/dashboard', { token: ana.accessToken });
   check('locatária não acessa o financeiro do espaço', forbidden.status === 403, String(forbidden.status));
+
+  console.log('\n=== 9. Parede entre carteiras ===');
+
+  const ownerCustomers = await api('/customers?perPage=100', { token: marcia.accessToken });
+  check(
+    'dona do espaço não vê as clientes da locatária',
+    !ownerCustomers.data.data.some((c) => c.name === 'Cliente da Ana'),
+    JSON.stringify(ownerCustomers.data.data.map((c) => c.name)),
+  );
+  check(
+    'mas continua vendo as clientes da própria estética',
+    ownerCustomers.data.data.some((c) => c.name === 'Helena Prado'),
+  );
+
+  const peek = await api(`/appointments/${created.id}`, { token: marcia.accessToken });
+  check(
+    'nem abrindo o agendamento da locatária pelo id',
+    peek.status === 404,
+    String(peek.status),
+  );
+
+  check(
+    'locatária não vê as clientes da casa',
+    !anaCustomers.data.data.some((c) => c.name === 'Helena Prado'),
+    JSON.stringify(anaCustomers.data.data.map((c) => c.name)),
+  );
+
+  const biaSession = await login('bia@marciavaz.com.br', 'marcia@12345');
+  const biaAgenda = await api('/appointments?perPage=100', { token: biaSession.accessToken });
+  check(
+    'uma locatária não vê a agenda da outra',
+    !biaAgenda.data.data.some((a) => a.professional?.id === ana.user.professionalId),
+  );
+
+  const intrusion = await api('/appointments', {
+    method: 'POST',
+    token: marcia.accessToken,
+    body: {
+      customerId: helena.id,
+      professionalId: anaSlots.professional.id,
+      startsAt: new Date(tuesday.getTime() + 9 * 3600_000).toISOString(),
+      services: [{ serviceId: services.data.data.find((s) => s.name === 'Corte').id, quantity: 1 }],
+    },
+  });
+  check(
+    'dona do espaço não lança nada na agenda da locatária',
+    intrusion.status === 403,
+    JSON.stringify(intrusion.data),
+  );
+
+  const anaDashboard = await api('/dashboard', { token: ana.accessToken });
+  check(
+    'dashboard da locatária não traz o caixa do espaço',
+    anaDashboard.data.financial === null && anaDashboard.data.rentals === null,
+    JSON.stringify({ financial: anaDashboard.data.financial, rentals: anaDashboard.data.rentals }),
+  );
+
+  const ownerDashboard = await api('/reports/appointments', { token: marcia.accessToken });
+  check(
+    'relatório da dona ignora os atendimentos alugados',
+    ownerDashboard.status === 200 && ownerDashboard.data.total >= 0,
+    JSON.stringify(ownerDashboard.data?.total),
+  );
 
   console.log(`\n──────────────────────────────\n  ${pass} passaram · ${fail} falharam\n`);
   process.exit(fail > 0 ? 1 : 0);

@@ -12,9 +12,13 @@ três camadas:
 
 1. `tenantMiddleware` resolve a `companyId` a partir do JWT (nunca do body/query).
 2. `AsyncLocalStorage` (`tenantContext`) carrega a `companyId` por requisição.
-3. **Prisma Client Extension** (`shared/database/tenantExtension.ts`) injeta
+3. **Prisma Client Extension** (`shared/database/prisma.ts`) injeta
    automaticamente `where: { companyId }` em toda leitura e `data: { companyId }`
    em toda escrita das entidades tenant-scoped.
+
+A mesma mecânica sustenta um segundo nível de isolamento **dentro** da empresa —
+a *carteira*, que separa o negócio da casa do negócio de cada locatária do
+espaço. Ver [4.5](#45-carteira--o-segundo-nível-de-isolamento).
 
 Modularidade: cada empresa possui uma lista de módulos habilitados
 (`CompanyModule`), resultante da interseção entre **o plano assinado** e **as
@@ -137,7 +141,53 @@ reservados, não de uma jornada fixa.
 A disponibilidade também muda: equipe própria usa `WorkingHour`; locatária usa os
 `RentalBooking` dela.
 
-### 4.5 Financeiro
+### 4.5 Carteira — o segundo nível de isolamento
+
+Um espaço compartilhado abriga **negócios diferentes debaixo do mesmo teto**: o
+da dona (a estética onde ela atende) e o de cada locatária. A locadora aluga
+imóvel mobiliado; o que acontece dentro dele é negócio de quem alugou. Ela
+fatura o turno — não o atendimento — e por isso **não enxerga a agenda, as
+clientes nem o faturamento de quem aluga**.
+
+Isso é uma segunda dimensão de isolamento, ortogonal à empresa:
+
+| | Discriminador | Quem separa |
+|---|---|---|
+| Empresa | `companyId` | uma empresa nunca vê outra |
+| Carteira | `ownerProfessionalId` | dentro da empresa, a casa não vê a locatária, e uma locatária não vê a outra |
+
+`Customer.ownerProfessionalId` e `Appointment.ownerProfessionalId` são `null`
+quando o registro é da casa e apontam para a locatária quando são dela. O campo
+é escalar de propósito: continua válido em `findUnique`/`update`/`delete`.
+
+O recorte de cada requisição vive no mesmo `AsyncLocalStorage` do tenant
+(`PortfolioScope`) e é aplicado pela **mesma Prisma Client Extension**:
+
+- `house` — a dona e a equipe: só `ownerProfessionalId = null`;
+- `professional` — a locatária: só a carteira dela;
+- `all` — sem recorte: jobs, seed, página pública e o motor de conflitos.
+
+`tenantContext.runUnscoped()` é a única porta para o modo `all` dentro de uma
+requisição com recorte. O motor de agendamento precisa dela: para impedir
+overbooking de uma sala é necessário enxergar a agenda inteira do espaço. Nada
+disso vaza para a resposta — quando o conflito é de outra carteira, o rótulo
+devolvido é genérico ("Este horário já está ocupado"), sem nome de profissional
+nem de cliente.
+
+A parede também vale para escrita (`assertCanWriteToPortfolio`): a locadora não
+lança nada na agenda de quem aluga, e uma locatária não lança nada na de outra.
+E vale para os avisos: eventos de WebSocket e notificações de um atendimento de
+locatária vão para a sala `professional:{id}` e para o usuário dela, nunca para
+a empresa inteira.
+
+A mesma pessoa pode ser cliente da casa **e** de uma locatária — são dois
+cadastros, porque são dois negócios. O reconhecimento por telefone no
+agendamento público acontece dentro da carteira de destino.
+
+Blocos do dashboard (caixa, aluguéis, recursos) passaram a exigir permissão
+além do módulo: quem só atende no espaço não recebe o financeiro da casa.
+
+### 4.6 Financeiro
 - `Rental` — contrato: recurso, responsável (profissional ou nome livre), período, valor, `billingCycle` (HOUR/DAY/WEEK/MONTH/CUSTOM), dia de vencimento, status.
 - `RentalPayment` — parcelas geradas automaticamente pelo worker de recorrência.
 - `FinancialTransaction` — receita/despesa unificada, com `paymentMethod`, `paymentStatus`, valor pago/pendente e origem (appointment, rental, avulso).
@@ -145,7 +195,7 @@ A disponibilidade também muda: equipe própria usa `WorkingHour`; locatária us
 - `Commission` — gerada na finalização do atendimento; percentual ou valor fixo; status de pagamento.
 - `Notification` — canal (IN_APP/EMAIL/WHATSAPP), evento, payload, lida/enviada.
 
-### 4.6 Regras de integridade multi-tenant
+### 4.7 Regras de integridade multi-tenant
 Todas as tabelas de domínio possuem `companyId` + índice composto
 `(companyId, <campo de busca>)`. Chaves únicas são sempre compostas com
 `companyId` (ex.: `@@unique([companyId, email])`), permitindo que duas empresas
@@ -162,7 +212,13 @@ Ao criar/alterar um agendamento o serviço valida, dentro de uma transação:
 4. **Espaço alugado**: a sala não aceita atendimento de outra profissional durante
    um turno reservado.
 5. **Locatária**: o atendimento precisa cair dentro de um turno que ela alugou.
-6. Limite de agendamentos do plano.
+6. **Carteira**: ninguém agenda na agenda de outra carteira (verificado antes de
+   qualquer validação de horário, para não revelar a agenda alheia pela mensagem
+   de erro).
+7. Limite de agendamentos do plano.
+
+As buscas por conflito rodam sem recorte de carteira — a sala é física e é
+compartilhada, então uma agenda invisível continua ocupando o espaço.
 
 ## 6. Segurança
 

@@ -9,6 +9,10 @@ dashboardRoutes.get(
   '/',
   requirePermission(PERMISSIONS.dashboardView),
   asyncHandler(async (req, res) => {
-    res.json(serialize(await dashboardService.overview(req.enabledModules ?? [])));
+    const viewer = {
+      permissions: req.user?.permissions ?? [],
+      isAdmin: req.user?.role === 'COMPANY_ADMIN' || req.user?.role === 'SUPER_ADMIN',
+    };
+    res.json(serialize(await dashboardService.overview(req.enabledModules ?? [], viewer)));
   }),
 );

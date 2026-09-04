@@ -9,7 +9,13 @@ import {
 import { getPagination, paginated } from '../../shared/utils/http';
 import { getCompanyContext } from '../../shared/services/companyContext.service';
 import { addMinutes, endOfMonth, referenceMonth, startOfMonth } from '../../shared/utils/datetime';
-import { SOCKET_EVENTS, emitToCompany } from '../../websocket/io';
+import { SOCKET_EVENTS } from '../../websocket/io';
+import {
+  assertCanWriteToPortfolio,
+  emitToPortfolio,
+  ownerOfProfessional,
+  userOfProfessional,
+} from '../../shared/services/portfolio.service';
 import { JOB_NAMES, QUEUE_NAMES, enqueue } from '../../queues';
 import { commissionsService } from '../commissions/commissions.service';
 import { financialService } from '../financial/financial.service';
@@ -123,6 +129,12 @@ export const appointmentsService = {
 
       if (endsAt <= startsAt) throw new BadRequestError('O término deve ser depois do início');
 
+      // Atendimento de locatária é da carteira dela: não aparece para a casa.
+      // A checagem vem antes da validação de horário para não revelar a agenda
+      // de outra carteira através da mensagem de conflito.
+      const ownerProfessionalId = await ownerOfProfessional(dto.professionalId, tx);
+      assertCanWriteToPortfolio(ownerProfessionalId);
+
       await validateSlot(tx, {
         professionalId: dto.professionalId ?? null,
         roomId: dto.roomId ?? null,
@@ -136,6 +148,7 @@ export const appointmentsService = {
           companyId,
           customerId: dto.customerId,
           professionalId: dto.professionalId ?? null,
+          ownerProfessionalId,
           roomId: dto.roomId ?? null,
           resourceId: dto.resourceId ?? null,
           startsAt,
@@ -160,12 +173,18 @@ export const appointmentsService = {
       });
     });
 
-    emitToCompany(companyId, SOCKET_EVENTS.appointmentCreated, appointment);
+    emitToPortfolio(
+      companyId,
+      appointment.ownerProfessionalId,
+      SOCKET_EVENTS.appointmentCreated,
+      appointment,
+    );
 
     await notificationsService.notifyEvent(companyId, 'APPOINTMENT_CREATED', {
       title: 'Novo agendamento',
       message: `${appointment.customer.name} — ${appointment.startsAt.toLocaleString('pt-BR')}`,
       data: { appointmentId: appointment.id },
+      userId: await userOfProfessional(appointment.ownerProfessionalId),
     });
 
     await scheduleReminders(companyId, appointment.id, appointment.startsAt);
@@ -203,6 +222,9 @@ export const appointmentsService = {
       const roomId = dto.roomId !== undefined ? dto.roomId : current.roomId;
       const resourceId = dto.resourceId !== undefined ? dto.resourceId : current.resourceId;
 
+      const nextOwner = await ownerOfProfessional(professionalId, tx);
+      assertCanWriteToPortfolio(nextOwner);
+
       await validateSlot(tx, {
         professionalId,
         roomId,
@@ -232,6 +254,7 @@ export const appointmentsService = {
         data: {
           ...(dto.customerId ? { customerId: dto.customerId } : {}),
           professionalId,
+          ownerProfessionalId: nextOwner,
           roomId,
           resourceId,
           startsAt,
@@ -244,7 +267,12 @@ export const appointmentsService = {
       });
     });
 
-    emitToCompany(companyId, SOCKET_EVENTS.appointmentUpdated, appointment);
+    emitToPortfolio(
+      companyId,
+      appointment.ownerProfessionalId,
+      SOCKET_EVENTS.appointmentUpdated,
+      appointment,
+    );
 
     if (dto.startsAt) {
       await scheduleReminders(companyId, appointment.id, appointment.startsAt);
@@ -284,16 +312,7 @@ export const appointmentsService = {
       if (dto.status === 'COMPLETED') {
         // Atendimento de locatária não entra no caixa da empresa: ela cobra as
         // próprias clientes e a empresa fatura apenas o aluguel do turno.
-        const owner = updated.professionalId
-          ? (
-              await tx.professional.findFirst({
-                where: { id: updated.professionalId },
-                select: { revenueOwner: true },
-              })
-            )?.revenueOwner
-          : 'COMPANY';
-
-        const belongsToCompany = owner !== 'PROFESSIONAL';
+        const belongsToCompany = updated.ownerProfessionalId === null;
 
         if (belongsToCompany && modules.includes(ModuleKey.financial)) {
           await financialService.registerAppointmentIncome(tx, companyId, updated, dto.payment, userId);
@@ -313,13 +332,19 @@ export const appointmentsService = {
       return updated;
     });
 
-    emitToCompany(companyId, SOCKET_EVENTS.appointmentUpdated, appointment);
+    emitToPortfolio(
+      companyId,
+      appointment.ownerProfessionalId,
+      SOCKET_EVENTS.appointmentUpdated,
+      appointment,
+    );
 
     if (dto.status === 'CANCELED') {
       await notificationsService.notifyEvent(companyId, 'APPOINTMENT_CANCELED', {
         title: 'Agendamento cancelado',
         message: `${appointment.customer.name} — ${appointment.startsAt.toLocaleString('pt-BR')}`,
         data: { appointmentId: appointment.id },
+        userId: await userOfProfessional(appointment.ownerProfessionalId),
       });
     }
 
@@ -332,7 +357,9 @@ export const appointmentsService = {
       throw new ConflictError('Um atendimento finalizado não pode ser excluído. Cancele-o se necessário.');
     }
     await prisma.appointment.delete({ where: { id } });
-    emitToCompany(companyId, SOCKET_EVENTS.appointmentDeleted, { id });
+    emitToPortfolio(companyId, appointment.ownerProfessionalId, SOCKET_EVENTS.appointmentDeleted, {
+      id,
+    });
   },
 
   /** Resumo do dia usado no dashboard. */

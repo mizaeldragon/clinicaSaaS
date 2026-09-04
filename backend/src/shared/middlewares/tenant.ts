@@ -1,6 +1,6 @@
 import { RequestHandler } from 'express';
 import { AppError, ForbiddenError, UnauthorizedError } from '../errors/AppError';
-import { tenantContext } from '../database/tenantContext';
+import { PortfolioScope, SCOPE_ALL, tenantContext } from '../database/tenantContext';
 import { getCompanyContext } from '../services/companyContext.service';
 import { asyncHandler } from '../utils/http';
 
@@ -11,12 +11,30 @@ import { asyncHandler } from '../utils/http';
  * um AsyncLocalStorage com a `companyId` — o Prisma extension usa esse valor
  * para filtrar automaticamente todas as consultas.
  */
+/**
+ * Qual carteira esta requisição enxerga.
+ *
+ * A locatária aluga o espaço e toca o próprio negócio ali dentro: as clientes e
+ * a agenda são dela. A locadora — mesmo sendo dona do imóvel e admin da conta —
+ * enxerga apenas a carteira da casa; do negócio de quem aluga ela vê a
+ * ocupação e a cobrança do turno, não o atendimento.
+ */
+function resolveScope(user: Express.AuthenticatedUser): PortfolioScope {
+  if (user.isRenter && user.professionalId) {
+    return { kind: 'professional', professionalId: user.professionalId };
+  }
+  return { kind: 'house' };
+}
+
 export const tenantMiddleware: RequestHandler = asyncHandler(async (req, _res, next) => {
   if (!req.user) throw new UnauthorizedError();
 
   // Super admin do SaaS opera fora do escopo de uma empresa.
   if (req.user.role === 'SUPER_ADMIN' && !req.user.companyId) {
-    tenantContext.run({ companyId: null, userId: req.user.id, bypassTenant: true }, () => next());
+    tenantContext.run(
+      { companyId: null, userId: req.user.id, bypassTenant: true, scope: SCOPE_ALL },
+      () => next(),
+    );
     return;
   }
 
@@ -41,5 +59,8 @@ export const tenantMiddleware: RequestHandler = asyncHandler(async (req, _res, n
   req.companyId = companyId;
   req.enabledModules = context.modules;
 
-  tenantContext.run({ companyId, userId: req.user.id, bypassTenant: false }, () => next());
+  tenantContext.run(
+    { companyId, userId: req.user.id, bypassTenant: false, scope: resolveScope(req.user) },
+    () => next(),
+  );
 });

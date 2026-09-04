@@ -22,6 +22,7 @@ export function authenticate(req: Request, _res: Response, next: NextFunction): 
     role: payload.role as UserRole,
     permissions: payload.permissions ?? [],
     professionalId: payload.professionalId ?? null,
+    isRenter: payload.isRenter === true,
   };
 
   next();

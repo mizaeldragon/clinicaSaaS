@@ -1,5 +1,6 @@
 import { AppointmentStatus, Prisma } from '@prisma/client';
 import { prisma, TxClient } from '../../shared/database/prisma';
+import { tenantContext } from '../../shared/database/tenantContext';
 import { BadRequestError, ScheduleConflictError } from '../../shared/errors/AppError';
 import { addMinutes, minutesOfDay, minutesToTime, startOfDay, endOfDay, timeToMinutes } from '../../shared/utils/datetime';
 
@@ -55,32 +56,48 @@ export async function findConflicts(
 
   if (or.length === 0) return [];
 
-  const conflicts = await client.appointment.findMany({
-    where: { ...overlap, OR: or },
-    select: {
-      id: true,
-      startsAt: true,
-      endsAt: true,
-      professionalId: true,
-      roomId: true,
-      resourceId: true,
-      professional: { select: { name: true } },
-      room: { select: { name: true } },
-      resource: { select: { name: true } },
-      customer: { select: { name: true } },
-    },
-  });
+  // Sem recorte de carteira: impedir overbooking exige enxergar também a agenda
+  // das locatárias. Nada daqui chega ao cliente além do rótulo abaixo, que é
+  // deliberadamente genérico quando o conflito é de outra carteira.
+  const conflicts = await tenantContext.runUnscoped(() =>
+    client.appointment.findMany({
+      where: { ...overlap, OR: or },
+      select: {
+        id: true,
+        startsAt: true,
+        endsAt: true,
+        professionalId: true,
+        ownerProfessionalId: true,
+        roomId: true,
+        resourceId: true,
+        professional: { select: { name: true } },
+        room: { select: { name: true } },
+        resource: { select: { name: true } },
+      },
+    }),
+  );
+
+  const scope = tenantContext.scope;
+  const visible = (ownerProfessionalId: string | null): boolean => {
+    if (scope.kind === 'all') return true;
+    if (scope.kind === 'house') return ownerProfessionalId === null;
+    return ownerProfessionalId === scope.professionalId;
+  };
 
   const result: ConflictInfo[] = [];
 
   for (const c of conflicts) {
+    const named = visible(c.ownerProfessionalId);
+
     if (target.professionalId && c.professionalId === target.professionalId) {
       result.push({
         type: 'professional',
         appointmentId: c.id,
         startsAt: c.startsAt,
         endsAt: c.endsAt,
-        label: `${c.professional?.name ?? 'Profissional'} já possui atendimento com ${c.customer?.name ?? 'cliente'} neste horário`,
+        label: named
+          ? `${c.professional?.name ?? 'Profissional'} já possui atendimento neste horário`
+          : 'Este horário já está ocupado',
       });
     }
     if (target.roomId && c.roomId === target.roomId) {
@@ -89,7 +106,7 @@ export async function findConflicts(
         appointmentId: c.id,
         startsAt: c.startsAt,
         endsAt: c.endsAt,
-        label: `A sala ${c.room?.name ?? ''} já está ocupada neste horário`,
+        label: `A sala ${c.room?.name ?? ''} já está ocupada neste horário`.trim(),
       });
     }
     if (target.resourceId && c.resourceId === target.resourceId) {
@@ -300,19 +317,23 @@ export async function getAvailableSlots(params: {
     prisma.timeOff.findMany({
       where: { professionalId, startsAt: { lt: dayEnd }, endsAt: { gt: dayStart } },
     }),
-    prisma.appointment.findMany({
-      where: {
-        status: { in: BLOCKING_STATUSES },
-        startsAt: { lt: dayEnd },
-        endsAt: { gt: dayStart },
-        OR: [
-          { professionalId },
-          ...(params.roomId ? [{ roomId: params.roomId }] : []),
-          ...(params.resourceId ? [{ resourceId: params.resourceId }] : []),
-        ],
-      },
-      select: { startsAt: true, endsAt: true },
-    }),
+    // Idem: a grade de horários precisa considerar a agenda inteira do espaço,
+    // mesmo o que pertence a outra carteira. Devolve só início e fim.
+    tenantContext.runUnscoped(() =>
+      prisma.appointment.findMany({
+        where: {
+          status: { in: BLOCKING_STATUSES },
+          startsAt: { lt: dayEnd },
+          endsAt: { gt: dayStart },
+          OR: [
+            { professionalId },
+            ...(params.roomId ? [{ roomId: params.roomId }] : []),
+            ...(params.resourceId ? [{ resourceId: params.resourceId }] : []),
+          ],
+        },
+        select: { startsAt: true, endsAt: true },
+      }),
+    ),
   ]);
 
   if (!workingHour || workingHour.isOff) return [];

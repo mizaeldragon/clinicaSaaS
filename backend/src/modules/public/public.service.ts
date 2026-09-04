@@ -3,7 +3,12 @@ import { prisma } from '../../shared/database/prisma';
 import { tenantContext } from '../../shared/database/tenantContext';
 import { NotFoundError, ScheduleConflictError } from '../../shared/errors/AppError';
 import { addMinutes, endOfDay, minutesOfDay, startOfDay, timeToMinutes } from '../../shared/utils/datetime';
-import { SOCKET_EVENTS, emitToCompany } from '../../websocket/io';
+import { SOCKET_EVENTS } from '../../websocket/io';
+import {
+  emitToPortfolio,
+  ownerOfProfessional,
+  userOfProfessional,
+} from '../../shared/services/portfolio.service';
 import { notificationsService } from '../notifications/notifications.service';
 import { BLOCKING_STATUSES } from '../appointments/scheduling.service';
 import type { AvailabilityQueryDTO, CreatePublicAppointmentDTO } from './public.schema';
@@ -302,9 +307,17 @@ export async function createPublicAppointment(
   }
 
   const appointment = await prisma.$transaction(async (tx) => {
-    // Cliente recorrente é reconhecido pelo telefone.
+    // Quem alugou o espaço tem carteira própria: a cliente entra na carteira da
+    // profissional escolhida. A mesma pessoa pode ser cliente da casa e de uma
+    // locatária — são dois negócios diferentes debaixo do mesmo teto.
+    const ownerProfessionalId = await ownerOfProfessional(dto.professionalId, tx);
+
+    // Cliente recorrente é reconhecido pelo telefone, dentro da mesma carteira.
     const existing = await tx.customer.findFirst({
-      where: { OR: [{ phone: dto.customer.phone }, { whatsapp: dto.customer.phone }] },
+      where: {
+        ownerProfessionalId,
+        OR: [{ phone: dto.customer.phone }, { whatsapp: dto.customer.phone }],
+      },
     });
 
     const customer =
@@ -312,6 +325,7 @@ export async function createPublicAppointment(
       (await tx.customer.create({
         data: {
           companyId,
+          ownerProfessionalId,
           name: dto.customer.name,
           phone: dto.customer.phone,
           whatsapp: dto.customer.phone,
@@ -325,6 +339,7 @@ export async function createPublicAppointment(
         companyId,
         customerId: customer.id,
         professionalId: dto.professionalId,
+        ownerProfessionalId,
         // Locatária atende na sala que alugou naquele turno.
         roomId: slot.resourceId,
         startsAt: slot.startsAt,
@@ -353,12 +368,20 @@ export async function createPublicAppointment(
     });
   });
 
-  emitToCompany(companyId, SOCKET_EVENTS.appointmentCreated, appointment);
+  emitToPortfolio(
+    companyId,
+    appointment.ownerProfessionalId,
+    SOCKET_EVENTS.appointmentCreated,
+    appointment,
+  );
 
+  // A locadora não é avisada do atendimento de quem aluga: a notificação vai
+  // para a própria locatária.
   await notificationsService.notifyEvent(companyId, 'APPOINTMENT_CREATED', {
     title: 'Novo agendamento online',
     message: `${appointment.customer.name} — ${appointment.startsAt.toLocaleString('pt-BR')} com ${appointment.professional?.name ?? 'profissional'}`,
     data: { appointmentId: appointment.id, source: 'PUBLIC' },
+    userId: await userOfProfessional(appointment.ownerProfessionalId),
   });
 
   return {

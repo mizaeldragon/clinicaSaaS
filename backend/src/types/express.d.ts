@@ -8,6 +8,8 @@ declare global {
       role: UserRole;
       permissions: string[];
       professionalId?: string | null;
+      /** Locatária: aluga um espaço da empresa e tem carteira própria. */
+      isRenter?: boolean;
     }
 
     interface Request {

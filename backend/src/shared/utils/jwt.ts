@@ -9,6 +9,8 @@ export interface AccessTokenPayload {
   role: string;
   permissions: string[];
   professionalId?: string | null;
+  /** Locatária: aluga um espaço da empresa e tem carteira própria. */
+  isRenter?: boolean;
 }
 
 export function signAccessToken(payload: AccessTokenPayload): string {

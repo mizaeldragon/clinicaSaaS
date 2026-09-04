@@ -11,12 +11,22 @@ function num(value: unknown): number {
   return typeof value === 'number' ? value : Number(value);
 }
 
+interface Viewer {
+  /** Permissões efetivas de quem está pedindo o dashboard. */
+  permissions: string[];
+  /** Admins da empresa passam por qualquer permissão. */
+  isAdmin: boolean;
+}
+
 /**
  * Dashboard principal. Cada bloco só é calculado quando o módulo
- * correspondente está habilitado para a empresa.
+ * correspondente está habilitado **e** quem pede tem permissão de vê-lo —
+ * caixa e aluguéis do espaço não são assunto de quem apenas atende ali.
  */
 export const dashboardService = {
-  async overview(modules: string[]) {
+  async overview(modules: string[], viewer: Viewer = { permissions: [], isAdmin: true }) {
+    const allowed = (permission: string) =>
+      viewer.isAdmin || viewer.permissions.includes(permission);
     const now = new Date();
     const monthStart = startOfMonth(now);
     const monthEnd = endOfMonth(now);
@@ -45,12 +55,20 @@ export const dashboardService = {
         : 0,
     ]);
 
-    const financial = modules.includes(ModuleKey.financial)
-      ? await financialService.dashboard({ from: monthStart, to: monthEnd })
-      : null;
+    const financial =
+      modules.includes(ModuleKey.financial) && allowed('financial:view')
+        ? await financialService.dashboard({ from: monthStart, to: monthEnd })
+        : null;
 
-    const resources = modules.includes(ModuleKey.resources) ? await resourcesService.stats() : null;
-    const rentals = modules.includes(ModuleKey.rentals) ? await rentalsService.stats() : null;
+    const resources =
+      modules.includes(ModuleKey.resources) && allowed('resources:view')
+        ? await resourcesService.stats()
+        : null;
+
+    const rentals =
+      modules.includes(ModuleKey.rentals) && allowed('rentals:view')
+        ? await rentalsService.stats()
+        : null;
 
     const revenueSeries = modules.includes(ModuleKey.appointments)
       ? await this.revenueLast30Days()

@@ -871,6 +871,9 @@ async function seedSharedSpace() {
   ];
 
   let bookings = 0;
+  /** Primeiro turno futuro de cada locatária — usado para semear a agenda dela. */
+  const firstShift = new Map<string, { startsAt: Date; resourceId: string }>();
+
   for (let offset = 0; offset < 21; offset += 1) {
     const date = startOfToday();
     date.setDate(date.getDate() + offset);
@@ -902,16 +905,73 @@ async function seedSharedSpace() {
         },
       });
       bookings += 1;
+
+      if (offset > 0 && !firstShift.has(contract.professionalId)) {
+        firstShift.set(contract.professionalId, { startsAt, resourceId: contract.resourceId });
+      }
     }
   }
 
-  // Algumas clientes já cadastradas
+  // Clientes da casa — carteira da Márcia (ownerProfessionalId nulo).
   await prisma.customer.createMany({
     data: [
       { name: 'Helena Prado', phone: '(11) 97000-1111' },
       { name: 'Isabela Moreira', phone: '(11) 97000-2222' },
     ].map((c) => ({ ...c, companyId })),
   });
+
+  // Cada locatária tem carteira própria: cliente e atendimento são dela, e não
+  // aparecem para a dona do espaço — que fatura o turno, não o atendimento.
+  const portfolios = [
+    { professional: ana, customer: 'Renata Alves', phone: '(11) 96000-1111', service: 'Corte' },
+    { professional: bia, customer: 'Tatiane Souza', phone: '(11) 96000-2222', service: 'Manicure' },
+  ];
+
+  for (const entry of portfolios) {
+    const shift = firstShift.get(entry.professional.id);
+    if (!shift) continue;
+
+    const service = byName(entry.service);
+    const customer = await prisma.customer.create({
+      data: {
+        companyId,
+        ownerProfessionalId: entry.professional.id,
+        name: entry.customer,
+        phone: entry.phone,
+        whatsapp: entry.phone,
+      },
+    });
+
+    const startsAt = new Date(shift.startsAt);
+    startsAt.setMinutes(startsAt.getMinutes() + 60);
+    const endsAt = new Date(startsAt);
+    endsAt.setMinutes(endsAt.getMinutes() + service.durationMinutes);
+
+    await prisma.appointment.create({
+      data: {
+        companyId,
+        customerId: customer.id,
+        professionalId: entry.professional.id,
+        ownerProfessionalId: entry.professional.id,
+        roomId: shift.resourceId,
+        startsAt,
+        endsAt,
+        durationMinutes: service.durationMinutes,
+        status: 'CONFIRMED',
+        totalPrice: service.price,
+        services: {
+          create: {
+            companyId,
+            serviceId: service.id,
+            name: service.name,
+            price: service.price,
+            durationMinutes: service.durationMinutes,
+            quantity: 1,
+          },
+        },
+      },
+    });
+  }
 
   await prisma.expenseCategory.createMany({
     data: ['Aluguel do imóvel', 'Energia', 'Produtos', 'Marketing'].map((name) => ({

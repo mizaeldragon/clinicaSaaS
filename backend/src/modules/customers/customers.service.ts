@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../../shared/database/prisma';
 import { NotFoundError } from '../../shared/errors/AppError';
 import { getPagination, paginated } from '../../shared/utils/http';
+import { currentPortfolioOwner } from '../../shared/services/portfolio.service';
 import type { CreateCustomerDTO, ListCustomersDTO, UpdateCustomerDTO } from './customers.schema';
 
 const COMPLETED_OR_ACTIVE = ['COMPLETED', 'IN_PROGRESS', 'CONFIRMED', 'SCHEDULED'] as const;
@@ -50,7 +51,14 @@ export const customersService = {
   },
 
   async create(dto: CreateCustomerDTO) {
-    return prisma.customer.create({ data: dto as Prisma.CustomerUncheckedCreateInput });
+    // A cliente nasce na carteira de quem a cadastrou: da locatária quando é
+    // ela que está logada, da casa nos demais casos.
+    return prisma.customer.create({
+      data: {
+        ...(dto as Prisma.CustomerUncheckedCreateInput),
+        ownerProfessionalId: currentPortfolioOwner(),
+      },
+    });
   },
 
   async update(id: string, dto: UpdateCustomerDTO) {
