@@ -64,6 +64,8 @@ export interface AuthUser {
   permissions: string[];
   companyId: string | null;
   professionalId?: string | null;
+  /** Locatária: aluga um espaço da empresa e tem carteira própria. */
+  isRenter?: boolean;
   professional?: { id: string; name: string; avatarUrl: string | null } | null;
 }
 

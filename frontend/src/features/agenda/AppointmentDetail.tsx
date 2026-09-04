@@ -70,7 +70,10 @@ export function AppointmentDetail({
   onEdit: () => void;
 }) {
   const { updateStatus, remove } = useAppointmentMutations();
-  const hasFinancial = useAuthStore((s) => s.hasModule('financial'));
+  // A locatária cobra a própria cliente: o valor não passa pelo caixa do
+  // espaço, então nem faz sentido pedir a forma de pagamento aqui.
+  const isRenter = useAuthStore((s) => s.user?.isRenter === true);
+  const hasFinancial = useAuthStore((s) => s.hasModule('financial')) && !isRenter;
 
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('PIX');
   const [completing, setCompleting] = useState(false);

@@ -39,6 +39,8 @@ interface AuthResult {
     permissions: string[];
     companyId: string | null;
     professionalId: string | null;
+    /** Locatária: aluga um espaço da empresa e tem carteira própria. */
+    isRenter: boolean;
   };
   company: Awaited<ReturnType<typeof getCompanyContext>>;
 }
@@ -83,6 +85,7 @@ async function issueSession(
   meta: SessionMeta,
 ): Promise<AuthResult> {
   const permissions = permissionsFor(user.role, user.permissions, user.professional);
+  const isRenter = user.professional?.revenueOwner === 'PROFESSIONAL';
 
   const payload: AccessTokenPayload = {
     sub: user.id,
@@ -90,7 +93,7 @@ async function issueSession(
     role: user.role,
     permissions,
     professionalId: user.professional?.id ?? null,
-    isRenter: user.professional?.revenueOwner === 'PROFESSIONAL',
+    isRenter,
   };
 
   const accessToken = signAccessToken(payload);
@@ -120,6 +123,7 @@ async function issueSession(
       permissions,
       companyId: user.companyId,
       professionalId: user.professional?.id ?? null,
+      isRenter,
     },
     company: user.companyId ? await getCompanyContext(user.companyId) : null,
   };
@@ -339,6 +343,8 @@ export const authService = {
         avatarUrl: user.avatarUrl,
         permissions: permissionsFor(user.role, user.permissions, user.professional),
         companyId: user.companyId,
+        professionalId: user.professional?.id ?? null,
+        isRenter: user.professional?.revenueOwner === 'PROFESSIONAL',
         professional: user.professional,
       },
       company,
