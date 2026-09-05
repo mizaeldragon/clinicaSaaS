@@ -409,6 +409,9 @@ model Professional {
   revenueOwner         RevenueOwner @default(COMPANY)
   /// Aparece na página pública de agendamento.
   publicBookingEnabled Boolean      @default(true)
+  /// Endereço do link público individual: /e/{empresa}/{publicSlug}.
+  /// Cada profissional — a dona e cada locatária — divulga o seu.
+  publicSlug           String?
 
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -427,6 +430,7 @@ model Professional {
   ownedCustomers    Customer[]    @relation("CustomerPortfolio")
   ownedAppointments Appointment[] @relation("AppointmentPortfolio")
 
+  @@unique([companyId, publicSlug])
   @@index([companyId, isActive])
   @@map("professionals")
 }

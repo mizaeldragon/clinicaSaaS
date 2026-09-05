@@ -90,6 +90,49 @@ export async function getStorefront(companyId: string) {
 }
 
 /**
+ * Vitrine individual: o link que cada profissional divulga.
+ *
+ * A dona do espaço tem o dela e cada locatária tem o seu. A página mostra a
+ * marca da casa, mas só os serviços de quem é dona daquele link — a cliente
+ * chega sabendo com quem vai marcar.
+ */
+export async function getProfessionalStorefront(companyId: string, publicSlug: string) {
+  const professional = await prisma.professional.findFirst({
+    where: { publicSlug, isActive: true, publicBookingEnabled: true },
+    select: {
+      id: true,
+      name: true,
+      avatarUrl: true,
+      color: true,
+      specialties: true,
+      bio: true,
+      publicSlug: true,
+    },
+  });
+
+  if (!professional) throw new NotFoundError('Página');
+
+  const storefront = await getStorefront(companyId);
+
+  const links = await prisma.professionalService.findMany({
+    where: { professionalId: professional.id },
+    select: { serviceId: true },
+  });
+  const offered = new Set(links.map((link) => link.serviceId));
+
+  const services = storefront.services.filter((service) => offered.has(service.id));
+
+  return {
+    company: storefront.company,
+    professional,
+    categories: storefront.categories.filter((category) =>
+      services.some((service) => service.categoryId === category.id),
+    ),
+    services,
+  };
+}
+
+/**
  * Janelas em que a profissional pode atender em um dia.
  *
  * Equipe própria → jornada de trabalho cadastrada.
@@ -263,13 +306,18 @@ export async function getPublicAvailability(query: AvailabilityQueryDTO) {
 }
 
 /** Dias com pelo menos um horário livre — pinta o calendário do link público. */
-export async function getPublicAgenda(serviceId: string, from: Date, days: number) {
+export async function getPublicAgenda(
+  serviceId: string,
+  from: Date,
+  days: number,
+  professionalId?: string,
+) {
   const result: { date: Date; available: boolean }[] = [];
 
   for (let i = 0; i < days; i += 1) {
     const date = startOfDay(from);
     date.setDate(date.getDate() + i);
-    const availability = await getPublicAvailability({ serviceId, date });
+    const availability = await getPublicAvailability({ serviceId, date, professionalId });
     result.push({ date, available: availability.professionals.length > 0 });
   }
 

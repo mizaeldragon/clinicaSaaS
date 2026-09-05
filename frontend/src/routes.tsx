@@ -35,6 +35,8 @@ export function AppRoutes() {
 
       {/* Página pública de agendamento — sem login */}
       <Route path="/e/:slug" element={<PublicBookingPage />} />
+      {/* Link individual: cada profissional divulga o seu. */}
+      <Route path="/e/:slug/:professionalSlug" element={<PublicBookingPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route path="/onboarding" element={<OnboardingPage />} />

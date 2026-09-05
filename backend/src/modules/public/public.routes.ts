@@ -10,10 +10,12 @@ import {
   agendaQuerySchema,
   availabilityQuerySchema,
   createPublicAppointmentSchema,
+  professionalSlugParamSchema,
   slugParamSchema,
 } from './public.schema';
 import {
   createPublicAppointment,
+  getProfessionalStorefront,
   getPublicAgenda,
   getPublicAvailability,
   getStorefront,
@@ -96,6 +98,22 @@ publicRoutes.get(
   }),
 );
 
+/**
+ * Vitrine individual — o link que cada profissional divulga.
+ * A dona do espaço tem o dela; cada locatária, o seu.
+ */
+publicRoutes.get(
+  '/p/:professionalSlug',
+  validate({ params: professionalSlugParamSchema }),
+  asyncHandler(async (req, res) => {
+    res.json(
+      serialize(
+        await getProfessionalStorefront(req.companyId as string, req.params.professionalSlug),
+      ),
+    );
+  }),
+);
+
 /** Dias com horário livre para um serviço (pinta o calendário). */
 publicRoutes.get(
   '/agenda/:serviceId',
@@ -104,8 +122,12 @@ publicRoutes.get(
     query: agendaQuerySchema,
   }),
   asyncHandler(async (req, res) => {
-    const query = req.query as unknown as { from: Date; days: number };
-    res.json(serialize(await getPublicAgenda(req.params.serviceId, query.from, query.days)));
+    const query = req.query as unknown as { from: Date; days: number; professionalId?: string };
+    res.json(
+      serialize(
+        await getPublicAgenda(req.params.serviceId, query.from, query.days, query.professionalId),
+      ),
+    );
   }),
 );
 

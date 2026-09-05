@@ -1,6 +1,7 @@
 /* eslint-disable no-console */
 import { PrismaClient, ModuleKey, CommissionType, Prisma } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { slugify } from '../src/shared/utils/slug';
 
 const prisma = new PrismaClient();
 
@@ -248,6 +249,7 @@ async function seedDemoCompany() {
         data: {
           companyId,
           name: p.name,
+          publicSlug: slugify(p.name),
           specialties: p.specialties,
           color: p.color,
           commissionType: CommissionType.PERCENTAGE,
@@ -738,6 +740,7 @@ async function seedSharedSpace() {
     data: {
       companyId,
       name: 'Márcia Vaz',
+      publicSlug: slugify('Márcia Vaz'),
       specialties: ['Estética facial', 'Estética corporal'],
       color: '#4B7C5B',
       phone: '(11) 99555-1000',
@@ -764,6 +767,7 @@ async function seedSharedSpace() {
     data: {
       companyId,
       name: 'Ana Ribeiro',
+      publicSlug: slugify('Ana Ribeiro'),
       specialties: ['Cabelo'],
       color: '#8B5CF6',
       phone: '(11) 98111-2020',
@@ -776,6 +780,7 @@ async function seedSharedSpace() {
     data: {
       companyId,
       name: 'Bia Nunes',
+      publicSlug: slugify('Bia Nunes'),
       specialties: ['Unhas'],
       color: '#EC4899',
       phone: '(11) 98111-3030',

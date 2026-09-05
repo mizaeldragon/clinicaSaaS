@@ -4,6 +4,7 @@ import { BadRequestError, NotFoundError, PlanLimitError } from '../../shared/err
 import { getPagination, paginated } from '../../shared/utils/http';
 import { getCompanyContext } from '../../shared/services/companyContext.service';
 import { endOfDay, endOfMonth, startOfDay, startOfMonth } from '../../shared/utils/datetime';
+import { uniqueSlug } from '../../shared/utils/slug';
 import type {
   CreateProfessionalDTO,
   CreateTimeOffDTO,
@@ -11,6 +12,24 @@ import type {
   SetWorkingHoursDTO,
   UpdateProfessionalDTO,
 } from './professionals.schema';
+
+/**
+ * Endereço do link público individual. Cada profissional divulga o seu —
+ * a dona do espaço o dela, cada locatária o dela.
+ */
+async function publicSlugFor(
+  tx: TxClient,
+  name: string,
+  ignoreId?: string,
+): Promise<string> {
+  return uniqueSlug(name, async (candidate) => {
+    const found = await tx.professional.findFirst({
+      where: { publicSlug: candidate, ...(ignoreId ? { id: { not: ignoreId } } : {}) },
+      select: { id: true },
+    });
+    return Boolean(found);
+  });
+}
 
 const DEFAULT_WORKING_HOURS = [1, 2, 3, 4, 5].map((weekday) => ({
   weekday,
@@ -88,7 +107,11 @@ export const professionalsService = {
 
     return prisma.$transaction(async (tx) => {
       const professional = await tx.professional.create({
-        data: { ...data, companyId } as Prisma.ProfessionalUncheckedCreateInput,
+        data: {
+          ...data,
+          companyId,
+          publicSlug: await publicSlugFor(tx, data.name),
+        } as Prisma.ProfessionalUncheckedCreateInput,
       });
 
       await tx.workingHour.createMany({
@@ -112,7 +135,11 @@ export const professionalsService = {
     const { serviceIds, workingHours, ...data } = dto;
 
     return prisma.$transaction(async (tx) => {
-      const professional = await tx.professional.update({ where: { id }, data });
+      const professional = await tx.professional.update({
+        where: { id },
+        // Renomear a profissional renova o endereço do link dela.
+        data: { ...data, ...(data.name ? { publicSlug: await publicSlugFor(tx, data.name, id) } : {}) },
+      });
 
       if (workingHours) {
         await tx.workingHour.deleteMany({ where: { professionalId: id } });

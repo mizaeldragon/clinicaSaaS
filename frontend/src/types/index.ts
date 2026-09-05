@@ -66,7 +66,14 @@ export interface AuthUser {
   professionalId?: string | null;
   /** Locatária: aluga um espaço da empresa e tem carteira própria. */
   isRenter?: boolean;
-  professional?: { id: string; name: string; avatarUrl: string | null } | null;
+  professional?: {
+    id: string;
+    name: string;
+    avatarUrl: string | null;
+    /** Endereço do link público individual dela. */
+    publicSlug?: string | null;
+    publicBookingEnabled?: boolean;
+  } | null;
 }
 
 export interface CompanyContext {
@@ -163,6 +170,8 @@ export interface Professional {
   /** PROFESSIONAL = locatária: aluga o espaço e cobra as próprias clientes. */
   revenueOwner?: 'COMPANY' | 'PROFESSIONAL';
   publicBookingEnabled?: boolean;
+  /** Endereço do link público individual: /e/{empresa}/{publicSlug}. */
+  publicSlug?: string | null;
   isActive: boolean;
   workingHours?: WorkingHour[];
   timeOffs?: { id: string; startsAt: string; endsAt: string; reason: string | null }[];

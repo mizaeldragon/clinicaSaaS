@@ -17,6 +17,16 @@ export const availabilityQuerySchema = z.object({
 export const agendaQuerySchema = z.object({
   from: z.coerce.date(),
   days: z.coerce.number().int().min(1).max(31).default(7),
+  /** No link individual, só interessa a agenda daquela profissional. */
+  professionalId: z.string().uuid().optional(),
+});
+
+export const professionalSlugParamSchema = slugParamSchema.extend({
+  professionalSlug: z
+    .string()
+    .min(1)
+    .max(80)
+    .regex(/^[a-z0-9-]+$/, 'Endereço inválido'),
 });
 
 export const createPublicAppointmentSchema = z.object({

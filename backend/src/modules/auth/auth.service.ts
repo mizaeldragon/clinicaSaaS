@@ -325,7 +325,16 @@ export const authService = {
       prisma.user.findUnique({
         where: { id: userId },
         include: {
-          professional: { select: { id: true, name: true, avatarUrl: true, revenueOwner: true } },
+          professional: {
+            select: {
+              id: true,
+              name: true,
+              avatarUrl: true,
+              revenueOwner: true,
+              publicSlug: true,
+              publicBookingEnabled: true,
+            },
+          },
         },
       }),
     );

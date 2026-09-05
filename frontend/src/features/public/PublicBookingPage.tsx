@@ -14,6 +14,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import {
+  useProfessionalStorefront,
   usePublicAvailability,
   usePublicBooking,
   useStorefront,
@@ -37,9 +38,34 @@ const STEP_LABELS: Record<Exclude<Step, 'done'>, string> = {
   form: 'Seus dados',
 };
 
+/**
+ * Página pública de agendamento, em dois formatos:
+ *
+ * - `/e/{empresa}` — a vitrine do espaço inteiro, com todas as profissionais;
+ * - `/e/{empresa}/{profissional}` — o link individual, que cada uma divulga
+ *   para as próprias clientes. A dona do espaço tem o dela e cada locatária
+ *   tem o seu.
+ */
 export function PublicBookingPage() {
-  const { slug = '' } = useParams();
-  const { data, isLoading, error } = useStorefront(slug);
+  const { slug = '', professionalSlug } = useParams();
+  const solo = Boolean(professionalSlug);
+
+  const space = useStorefront(slug, !solo);
+  const individual = useProfessionalStorefront(slug, professionalSlug);
+
+  const source = solo ? individual : space;
+  const isLoading = source.isLoading;
+  const error = source.error;
+
+  // A vitrine individual traz uma profissional só; o resto da tela é igual.
+  const data: Storefront | undefined = useMemo(() => {
+    if (!solo) return space.data;
+    if (!individual.data) return undefined;
+    const { company, categories, services, professional } = individual.data;
+    return { company, categories, services, professionals: [professional] };
+  }, [solo, space.data, individual.data]);
+
+  const host = solo ? individual.data?.professional : null;
 
   const [step, setStep] = useState<Step>('service');
   const [serviceId, setServiceId] = useState<string>('');
@@ -51,6 +77,7 @@ export function PublicBookingPage() {
     slug,
     step === 'slot' || step === 'form' ? serviceId : undefined,
     date.toISOString(),
+    host?.id,
   );
   const booking = usePublicBooking(slug);
 
@@ -113,20 +140,34 @@ export function PublicBookingPage() {
       <header className="border-b border-border/60 bg-card/80 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-5 py-4">
           <div className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-primary text-primary-foreground">
-            {company.logoUrl ? (
+            {host?.avatarUrl ? (
+              <img src={host.avatarUrl} alt="" className="size-full object-cover" />
+            ) : company.logoUrl ? (
               <img src={company.logoUrl} alt="" className="size-full object-cover" />
             ) : (
               <Sparkles className="size-5" />
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-lg font-semibold tracking-tight">{company.name}</h1>
-            {address ? (
-              <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
-                <MapPin className="size-3" />
-                {address}
-              </p>
-            ) : null}
+            {host ? (
+              <>
+                <h1 className="truncate text-lg font-semibold tracking-tight">{host.name}</h1>
+                <p className="truncate text-xs text-muted-foreground">
+                  {company.name}
+                  {address ? ` · ${address}` : ''}
+                </p>
+              </>
+            ) : (
+              <>
+                <h1 className="truncate text-lg font-semibold tracking-tight">{company.name}</h1>
+                {address ? (
+                  <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+                    <MapPin className="size-3" />
+                    {address}
+                  </p>
+                ) : null}
+              </>
+            )}
           </div>
           {company.whatsapp ? (
             <Button variant="outline" size="sm" asChild>
@@ -158,9 +199,9 @@ export function PublicBookingPage() {
           />
         ) : (
           <>
-            {company.publicDescription && step === 'service' ? (
+            {step === 'service' && (host?.bio || company.publicDescription) ? (
               <p className="mb-6 rounded-xl border border-border/70 bg-card p-4 text-sm text-muted-foreground">
-                {company.publicDescription}
+                {host?.bio ?? company.publicDescription}
               </p>
             ) : null}
 

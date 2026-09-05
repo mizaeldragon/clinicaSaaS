@@ -257,6 +257,19 @@ Rotas **sem autenticação**, montadas em `/api/v1/public/:slug`. O slug da empr
 resolve o tenant e abre o `AsyncLocalStorage` — o mesmo isolamento do resto da API
 vale aqui.
 
+Duas vitrines saem das mesmas rotas:
+
+| Endereço | O que mostra | Quem divulga |
+|---|---|---|
+| `/e/{empresa}` | o espaço inteiro: quem está no salão naquele dia | a casa |
+| `/e/{empresa}/{profissional}` | uma profissional só, com os serviços dela | cada uma para as próprias clientes |
+
+`Professional.publicSlug` (único por empresa, derivado do nome) é o endereço
+individual. Num espaço compartilhado cada locatária divulga o seu, e a dona
+divulga o dela — quem abre já cai na agenda de quem mandou o link. A vitrine
+individual filtra os serviços por `ProfessionalService` e passa `professionalId`
+adiante, então disponibilidade e agenda respondem por aquela profissional apenas.
+
 Fluxo da cliente: **serviço → data → profissional/horário → dados → confirmação.**
 
 A lista de profissionais de um dia é montada assim:

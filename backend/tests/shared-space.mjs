@@ -130,8 +130,42 @@ const run = async () => {
     JSON.stringify(blocked.data),
   );
 
+  console.log('\n=== 3b. Link público individual ===');
+
+  const anaPage = await api(`/public/${SLUG}/p/ana-ribeiro`);
+  check('link individual da locatária abre sem login', anaPage.status === 200, JSON.stringify(anaPage.data?.error));
+  check('traz a marca do espaço', anaPage.data?.company?.name === 'Espaço Márcia Vaz');
+  check('e só a profissional daquele link', anaPage.data?.professional?.name === 'Ana Ribeiro');
+  check(
+    'mostra só os serviços que ela faz',
+    anaPage.data.services.length > 0 &&
+      anaPage.data.services.every((s) => ['Corte', 'Escova', 'Lavagem + finalização'].includes(s.name)),
+    JSON.stringify(anaPage.data.services.map((s) => s.name)),
+  );
+
+  const marciaPage = await api(`/public/${SLUG}/p/marcia-vaz`);
+  check(
+    'a dona do espaço tem o link dela, com os serviços dela',
+    marciaPage.status === 200 &&
+      marciaPage.data.services.every((s) => ['Limpeza de pele', 'Massagem modeladora'].includes(s.name)),
+    JSON.stringify(marciaPage.data.services?.map((s) => s.name)),
+  );
+
+  const ghost = await api(`/public/${SLUG}/p/nao-existe`);
+  check('link inexistente devolve 404', ghost.status === 404, String(ghost.status));
+
   console.log('\n=== 4. Profissional do dia sai do aluguel ===');
   const corte = storefront.data.services.find((s) => s.name === 'Corte');
+
+  const anaOnly = await api(
+    `/public/${SLUG}/availability?serviceId=${corte.id}&date=${tuesday.toISOString()}&professionalId=${anaPage.data.professional.id}`,
+  );
+  check(
+    'link individual mostra a agenda de uma profissional só',
+    anaOnly.data.professionals.length === 1 &&
+      anaOnly.data.professionals[0].professional.name === 'Ana Ribeiro',
+    JSON.stringify(anaOnly.data.professionals.map((p) => p.professional.name)),
+  );
 
   const tuesdayAvailability = await api(
     `/public/${SLUG}/availability?serviceId=${corte.id}&date=${tuesday.toISOString()}`,

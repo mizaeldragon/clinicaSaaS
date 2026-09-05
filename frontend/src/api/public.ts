@@ -34,6 +34,33 @@ export interface Storefront {
   }[];
 }
 
+export interface PublicProfessional {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+  color: string;
+  specialties: string[];
+  bio: string | null;
+  publicSlug: string | null;
+}
+
+/** Vitrine individual: o link que cada profissional divulga. */
+export interface ProfessionalStorefront {
+  company: Storefront['company'];
+  professional: PublicProfessional;
+  categories: Storefront['categories'];
+  services: Storefront['services'];
+}
+
+export function useProfessionalStorefront(slug: string, professionalSlug?: string) {
+  return useQuery<ProfessionalStorefront>({
+    queryKey: ['storefront', slug, professionalSlug],
+    queryFn: () => api.get<ProfessionalStorefront>(`/public/${slug}/p/${professionalSlug}`),
+    enabled: Boolean(professionalSlug),
+    retry: false,
+  });
+}
+
 export interface PublicSlot {
   time: string;
   startsAt: string;
@@ -52,26 +79,43 @@ export interface PublicAvailability {
   }[];
 }
 
-export function useStorefront(slug: string) {
+export function useStorefront(slug: string, enabled = true) {
   return useQuery<Storefront>({
     queryKey: ['storefront', slug],
     queryFn: () => api.get<Storefront>(`/public/${slug}`),
+    enabled,
     retry: false,
   });
 }
 
-export function usePublicAvailability(slug: string, serviceId?: string, date?: string) {
+export function usePublicAvailability(
+  slug: string,
+  serviceId?: string,
+  date?: string,
+  professionalId?: string,
+) {
   return useQuery<PublicAvailability>({
-    queryKey: ['public-availability', slug, serviceId, date],
-    queryFn: () => api.get<PublicAvailability>(`/public/${slug}/availability`, { serviceId, date }),
+    queryKey: ['public-availability', slug, serviceId, date, professionalId],
+    queryFn: () =>
+      api.get<PublicAvailability>(`/public/${slug}/availability`, {
+        serviceId,
+        date,
+        professionalId,
+      }),
     enabled: Boolean(serviceId && date),
   });
 }
 
-export function usePublicAgenda(slug: string, serviceId?: string, from?: string, days = 14) {
+export function usePublicAgenda(
+  slug: string,
+  serviceId?: string,
+  from?: string,
+  days = 14,
+  professionalId?: string,
+) {
   return useQuery<{ date: string; available: boolean }[]>({
-    queryKey: ['public-agenda', slug, serviceId, from, days],
-    queryFn: () => api.get(`/public/${slug}/agenda/${serviceId}`, { from, days }),
+    queryKey: ['public-agenda', slug, serviceId, from, days, professionalId],
+    queryFn: () => api.get(`/public/${slug}/agenda/${serviceId}`, { from, days, professionalId }),
     enabled: Boolean(serviceId && from),
   });
 }

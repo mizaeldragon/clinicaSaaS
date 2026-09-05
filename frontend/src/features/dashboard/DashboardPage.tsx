@@ -29,6 +29,7 @@ import { StatCard } from '@/components/ui/data';
 import { Button } from '@/components/ui/button';
 import { EmptyState, ErrorState, SkeletonCards, Skeleton } from '@/components/ui/feedback';
 import { UserAvatar } from '@/components/ui/primitives';
+import { PublicLinkCard } from '@/components/PublicLinkCard';
 import { compactCurrency, currency, number, shortDate, timeLabel } from '@/lib/format';
 
 function greeting() {
@@ -41,7 +42,11 @@ function greeting() {
 export function DashboardPage() {
   const { data, isLoading, isError, refetch } = useDashboard();
   const user = useAuthStore((s) => s.user);
+  const company = useAuthStore((s) => s.company);
   const hasModule = useAuthStore((s) => s.hasModule);
+
+  // Quem atende tem link próprio para divulgar; quem só administra, não.
+  const ownLink = user?.professional?.publicSlug ?? null;
 
   if (isLoading) {
     return (
@@ -77,6 +82,10 @@ export function DashboardPage() {
           })}
         </p>
       </div>
+
+      {ownLink && company?.slug ? (
+        <PublicLinkCard companySlug={company.slug} professionalSlug={ownLink} />
+      ) : null}
 
       {/* ------------------------------------------------------------ Hoje */}
       {data.today ? (

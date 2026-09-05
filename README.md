@@ -84,10 +84,17 @@ O *Espaço Márcia Vaz* demonstra o cenário de coworking de beleza:
   estética onde a dona atende;
 - turnos fixos (Manhã / Tarde / Noite) com **preço por espaço × turno**;
 - contratos recorrentes ("toda terça e quinta de manhã") que geram as reservas sozinhos;
-- **link público**: `http://localhost:5173/e/espaco-marcia-vaz`
+- **link público do espaço**: `http://localhost:5173/e/espaco-marcia-vaz`
+- **link público individual**, um para cada profissional:
+  `/e/espaco-marcia-vaz/marcia-vaz`, `/e/espaco-marcia-vaz/ana-ribeiro`
 
-No link, a cliente escolhe o serviço e o sistema mostra **quem está no espaço naquele
-dia** — a disponibilidade das locatárias vem dos turnos que elas alugaram.
+No link do espaço a cliente escolhe o serviço e o sistema mostra **quem está no
+espaço naquele dia** — a disponibilidade das locatárias vem dos turnos que elas
+alugaram.
+
+Cada profissional também tem **o próprio link** para divulgar no Instagram: ele
+mostra a marca da casa, mas só o nome e os serviços dela, e quem abre marca
+direto com ela. O endereço aparece no painel de cada uma, pronto para copiar.
 
 #### Cada uma com a sua carteira
 
@@ -119,17 +126,18 @@ cd backend && npm run test:e2e
 ```
 
 Reseta o banco, recria o seed e roda as duas suítes end-to-end contra a API
-(**83 verificações**):
+(**90 verificações**):
 
 **`test:smoke` (43)** — autenticação e rotação de refresh token, **isolamento entre
 empresas**, feature flags de módulos, prevenção de conflitos de agenda, finalização
 de atendimento gerando receita e comissão, dashboards, aluguéis, permissões por
 papel, painel do super admin e onboarding.
 
-**`test:shared-space` (40)** — turnos e preços, reserva sem sobreposição, **página
+**`test:shared-space` (47)** — turnos e preços, reserva sem sobreposição, **página
 pública sem login**, "profissional do dia" saindo do aluguel, agendamento pelo link,
 **caixa separado** (receita da locatária não entra no da empresa), sala alugada
-protegendo a agenda, painel restrito da locatária e a **parede entre carteiras**:
+protegendo a agenda, **link individual de cada profissional**, painel restrito da
+locatária e a **parede entre carteiras**:
 a dona não vê as clientes nem os agendamentos de quem aluga (nem pelo id direto),
 uma locatária não vê a outra, e ninguém escreve na agenda alheia.
 

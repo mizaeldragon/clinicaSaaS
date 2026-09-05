@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { MoreHorizontal, Pencil, Plus, Trash2, UserCog } from 'lucide-react';
+import { Link2, MoreHorizontal, Pencil, Plus, Trash2, UserCog } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,11 +16,22 @@ import {
 import { useProfessionalMutations, useProfessionals } from '@/api/queries';
 import { useAuthStore } from '@/stores/auth.store';
 import { phoneMask } from '@/lib/format';
+import { publicBookingUrl } from '@/components/PublicLinkCard';
 import { ProfessionalDialog } from './ProfessionalDialog';
 import type { Professional } from '@/types';
 
+/** O link individual da profissional, pronto para mandar por WhatsApp. */
+async function copyLink(url: string) {
+  try {
+    await navigator.clipboard.writeText(url);
+  } catch {
+    // Clipboard bloqueado: o link continua acessível pela página da profissional.
+  }
+}
+
 export function ProfessionalsPage() {
   const canManage = useAuthStore((s) => s.can('professionals:manage'));
+  const company = useAuthStore((s) => s.company);
   const { data, isLoading } = useProfessionals({});
   const { remove } = useProfessionalMutations();
 
@@ -98,6 +109,16 @@ export function ProfessionalsPage() {
                         <Pencil />
                         Editar
                       </DropdownMenuItem>
+                      {professional.publicSlug && company?.slug ? (
+                        <DropdownMenuItem
+                          onSelect={() =>
+                            copyLink(publicBookingUrl(company.slug, professional.publicSlug))
+                          }
+                        >
+                          <Link2 />
+                          Copiar link de agendamento
+                        </DropdownMenuItem>
+                      ) : null}
                       <DropdownMenuItem destructive onSelect={() => remove.mutate(professional.id)}>
                         <Trash2 />
                         Remover
