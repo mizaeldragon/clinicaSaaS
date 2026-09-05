@@ -9,6 +9,20 @@ import { Label } from '@/components/ui/primitives';
 import { useAuthStore } from '@/stores/auth.store';
 import { ApiError } from '@/lib/api';
 
+/**
+ * Atalhos do seed. Credenciais reais numa página aberta só fazem sentido em
+ * desenvolvimento — em produção o bloco não é sequer renderizado.
+ */
+const DEMO_ACCOUNTS = import.meta.env.DEV
+  ? [
+      { label: 'Clínica completa', email: 'admin@clinicabella.com', password: 'bella@12345' },
+      { label: 'Studio pequeno', email: 'lu@studionails.com', password: 'studio@12345' },
+      { label: 'Espaço compartilhado', email: 'marcia@marciavaz.com.br', password: 'marcia@12345' },
+      { label: 'Locatária do espaço', email: 'ana@marciavaz.com.br', password: 'marcia@12345' },
+      { label: 'Super admin', email: 'admin@saas.com', password: 'admin@12345' },
+    ]
+  : null;
+
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -120,50 +134,29 @@ export function LoginPage() {
         </Button>
       </form>
 
-      <div className="rounded-xl border border-dashed bg-muted/40 p-4 text-xs text-muted-foreground">
-        <p className="mb-2 font-medium text-foreground">Contas de demonstração</p>
-        <ul className="space-y-1">
-          <li>
-            <button
-              type="button"
-              className="text-primary hover:underline"
-              onClick={() => {
-                setEmail('admin@clinicabella.com');
-                setPassword('bella@12345');
-              }}
-            >
-              Clínica completa
-            </button>{' '}
-            — admin@clinicabella.com / bella@12345
-          </li>
-          <li>
-            <button
-              type="button"
-              className="text-primary hover:underline"
-              onClick={() => {
-                setEmail('lu@studionails.com');
-                setPassword('studio@12345');
-              }}
-            >
-              Studio pequeno
-            </button>{' '}
-            — lu@studionails.com / studio@12345
-          </li>
-          <li>
-            <button
-              type="button"
-              className="text-primary hover:underline"
-              onClick={() => {
-                setEmail('admin@saas.com');
-                setPassword('admin@12345');
-              }}
-            >
-              Super admin
-            </button>{' '}
-            — admin@saas.com / admin@12345
-          </li>
-        </ul>
-      </div>
+      {DEMO_ACCOUNTS ? (
+        <div className="rounded-xl border border-dashed bg-muted/40 p-4 text-xs text-muted-foreground">
+          <p className="mb-2 font-medium text-foreground">Contas de demonstração</p>
+          <ul className="space-y-1">
+            {DEMO_ACCOUNTS.map((account) => (
+              <li key={account.email}>
+                <button
+                  type="button"
+                  className="text-primary hover:underline"
+                  onClick={() => {
+                    setEmail(account.email);
+                    setPassword(account.password);
+                  }}
+                >
+                  {account.label}
+                </button>{' '}
+                — {account.email} / {account.password}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
     </AuthShell>
   );
 }
