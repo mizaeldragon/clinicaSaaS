@@ -408,6 +408,37 @@ const run = async () => {
     JSON.stringify({ financial: anaDashboard.data.financial, rentals: anaDashboard.data.rentals }),
   );
 
+  // A guarda de exclusão conta atendimentos e turnos — dados que a locadora não
+  // enxerga. Se ela contasse dentro da carteira dela, a locatária "vazia" seria
+  // apagada de verdade, levando junto as reservas de turno em cascata.
+  const removed = await api(`/professionals/${anaSlots.professional.id}`, {
+    method: 'DELETE',
+    token: marcia.accessToken,
+  });
+  check('remover locatária responde ok', removed.status === 204, String(removed.status));
+
+  const stillThere = await api('/professionals?isActive=false', { token: marcia.accessToken });
+  check(
+    'locatária com histórico é inativada, nunca apagada',
+    stillThere.data.data.some((p) => p.id === anaSlots.professional.id),
+    JSON.stringify(stillThere.data.data.map((p) => p.name)),
+  );
+
+  const survivingBookings = await api('/rentals/bookings?perPage=100', { token: marcia.accessToken });
+  check(
+    'e os turnos alugados dela continuam no histórico',
+    survivingBookings.data.data.some((b) => b.professional.id === anaSlots.professional.id),
+    String(survivingBookings.data.meta?.total),
+  );
+
+  // Devolve a locatária ao ar: o seed também é o ambiente de demonstração.
+  const restored = await api(`/professionals/${anaSlots.professional.id}`, {
+    method: 'PATCH',
+    token: marcia.accessToken,
+    body: { isActive: true },
+  });
+  check('locatária pode ser reativada', restored.status === 200, String(restored.status));
+
   const ownerDashboard = await api('/reports/appointments', { token: marcia.accessToken });
   check(
     'relatório da dona ignora os atendimentos alugados',

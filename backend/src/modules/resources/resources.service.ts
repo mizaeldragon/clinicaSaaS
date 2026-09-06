@@ -1,5 +1,6 @@
 import { Prisma, ResourceStatus } from '@prisma/client';
 import { prisma } from '../../shared/database/prisma';
+import { tenantContext } from '../../shared/database/tenantContext';
 import { ConflictError, NotFoundError } from '../../shared/errors/AppError';
 import { getPagination, paginated } from '../../shared/utils/http';
 import { endOfDay, startOfDay } from '../../shared/utils/datetime';
@@ -107,15 +108,20 @@ export const resourcesService = {
   async remove(id: string) {
     await this.get(id);
 
-    const [appointments, rentals] = await Promise.all([
-      prisma.appointment.count({ where: { OR: [{ roomId: id }, { resourceId: id }] } }),
-      prisma.rental.count({ where: { resourceId: id, status: { in: ['ACTIVE', 'OVERDUE'] } } }),
-    ]);
+    // Idem: o espaço pode estar ocupado por atendimentos de uma locatária, que
+    // não aparecem para a casa. A guarda precisa enxergar todas as carteiras.
+    const [appointments, rentals, bookings] = await tenantContext.runUnscoped(() =>
+      Promise.all([
+        prisma.appointment.count({ where: { OR: [{ roomId: id }, { resourceId: id }] } }),
+        prisma.rental.count({ where: { resourceId: id, status: { in: ['ACTIVE', 'OVERDUE'] } } }),
+        prisma.rentalBooking.count({ where: { resourceId: id, status: { not: 'CANCELED' } } }),
+      ]),
+    );
 
     if (rentals > 0) {
       throw new ConflictError('Este recurso possui contratos de aluguel ativos');
     }
-    if (appointments > 0) {
+    if (appointments > 0 || bookings > 0) {
       return prisma.resource.update({ where: { id }, data: { isActive: false, status: 'INACTIVE' } });
     }
     return prisma.resource.delete({ where: { id } });

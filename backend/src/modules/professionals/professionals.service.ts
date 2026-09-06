@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma, TxClient } from '../../shared/database/prisma';
+import { tenantContext } from '../../shared/database/tenantContext';
 import { BadRequestError, NotFoundError, PlanLimitError } from '../../shared/errors/AppError';
 import { getPagination, paginated } from '../../shared/utils/http';
 import { getCompanyContext } from '../../shared/services/companyContext.service';
@@ -158,10 +159,22 @@ export const professionalsService = {
 
   async remove(id: string) {
     await this.get(id);
-    const appointments = await prisma.appointment.count({ where: { professionalId: id } });
-    if (appointments > 0) {
+
+    // Sem recorte de carteira: a locadora não enxerga a agenda de quem aluga,
+    // e essa contagem é justamente o que decide entre inativar e apagar. Com o
+    // recorte, uma locatária cheia de atendimentos parecia vazia e era apagada
+    // de verdade — levando junto, em cascata, as reservas de turno dela.
+    const [appointments, bookings] = await tenantContext.runUnscoped(() =>
+      Promise.all([
+        prisma.appointment.count({ where: { professionalId: id } }),
+        prisma.rentalBooking.count({ where: { professionalId: id } }),
+      ]),
+    );
+
+    if (appointments > 0 || bookings > 0) {
       return prisma.professional.update({ where: { id }, data: { isActive: false } });
     }
+
     return prisma.professional.delete({ where: { id } });
   },
 

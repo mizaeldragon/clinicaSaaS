@@ -126,20 +126,22 @@ cd backend && npm run test:e2e
 ```
 
 Reseta o banco, recria o seed e roda as duas suítes end-to-end contra a API
-(**90 verificações**):
+(**94 verificações**):
 
 **`test:smoke` (43)** — autenticação e rotação de refresh token, **isolamento entre
 empresas**, feature flags de módulos, prevenção de conflitos de agenda, finalização
 de atendimento gerando receita e comissão, dashboards, aluguéis, permissões por
 papel, painel do super admin e onboarding.
 
-**`test:shared-space` (47)** — turnos e preços, reserva sem sobreposição, **página
+**`test:shared-space` (51)** — turnos e preços, reserva sem sobreposição, **página
 pública sem login**, "profissional do dia" saindo do aluguel, agendamento pelo link,
 **caixa separado** (receita da locatária não entra no da empresa), sala alugada
 protegendo a agenda, **link individual de cada profissional**, painel restrito da
 locatária e a **parede entre carteiras**:
 a dona não vê as clientes nem os agendamentos de quem aluga (nem pelo id direto),
-uma locatária não vê a outra, e ninguém escreve na agenda alheia.
+uma locatária não vê a outra, e ninguém escreve na agenda alheia — inclusive a
+guarda de exclusão, que conta histórico fora do recorte para nunca apagar de
+verdade uma profissional que tem agenda ou turnos.
 
 As suítes esperam o seed limpo — rode sempre pelo `test:e2e`.
 
