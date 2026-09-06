@@ -40,6 +40,7 @@ import {
   useSubscription,
   useSubscriptionMutations,
   useUserMutations,
+  useProfessionals,
   useUsers,
 } from '@/api/queries';
 import { useAuthStore } from '@/stores/auth.store';
@@ -65,6 +66,7 @@ export function SettingsPage() {
   const { data: company, isLoading } = useCompany();
   const { data: modules } = useCompanyModules();
   const { data: users } = useUsers({ perPage: 50 });
+  const { data: professionals } = useProfessionals({ isActive: 'true' });
   const { data: subscription } = useSubscription();
   const { data: plans } = usePlans();
   const { data: auditLogs } = useAuditLogs({ perPage: 30 });
@@ -97,7 +99,14 @@ export function SettingsPage() {
     email: '',
     password: '',
     role: 'RECEPTIONIST' as UserRole,
+    professionalId: '',
   });
+
+  // Profissionais que ainda não têm login. Sem esse vínculo o acesso não sabe
+  // de quem é a agenda — e uma locatária cairia na carteira da casa.
+  const linkable = (professionals?.data ?? []).filter(
+    (professional) => !professional.user,
+  );
 
   useEffect(() => {
     if (!company) return;
@@ -702,10 +711,19 @@ export function SettingsPage() {
             onSubmit={async (event) => {
               event.preventDefault();
               await userMutations.create
-                .mutateAsync(userForm)
+                .mutateAsync({
+                  ...userForm,
+                  professionalId: userForm.professionalId || undefined,
+                })
                 .then(() => {
                   setUserDialog(false);
-                  setUserForm({ name: '', email: '', password: '', role: 'RECEPTIONIST' });
+                  setUserForm({
+                    name: '',
+                    email: '',
+                    password: '',
+                    role: 'RECEPTIONIST',
+                    professionalId: '',
+                  });
                 })
                 .catch(() => undefined);
             }}
@@ -754,6 +772,33 @@ export function SettingsPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {userForm.role === 'PROFESSIONAL' ? (
+              <div className="space-y-1.5">
+                <Label>Vincular à profissional</Label>
+                <Select
+                  value={userForm.professionalId}
+                  onValueChange={(v) => setUserForm((f) => ({ ...f, professionalId: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione quem vai usar este acesso" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {linkable.map((professional) => (
+                      <SelectItem key={professional.id} value={professional.id}>
+                        {professional.name}
+                        {professional.revenueOwner === 'PROFESSIONAL' ? ' — locatária' : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  É esse vínculo que faz o acesso abrir a agenda certa. Sem ele, quem
+                  entrar não enxerga a própria agenda nem o próprio link de agendamento.
+                </p>
+              </div>
+            ) : null}
+
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setUserDialog(false)}>
                 Cancelar

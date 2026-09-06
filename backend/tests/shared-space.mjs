@@ -446,6 +446,57 @@ const run = async () => {
     JSON.stringify(ownerDashboard.data?.total),
   );
 
+  console.log('\n=== 10. Cadastrando uma locatária nova, do zero ===');
+
+  const nova = await api('/professionals', {
+    method: 'POST',
+    token: marcia.accessToken,
+    body: {
+      name: 'Carol Dias',
+      phone: '(11) 98111-4040',
+      revenueOwner: 'PROFESSIONAL',
+      publicBookingEnabled: true,
+      specialties: ['Cabelo'],
+    },
+  });
+  check('1) cadastra a profissional como locatária', nova.status === 201, JSON.stringify(nova.data));
+  check(
+    '2) o link individual dela já nasce pronto',
+    nova.data.publicSlug === 'carol-dias',
+    nova.data.publicSlug,
+  );
+
+  const acesso = await api('/users', {
+    method: 'POST',
+    token: marcia.accessToken,
+    body: {
+      name: 'Carol Dias',
+      email: 'carol@marciavaz.com.br',
+      password: 'carol@12345',
+      role: 'PROFESSIONAL',
+      professionalId: nova.data.id,
+    },
+  });
+  check('3) cria o acesso vinculado a ela', acesso.status === 201, JSON.stringify(acesso.data));
+
+  const carol = await login('carol@marciavaz.com.br', 'carol@12345');
+  check('4) ela entra e o sistema a reconhece como locatária', carol.user.isRenter === true);
+  check('   e sabe de quem é a agenda', carol.user.professionalId === nova.data.id);
+
+  const carolClientes = await api('/customers?perPage=100', { token: carol.accessToken });
+  check(
+    '5) começa com a carteira vazia — não herda as clientes da casa',
+    carolClientes.data.data.length === 0,
+    JSON.stringify(carolClientes.data.data.map((c) => c.name)),
+  );
+
+  const carolPage = await api(`/public/${SLUG}/p/carol-dias`);
+  check(
+    '6) o link público dela responde',
+    carolPage.status === 200 && carolPage.data.professional.name === 'Carol Dias',
+    String(carolPage.status),
+  );
+
   console.log(`\n──────────────────────────────\n  ${pass} passaram · ${fail} falharam\n`);
   process.exit(fail > 0 ? 1 : 0);
 };
