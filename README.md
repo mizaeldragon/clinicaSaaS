@@ -126,12 +126,14 @@ cd backend && npm run test:e2e
 ```
 
 Reseta o banco, recria o seed e roda as duas suítes end-to-end contra a API
-(**108 verificações**):
+(**113 verificações**):
 
-**`test:smoke` (43)** — autenticação e rotação de refresh token, **isolamento entre
+**`test:smoke` (48)** — autenticação e rotação de refresh token, **isolamento entre
 empresas**, feature flags de módulos, prevenção de conflitos de agenda, finalização
 de atendimento gerando receita e comissão, dashboards, aluguéis, permissões por
-papel, painel do super admin e onboarding.
+papel, painel do super admin e o **cadastro decidindo os módulos**: uma clínica
+nova nasce só com agenda, clientes e serviços, e continua sem "Aluguel" quando
+responde que não aluga espaço — inclusive na API, não só no menu.
 
 **`test:shared-space` (65)** — turnos e preços, reserva sem sobreposição, **página
 pública sem login**, "profissional do dia" saindo do aluguel, agendamento pelo link,

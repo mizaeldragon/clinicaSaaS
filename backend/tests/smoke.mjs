@@ -276,6 +276,72 @@ const run = async () => {
   });
   check('módulo essencial não pode ser desativado', disableCore.status === 400);
 
+  // Uma clínica que não aluga espaço não deve ver "Aluguel" em lugar nenhum.
+  // É o cadastro que decide: a empresa nasce só com o básico e o wizard liga o
+  // resto conforme as respostas.
+  const nova = await api('/auth/register', {
+    method: 'POST',
+    body: {
+      company: { name: `Clínica Sem Aluguel ${Date.now()}`, type: 'AESTHETIC_CLINIC' },
+      admin: {
+        name: 'Dona da Clínica',
+        email: `clinica${Date.now()}@teste.com`,
+        password: 'clinica@12345',
+      },
+    },
+  });
+  check('nova empresa é criada', nova.status === 201, JSON.stringify(nova.data?.error));
+  check(
+    'nasce só com o básico — agenda, clientes e serviços',
+    ['appointments', 'customers', 'services'].every((m) => nova.data.company.modules.includes(m)) &&
+      !nova.data.company.modules.includes('rentals'),
+    JSON.stringify(nova.data.company?.modules),
+  );
+
+  const semAluguel = await api('/onboarding/complete', {
+    method: 'POST',
+    token: nova.data.accessToken,
+    body: {
+      companyType: 'AESTHETIC_CLINIC',
+      serviceKeys: ['facial'],
+      hasProfessionals: true,
+      usesCommission: true,
+      hasRooms: true,
+      rentsSpaces: false,
+      seedCatalog: false,
+    },
+  });
+  check(
+    'respondendo "não aluga", o módulo continua desligado',
+    semAluguel.status === 200 && !semAluguel.data.modules.includes('rentals'),
+    JSON.stringify(semAluguel.data?.modules),
+  );
+
+  const rentalsOff = await api('/rentals', { token: nova.data.accessToken });
+  check(
+    'e a API recusa /rentals para essa empresa',
+    rentalsOff.status === 403,
+    String(rentalsOff.status),
+  );
+
+  const comAluguel = await api('/onboarding/preview', {
+    method: 'POST',
+    token: nova.data.accessToken,
+    body: {
+      companyType: 'BEAUTY_COWORKING',
+      serviceKeys: ['hair'],
+      hasProfessionals: true,
+      usesCommission: false,
+      hasRooms: true,
+      rentsSpaces: true,
+    },
+  });
+  check(
+    'respondendo "aluga", o módulo é sugerido',
+    comAluguel.data.modules.includes('rentals'),
+    JSON.stringify(comAluguel.data?.modules),
+  );
+
   console.log('\n=== 11. Refresh token ===');
   const refreshed = await api('/auth/refresh', {
     method: 'POST',
