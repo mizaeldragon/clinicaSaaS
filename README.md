@@ -65,16 +65,29 @@ Painel em `http://localhost:5173` (o Vite já faz proxy de `/api` e `/socket.io`
 
 | Perfil | E-mail | Senha | O que demonstra |
 |---|---|---|---|
-| Admin da clínica | `admin@clinicabella.com` | `bella@12345` | Empresa plano Business com **todos os módulos** |
+| Admin da clínica | `admin@clinicabella.com` | `bella@12345` | Plano **Pro** — clínica completa, **sem aluguel** |
 | Recepcionista | `recepcao@clinicabella.com` | `bella@12345` | Permissões restritas (sem usuários/configuração) |
 | Profissional | `juliana@clinicabella.com` | `bella@12345` | Enxerga apenas a própria agenda e comissões |
 | Studio pequeno | `lu@studionails.com` | `studio@12345` | Plano Starter — **só agenda, clientes e serviços** |
-| Espaço compartilhado | `marcia@marciavaz.com.br` | `marcia@12345` | **Aluguel por turno** + link público de agendamento |
+| Espaço compartilhado | `marcia@marciavaz.com.br` | `marcia@12345` | Plano **Premium** — **aluguel por turno** + link público |
 | Locatária | `ana@marciavaz.com.br` | `marcia@12345` | Aluga turnos e enxerga só os próprios turnos e agenda |
 | Super admin do SaaS | `admin@saas.com` | `admin@12345` | Painel da plataforma (empresas, planos, MRR) |
 
-Comparar o login da *Clínica Bella* com o do *Studio Nails Lu* mostra a arquitetura
-modular na prática: o menu, as rotas e o dashboard mudam conforme os módulos ativos.
+### Os planos decidem o que a empresa vê
+
+| Plano | Para quem | Aluguel de espaços |
+|---|---|---|
+| **Starter** | quem está começando: agenda, clientes e serviços | não |
+| **Pro** | a clínica que atende as próprias clientes — equipe, salas, financeiro, comissões e relatórios | **não** |
+| **Premium** | o espaço compartilhado: tudo do Pro mais locação por turno ou diária e link público individual | **sim** |
+
+É o plano que corta, não só o wizard: uma clínica no Pro **não vê "Aluguel"** no
+menu, e a API recusa `/rentals` com `MODULE_DISABLED` mesmo que alguém digite o
+endereço na barra. No onboarding, um módulo fora do plano aparece como
+*"Disponível no plano Premium"* — desligado, com o caminho do upgrade à vista.
+
+Comparar os três logins mostra a arquitetura modular na prática: o menu, as
+rotas e o dashboard mudam conforme o plano e os módulos ativos.
 
 ### Espaço compartilhado (aluguel por turno + agendamento público)
 
@@ -126,14 +139,15 @@ cd backend && npm run test:e2e
 ```
 
 Reseta o banco, recria o seed e roda as duas suítes end-to-end contra a API
-(**113 verificações**):
+(**117 verificações**):
 
-**`test:smoke` (48)** — autenticação e rotação de refresh token, **isolamento entre
+**`test:smoke` (52)** — autenticação e rotação de refresh token, **isolamento entre
 empresas**, feature flags de módulos, prevenção de conflitos de agenda, finalização
 de atendimento gerando receita e comissão, dashboards, aluguéis, permissões por
-papel, painel do super admin e o **cadastro decidindo os módulos**: uma clínica
-nova nasce só com agenda, clientes e serviços, e continua sem "Aluguel" quando
-responde que não aluga espaço — inclusive na API, não só no menu.
+papel, painel do super admin e o **plano decidindo os módulos**: a clínica no Pro
+não recebe aluguel nem no menu, nem no dashboard, nem na API; o espaço no Premium
+recebe; e uma empresa nova nasce só com o básico, sem destravar aluguel nem
+quando responde que aluga — o wizard devolve o que ficou fora do plano.
 
 **`test:shared-space` (65)** — turnos e preços, reserva sem sobreposição, **página
 pública sem login**, "profissional do dia" saindo do aluguel, agendamento pelo link,

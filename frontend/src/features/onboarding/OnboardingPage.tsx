@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, ArrowRight, Check, PartyPopper, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
+import { usePlans } from '@/api/queries';
 import { useAuthStore } from '@/stores/auth.store';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -52,6 +53,14 @@ export function OnboardingPage() {
     rentalResourceKeys: [] as string[],
   });
   const [modules, setModules] = useState<ModuleKey[]>([]);
+  const { data: plans } = usePlans();
+
+  /**
+   * Menor plano que inclui o módulo — é o que a empresa precisa assinar para
+   * destravar. Sem isso, "fora do seu plano" não diz o que fazer a respeito.
+   */
+  const planWith = (module: ModuleKey): string | null =>
+    (plans ?? []).find((plan) => plan.modules.includes(module))?.name ?? null;
 
   const { data: options } = useQuery<Options>({
     queryKey: ['onboarding-options'],
@@ -317,7 +326,11 @@ export function OnboardingPage() {
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium">{MODULE_LABELS[module]}</p>
                         <p className="text-[11px] text-muted-foreground">
-                          {locked ? 'Essencial' : inPlan ? 'Opcional' : 'Fora do seu plano'}
+                          {locked
+                            ? 'Essencial'
+                            : inPlan
+                              ? 'Opcional'
+                              : `Disponível no plano ${planWith(module) ?? 'superior'}`}
                         </p>
                       </div>
                       <Switch

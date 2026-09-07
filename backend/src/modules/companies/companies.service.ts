@@ -105,12 +105,18 @@ export const companiesService = {
   },
 
   /** Habilita uma lista de módulos respeitando o plano (usado pelo onboarding). */
+  /**
+   * Liga os módulos pedidos, respeitando o plano assinado.
+   *
+   * O que o plano não cobre volta em `blocked` em vez de sumir em silêncio —
+   * é assim que o wizard consegue dizer "aluguel de espaços está no Premium".
+   */
   async enableModules(companyId: string, modules: ModuleKey[]) {
     const context = await getCompanyContext(companyId);
     const planModules = context?.plan?.modules ?? MODULE_ORDER;
-    const allowed = [...new Set([...CORE_MODULES, ...modules])].filter((m) =>
-      planModules.includes(m),
-    );
+    const requested = [...new Set([...CORE_MODULES, ...modules])];
+    const allowed = requested.filter((m) => planModules.includes(m));
+    const blocked = requested.filter((m) => !planModules.includes(m));
 
     await prisma.$transaction(
       allowed.map((module) =>
@@ -123,6 +129,6 @@ export const companiesService = {
     );
 
     invalidateCompanyContext(companyId);
-    return allowed;
+    return { enabled: allowed, blocked, plan: context?.plan?.name ?? null };
   },
 };

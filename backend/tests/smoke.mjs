@@ -40,7 +40,11 @@ const run = async () => {
   console.log('\n=== 1. Autenticação ===');
   const bella = await login('admin@clinicabella.com', 'bella@12345');
   check('login admin da Clínica Bella', Boolean(bella.accessToken));
-  check('contexto traz módulos da empresa', bella.company.modules.length === 10, JSON.stringify(bella.company.modules));
+  check(
+    'clínica no plano Pro fica sem o módulo de aluguel',
+    bella.company.modules.length === 9 && !bella.company.modules.includes('rentals'),
+    JSON.stringify(bella.company.modules),
+  );
 
   const lu = await login('lu@studionails.com', 'studio@12345');
   check('login do Studio Nails (plano Starter)', Boolean(lu.accessToken));
@@ -73,7 +77,19 @@ const run = async () => {
   const luRentals = await api('/rentals', { token: lu.accessToken });
   check('módulo desabilitado bloqueia no backend', luRentals.status === 403 && luRentals.data.error.code === 'MODULE_DISABLED');
   const bellaRentals = await api('/rentals', { token: bella.accessToken });
-  check('empresa com módulo ativo acessa aluguéis', bellaRentals.status === 200);
+  check(
+    'clínica no Pro também não acessa aluguéis pela API',
+    bellaRentals.status === 403 && bellaRentals.data.error.code === 'MODULE_DISABLED',
+    String(bellaRentals.status),
+  );
+
+  const marcia = await login('marcia@marciavaz.com.br', 'marcia@12345');
+  const marciaRentals = await api('/rentals', { token: marcia.accessToken });
+  check(
+    'espaço no Premium acessa aluguéis',
+    marciaRentals.status === 200 && marcia.company.modules.includes('rentals'),
+    String(marciaRentals.status),
+  );
 
   console.log('\n=== 4. Agenda e prevenção de conflitos ===');
   const professionals = await api('/professionals', { token: bella.accessToken });
@@ -196,7 +212,14 @@ const run = async () => {
   const dashboard = await api('/dashboard', { token: bella.accessToken });
   check('dashboard responde', dashboard.status === 200);
   check('dashboard traz bloco financeiro', dashboard.data.financial !== null);
-  check('dashboard traz bloco de aluguéis', dashboard.data.rentals !== null);
+  check(
+    'clínica no Pro não recebe o bloco de aluguéis',
+    dashboard.data.rentals === null,
+    JSON.stringify(dashboard.data.rentals),
+  );
+
+  const marciaDashboard = await api('/dashboard', { token: marcia.accessToken });
+  check('espaço no Premium recebe o bloco de aluguéis', marciaDashboard.data.rentals !== null);
 
   const luDashboard = await api('/dashboard', { token: lu.accessToken });
   check('empresa sem financeiro não recebe o bloco', luDashboard.data.financial === null);
@@ -206,16 +229,16 @@ const run = async () => {
   check('relatório de profissionais', reports.status === 200 && reports.data.length === 3);
 
   console.log('\n=== 7. Aluguéis e cobranças ===');
-  const rentalStats = await api('/rentals/stats', { token: bella.accessToken });
-  check('estatísticas de aluguel', rentalStats.data.activeRentals >= 1);
-  const payments = await api('/rentals/payments', { token: bella.accessToken });
-  check('cobranças geradas', payments.data.data.length >= 3);
+  const rentalStats = await api('/rentals/stats', { token: marcia.accessToken });
+  check('estatísticas de aluguel', rentalStats.data.activeRentals >= 1, JSON.stringify(rentalStats.data));
+  const payments = await api('/rentals/payments', { token: marcia.accessToken });
+  check('cobranças geradas', payments.data.data.length >= 1, String(payments.data.data?.length));
 
   const pending = payments.data.data.find((p) => p.status === 'PENDING');
   if (pending) {
     const paid = await api(`/rentals/payments/${pending.id}/pay`, {
       method: 'POST',
-      token: bella.accessToken,
+      token: marcia.accessToken,
       body: { amount: pending.amount, paymentMethod: 'PIX' },
     });
     check('registra pagamento de aluguel', paid.status === 200 && paid.data.status === 'PAID');
@@ -288,6 +311,7 @@ const run = async () => {
         email: `clinica${Date.now()}@teste.com`,
         password: 'clinica@12345',
       },
+      planSlug: 'pro',
     },
   });
   check('nova empresa é criada', nova.status === 201, JSON.stringify(nova.data?.error));
@@ -322,6 +346,32 @@ const run = async () => {
     'e a API recusa /rentals para essa empresa',
     rentalsOff.status === 403,
     String(rentalsOff.status),
+  );
+
+  // Mesmo respondendo "aluga", o plano manda: no Pro o módulo não liga, e o
+  // wizard devolve o que ficou de fora para a tela poder oferecer o upgrade.
+  const tentaAlugar = await api('/onboarding/complete', {
+    method: 'POST',
+    token: nova.data.accessToken,
+    body: {
+      companyType: 'AESTHETIC_CLINIC',
+      serviceKeys: ['facial'],
+      hasProfessionals: true,
+      usesCommission: true,
+      hasRooms: true,
+      rentsSpaces: true,
+      seedCatalog: false,
+    },
+  });
+  check(
+    'no plano Pro, pedir aluguel não liga o módulo',
+    !tentaAlugar.data.modules.includes('rentals'),
+    JSON.stringify(tentaAlugar.data?.modules),
+  );
+  check(
+    'e o wizard avisa o que ficou de fora do plano',
+    tentaAlugar.data.blocked.includes('rentals') && tentaAlugar.data.plan === 'Pro',
+    JSON.stringify({ blocked: tentaAlugar.data?.blocked, plan: tentaAlugar.data?.plan }),
   );
 
   const comAluguel = await api('/onboarding/preview', {

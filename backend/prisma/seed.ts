@@ -33,10 +33,12 @@ async function seedPlans() {
       sortOrder: 1,
     },
     {
+      // A clínica que atende as próprias clientes: equipe, salas, caixa e
+      // comissões. Não aluga espaço — e por isso nunca vê "Aluguel" no menu.
       name: 'Pro',
       slug: 'pro',
-      description: 'Equipe, financeiro e relatórios para crescer com controle.',
-      price: 99.9,
+      description: 'A clínica completa: equipe, salas, financeiro, comissões e relatórios.',
+      price: 129.9,
       trialDays: 14,
       maxUsers: 8,
       maxProfessionals: 10,
@@ -46,17 +48,22 @@ async function seedPlans() {
         'customers',
         'services',
         'professionals',
+        'resources',
         'financial',
+        'commissions',
         'reports',
         'notifications',
       ],
       sortOrder: 2,
     },
     {
-      name: 'Business',
-      slug: 'business',
-      description: 'Operação completa: recursos, salas, aluguéis e comissões.',
-      price: 199.9,
+      // O espaço compartilhado: além de atender, aluga sala/mesa/cadeira por
+      // turno ou diária, com link público para cada profissional.
+      name: 'Premium',
+      slug: 'premium',
+      description:
+        'Tudo do Pro mais o aluguel de espaços por turno ou diária, com link público para cada profissional.',
+      price: 219.9,
       trialDays: 14,
       maxUsers: null,
       maxProfessionals: null,
@@ -136,7 +143,7 @@ async function seedDemoCompany() {
     return;
   }
 
-  const plan = await prisma.plan.findUniqueOrThrow({ where: { slug: 'business' } });
+  const plan = await prisma.plan.findUniqueOrThrow({ where: { slug: 'pro' } });
 
   const trialEndsAt = new Date();
   trialEndsAt.setDate(trialEndsAt.getDate() + 30);
@@ -160,8 +167,7 @@ async function seedDemoCompany() {
         hasProfessionals: true,
         usesCommission: true,
         hasRooms: true,
-        rentsSpaces: true,
-        rentalResourceKeys: ['tables', 'rooms'],
+        rentsSpaces: false,
       },
       subscription: {
         create: {
@@ -171,7 +177,7 @@ async function seedDemoCompany() {
           currentPeriodEnd: trialEndsAt,
         },
       },
-      modules: { create: ALL_MODULES.map((module) => ({ module, enabled: true })) },
+      modules: { create: plan.modules.map((module) => ({ module, enabled: true })) },
       businessHours: { create: BUSINESS_HOURS },
     },
   });
@@ -442,46 +448,6 @@ async function seedDemoCompany() {
     })),
   });
 
-  // -------------------------------------------------------------- aluguéis
-  const rentalStart = new Date(today.getFullYear(), today.getMonth() - 2, 1);
-
-  const rental = await prisma.rental.create({
-    data: {
-      companyId,
-      resourceId: tables[0].id,
-      professionalId: professionals[0].id,
-      renterName: 'Juliana Alves',
-      renterPhone: '(11) 97777-0000',
-      startsAt: rentalStart,
-      amount: 500,
-      billingCycle: 'MONTHLY',
-      dueDay: 10,
-      status: 'ACTIVE',
-    },
-  });
-
-  await prisma.resource.update({ where: { id: tables[0].id }, data: { status: 'IN_USE' } });
-
-  for (let i = 0; i < 3; i += 1) {
-    const dueDate = new Date(rentalStart.getFullYear(), rentalStart.getMonth() + i, 10, 12);
-    const reference = `${dueDate.getFullYear()}-${String(dueDate.getMonth() + 1).padStart(2, '0')}`;
-    const paid = i < 2;
-
-    await prisma.rentalPayment.create({
-      data: {
-        companyId,
-        rentalId: rental.id,
-        referenceMonth: reference,
-        dueDate,
-        amount: 500,
-        paidAmount: paid ? 500 : 0,
-        status: paid ? 'PAID' : 'PENDING',
-        paidAt: paid ? dueDate : null,
-        paymentMethod: paid ? 'PIX' : null,
-      },
-    });
-  }
-
   console.log(`✔ Empresa demo "Clínica Bella" criada com ${created} agendamentos`);
   console.log('  Admin:        admin@clinicabella.com / bella@12345');
   console.log('  Recepção:     recepcao@clinicabella.com / bella@12345');
@@ -582,7 +548,7 @@ async function seedSharedSpace() {
     return;
   }
 
-  const plan = await prisma.plan.findUniqueOrThrow({ where: { slug: 'business' } });
+  const plan = await prisma.plan.findUniqueOrThrow({ where: { slug: 'premium' } });
   const passwordHash = await bcrypt.hash('marcia@12345', 10);
 
   const company = await prisma.company.create({
@@ -915,6 +881,47 @@ async function seedSharedSpace() {
         firstShift.set(contract.professionalId, { startsAt, resourceId: contract.resourceId });
       }
     }
+  }
+
+  // ------------------------------------------------- contrato mensal fixo
+  // Nem toda locação é por turno: a mesa 02 é alugada por mês, com parcelas.
+  const monthlyStart = new Date();
+  monthlyStart.setMonth(monthlyStart.getMonth() - 2, 1);
+  monthlyStart.setHours(12, 0, 0, 0);
+
+  const monthly = await prisma.rental.create({
+    data: {
+      companyId,
+      resourceId: nailTables[1].id,
+      renterName: 'Priscila Matos',
+      renterPhone: '(11) 98111-5050',
+      startsAt: monthlyStart,
+      amount: 600,
+      billingCycle: 'MONTHLY',
+      dueDay: 10,
+      status: 'ACTIVE',
+      notes: 'Aluguel fixo da mesa 02, sem turno — cobrança mensal.',
+    },
+  });
+
+  for (let i = 0; i < 3; i += 1) {
+    const dueDate = new Date(monthlyStart.getFullYear(), monthlyStart.getMonth() + i, 10, 12);
+    const reference = `${dueDate.getFullYear()}-${String(dueDate.getMonth() + 1).padStart(2, '0')}`;
+    const paid = i < 2;
+
+    await prisma.rentalPayment.create({
+      data: {
+        companyId,
+        rentalId: monthly.id,
+        referenceMonth: reference,
+        dueDate,
+        amount: 600,
+        paidAmount: paid ? 600 : 0,
+        status: paid ? 'PAID' : 'PENDING',
+        paidAt: paid ? dueDate : null,
+        paymentMethod: paid ? 'PIX' : null,
+      },
+    });
   }
 
   // Clientes da casa — carteira da Márcia (ownerProfessionalId nulo).

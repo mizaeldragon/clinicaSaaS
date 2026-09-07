@@ -63,7 +63,7 @@ export const onboardingService = {
       }),
     );
 
-    const enabled = await companiesService.enableModules(companyId, chosen);
+    const { enabled, blocked, plan } = await companiesService.enableModules(companyId, chosen);
 
     if (dto.seedCatalog) {
       await this.seedCatalog(companyId, dto, enabled);
@@ -71,7 +71,7 @@ export const onboardingService = {
 
     invalidateCompanyContext(companyId);
 
-    return { modules: enabled };
+    return { modules: enabled, blocked, plan };
   },
 
   /** Cria categorias/serviços/recursos iniciais conforme as respostas. */
