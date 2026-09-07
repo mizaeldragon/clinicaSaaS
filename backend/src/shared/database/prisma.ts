@@ -83,6 +83,24 @@ function injectCompanyId<T>(data: T, companyId: string): T {
   return data;
 }
 
+/**
+ * O Postgres guarda o plano das prepared statements por conexão. Depois de uma
+ * migração que muda o tipo do resultado, a primeira consulta numa conexão
+ * antiga falha com 0A000 — o plano em cache é descartado nesse erro, então
+ * repetir uma vez resolve. Sem isso, a primeira requisição depois de um deploy
+ * com migração devolve 500 para quem estiver online.
+ */
+const STALE_PLAN_CODE = '0A000';
+
+function isStalePlan(error: unknown): boolean {
+  const candidate = error as { code?: string; message?: string };
+  return (
+    candidate?.code === STALE_PLAN_CODE ||
+    (typeof candidate?.message === 'string' &&
+      candidate.message.includes('cached plan must not change result type'))
+  );
+}
+
 function buildClient() {
   const base = new PrismaClient({
     log: env.isDevelopment ? ['warn', 'error'] : ['error'],
@@ -138,6 +156,20 @@ function buildClient() {
 
           return query(nextArgs);
         },
+      },
+    },
+  }).$extends({
+    // Camada externa: pega também o $queryRaw, que não passa por $allModels.
+    name: 'stale-plan-retry',
+    query: {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      async $allOperations({ args, query }: any) {
+        try {
+          return await query(args);
+        } catch (error) {
+          if (!isStalePlan(error)) throw error;
+          return query(args);
+        }
       },
     },
   });

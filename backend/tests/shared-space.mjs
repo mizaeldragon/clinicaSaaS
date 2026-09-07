@@ -457,6 +457,7 @@ const run = async () => {
       revenueOwner: 'PROFESSIONAL',
       publicBookingEnabled: true,
       specialties: ['Cabelo'],
+      serviceIds: [corte.id],
     },
   });
   check('1) cadastra a profissional como locatária', nova.status === 201, JSON.stringify(nova.data));
@@ -496,6 +497,151 @@ const run = async () => {
     carolPage.status === 200 && carolPage.data.professional.name === 'Carol Dias',
     String(carolPage.status),
   );
+
+  console.log('\n=== 11. Formatos reais de locação ===');
+
+  const carolId = nova.data.id;
+  const table = await api('/shifts/prices', { token: marcia.accessToken });
+  const priceOf = (resourceId, shiftId) =>
+    Number(
+      table.data.resources
+        .find((r) => r.id === resourceId)
+        ?.shiftPrices.find((p) => p.shiftId === shiftId)?.price ?? 0,
+    );
+  const nightShift = shifts.data.find((s) => s.name === 'Noite');
+  const morningShift = shifts.data.find((s) => s.name === 'Manhã');
+  const afternoonShift = shifts.data.find((s) => s.name === 'Tarde');
+  const table02 = resources.data.data.find((r) => r.name.includes('02'));
+
+  const nextMonday = nextWeekday(1);
+  const monthEnd = new Date(nextMonday.getFullYear(), nextMonday.getMonth() + 1, 0);
+
+  // (a) A semana inteira, um turno por dia.
+  const weekAhead = new Date(nextMonday);
+  weekAhead.setDate(weekAhead.getDate() + 6);
+  const weekPreview = await api('/rentals/bookings/preview', {
+    method: 'POST',
+    token: marcia.accessToken,
+    body: {
+      resourceId: table02.id,
+      professionalId: carolId,
+      date: nextMonday.toISOString(),
+      until: weekAhead.toISOString(),
+      kind: 'SHIFT',
+      shiftIds: [nightShift.id],
+    },
+  });
+  check(
+    'a) semana inteira: 7 dias, com valor somado antes de confirmar',
+    weekPreview.data.total === 7 && weekPreview.data.amount > 0,
+    JSON.stringify({ total: weekPreview.data?.total, amount: weekPreview.data?.amount }),
+  );
+
+  // (b) O mesmo turno em dias fixos, o mês inteiro.
+  const monthPreview = await api('/rentals/bookings/preview', {
+    method: 'POST',
+    token: marcia.accessToken,
+    body: {
+      resourceId: table02.id,
+      professionalId: carolId,
+      date: nextMonday.toISOString(),
+      until: monthEnd.toISOString(),
+      weekdays: [1, 3],
+      kind: 'SHIFT',
+      shiftIds: [nightShift.id],
+    },
+  });
+  const onlyMonWed = monthPreview.data.days.every((d) => [1, 3].includes(new Date(d.date).getDay()));
+  check(
+    'b) mês inteiro só nas segundas e quartas',
+    onlyMonWed && monthPreview.data.total >= 4,
+    JSON.stringify({ total: monthPreview.data?.total }),
+  );
+
+  // (c) Dois turnos no mesmo dia.
+  const twoShifts = await api('/rentals/bookings/preview', {
+    method: 'POST',
+    token: marcia.accessToken,
+    body: {
+      resourceId: table02.id,
+      professionalId: carolId,
+      date: nextMonday.toISOString(),
+      kind: 'SHIFT',
+      shiftIds: [morningShift.id, afternoonShift.id],
+    },
+  });
+  const morningPrice = priceOf(table02.id, morningShift.id);
+  const afternoonPrice = priceOf(table02.id, afternoonShift.id);
+  check(
+    'c) manhã + tarde no mesmo dia, cada turno com seu preço',
+    twoShifts.data.total === 2 &&
+      Math.abs(twoShifts.data.amount - (morningPrice + afternoonPrice)) < 0.01,
+    JSON.stringify({ amount: twoShifts.data?.amount, morningPrice, afternoonPrice }),
+  );
+
+  // (d) Gravando de verdade o mês inteiro.
+  const monthBooked = await api('/rentals/bookings', {
+    method: 'POST',
+    token: marcia.accessToken,
+    body: {
+      resourceId: table02.id,
+      professionalId: carolId,
+      date: nextMonday.toISOString(),
+      until: monthEnd.toISOString(),
+      weekdays: [1, 3],
+      kind: 'SHIFT',
+      shiftIds: [nightShift.id],
+    },
+  });
+  check(
+    'd) o mês inteiro é criado de uma vez',
+    monthBooked.status === 201 && monthBooked.data.created.length === monthPreview.data.total,
+    JSON.stringify({ criadas: monthBooked.data?.created?.length }),
+  );
+
+  // (e) Repetir o mesmo período: tudo ocupado, nada duplicado.
+  const again = await api('/rentals/bookings/preview', {
+    method: 'POST',
+    token: marcia.accessToken,
+    body: {
+      resourceId: table02.id,
+      professionalId: carolId,
+      date: nextMonday.toISOString(),
+      until: monthEnd.toISOString(),
+      weekdays: [1, 3],
+      kind: 'SHIFT',
+      shiftIds: [nightShift.id],
+    },
+  });
+  check(
+    'e) repetir o período mostra tudo ocupado, sem duplicar',
+    again.data.available === 0 && again.data.blocked === again.data.total,
+    JSON.stringify({ livres: again.data?.available, ocupados: again.data?.blocked }),
+  );
+
+  // (f) A locatária do mês passa a ter agenda naqueles dias.
+  const carolAgenda = await api(
+    `/public/${SLUG}/availability?serviceId=${corte.id}&date=${nextMonday.toISOString()}&professionalId=${carolId}`,
+  );
+  check(
+    'f) quem alugou o mês aparece no link público naqueles dias',
+    carolAgenda.data.professionals.length === 1,
+    JSON.stringify(carolAgenda.data.professionals?.map((p) => p.professional.name)),
+  );
+
+  const rejected = await api('/rentals/bookings/preview', {
+    method: 'POST',
+    token: marcia.accessToken,
+    body: {
+      resourceId: table02.id,
+      professionalId: carolId,
+      date: monthEnd.toISOString(),
+      until: nextMonday.toISOString(),
+      kind: 'SHIFT',
+      shiftIds: [nightShift.id],
+    },
+  });
+  check('período invertido é recusado', rejected.status === 400, String(rejected.status));
 
   console.log(`\n──────────────────────────────\n  ${pass} passaram · ${fail} falharam\n`);
   process.exit(fail > 0 ? 1 : 0);

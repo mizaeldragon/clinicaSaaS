@@ -125,6 +125,23 @@ Peças:
 - `Rental.shiftId` + `Rental.weekdays` — contrato recorrente ("toda terça e quinta
   de manhã") do qual um job diário deriva as reservas futuras.
 
+A criação de reservas trabalha sempre com **período**, não com um dia: data
+inicial, `until` opcional, `weekdays` opcional e um ou mais `shiftIds`. Os
+formatos que aparecem na vida real são todos o mesmo desenho:
+
+| O que a dona quer | Como fica |
+|---|---|
+| um turno solto | sem `until` |
+| a semana toda | `until` = fim da semana |
+| o mês inteiro | `until` = fim do mês |
+| "terça e quinta de manhã até dia 30" | `until` + `weekdays: [2,4]` |
+| manhã e tarde no mesmo dia | dois `shiftIds` |
+
+`POST /rentals/bookings/preview` roda a mesma expansão sem gravar e devolve
+quantos turnos entram, quais estão ocupados e o total — o valor aparece antes de
+confirmar. Na gravação, dias ocupados são pulados em vez de derrubar a série, e
+cada turno recebe o preço da sua própria faixa.
+
 **Quem alugou o turno é a profissional do dia.** Essa é a ligação entre o módulo de
 aluguel e a agenda pública: a disponibilidade que aparece no link vem dos turnos
 reservados, não de uma jornada fixa.

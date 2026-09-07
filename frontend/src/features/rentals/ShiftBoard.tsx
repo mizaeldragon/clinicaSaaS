@@ -12,7 +12,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -23,27 +22,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { SearchSelect } from '@/components/ui/search-select';
 import { PaymentStatusBadge } from '@/components/StatusBadge';
 import {
   useBookingMutations,
   useDayMap,
-  useProfessionals,
-  useResources,
   useShifts,
   type RentalBooking,
 } from '@/api/queries';
 import { useAuthStore } from '@/stores/auth.store';
+import { BookingDialog, type BookingTarget } from './BookingDialog';
 import { PAYMENT_METHOD } from '@/config/labels';
 import { currency } from '@/lib/format';
 import type { PaymentMethod } from '@/types';
-
-interface BookingTarget {
-  resourceId: string;
-  resourceName: string;
-  shiftId: string | null;
-  shiftName: string;
-}
 
 export function ShiftBoard() {
   const canManage = useAuthStore((s) => s.can('rentals:manage'));
@@ -210,184 +200,6 @@ export function ShiftBoard() {
 
       <BookingDetail booking={detail} onClose={() => setDetail(null)} />
     </div>
-  );
-}
-
-/* ------------------------------------------------------- Reservar turno */
-function BookingDialog({
-  target,
-  date,
-  onClose,
-}: {
-  target: BookingTarget | null;
-  date: Date;
-  onClose: () => void;
-}) {
-  const { create } = useBookingMutations();
-  const { data: shifts } = useShifts();
-  const { data: professionals } = useProfessionals({ isActive: 'true' });
-  const { data: resources } = useResources({ isRentable: 'true' });
-
-  const [professionalId, setProfessionalId] = useState('');
-  const [resourceId, setResourceId] = useState('');
-  const [shiftId, setShiftId] = useState<string>('');
-  const [kind, setKind] = useState<'SHIFT' | 'DAILY'>('SHIFT');
-  const [repeatWeeks, setRepeatWeeks] = useState('0');
-  const [customPrice, setCustomPrice] = useState('');
-
-  const open = Boolean(target);
-
-  // Sincroniza com a célula clicada no mapa.
-  const effectiveResource = resourceId || target?.resourceId || '';
-  const effectiveShift = shiftId || target?.shiftId || '';
-
-  async function submit(event: React.FormEvent) {
-    event.preventDefault();
-    await create
-      .mutateAsync({
-        resourceId: effectiveResource,
-        professionalId,
-        date: date.toISOString(),
-        kind,
-        shiftId: kind === 'SHIFT' ? effectiveShift : null,
-        price: customPrice ? Number(customPrice) : undefined,
-        repeatWeeks: Number(repeatWeeks),
-      })
-      .then(() => {
-        onClose();
-        setProfessionalId('');
-        setResourceId('');
-        setShiftId('');
-        setKind('SHIFT');
-        setRepeatWeeks('0');
-        setCustomPrice('');
-      })
-      .catch(() => undefined);
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={(value) => !value && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Reservar turno</DialogTitle>
-          <DialogDescription>
-            {format(date, "EEEE, dd 'de' MMMM", { locale: ptBR })}
-            {target?.resourceName ? ` · ${target.resourceName}` : ''}
-          </DialogDescription>
-        </DialogHeader>
-
-        <form onSubmit={submit} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label>Espaço *</Label>
-            <SearchSelect
-              options={(resources?.data ?? []).map((resource) => ({
-                value: resource.id,
-                label: resource.name,
-                description: resource.category?.name,
-              }))}
-              value={effectiveResource}
-              onChange={setResourceId}
-              placeholder="Selecione o espaço"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Profissional *</Label>
-            <SearchSelect
-              options={(professionals?.data ?? []).map((professional) => ({
-                value: professional.id,
-                label: professional.name,
-                description: professional.specialties.join(', '),
-                color: professional.color,
-              }))}
-              value={professionalId}
-              onChange={setProfessionalId}
-              placeholder="Quem vai usar o espaço"
-            />
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label>Tipo</Label>
-              <Select value={kind} onValueChange={(v) => setKind(v as 'SHIFT' | 'DAILY')}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="SHIFT">Turno</SelectItem>
-                  <SelectItem value="DAILY">Diária (dia inteiro)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>Turno</Label>
-              <Select
-                value={effectiveShift}
-                onValueChange={setShiftId}
-                disabled={kind === 'DAILY'}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(shifts ?? []).map((shift) => (
-                    <SelectItem key={shift.id} value={shift.id}>
-                      {shift.name} ({shift.startsAt}–{shift.endsAt})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="price">Valor (opcional)</Label>
-              <Input
-                id="price"
-                type="number"
-                step="0.01"
-                placeholder="Usa a tabela do turno"
-                value={customPrice}
-                onChange={(e) => setCustomPrice(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="repeat">Repetir por (semanas)</Label>
-              <Input
-                id="repeat"
-                type="number"
-                min={0}
-                max={52}
-                value={repeatWeeks}
-                onChange={(e) => setRepeatWeeks(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {Number(repeatWeeks) > 0 ? (
-            <p className="rounded-lg bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
-              Serão criadas {Number(repeatWeeks) + 1} reservas, no mesmo dia da semana. Dias já
-              ocupados são pulados automaticamente.
-            </p>
-          ) : null}
-
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              loading={create.isPending}
-              disabled={!effectiveResource || !professionalId || (kind === 'SHIFT' && !effectiveShift)}
-            >
-              Reservar
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 }
 

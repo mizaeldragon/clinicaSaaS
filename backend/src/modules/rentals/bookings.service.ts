@@ -70,6 +70,50 @@ async function resolveInterval(
   return { startsAt, endsAt };
 }
 
+/** Teto defensivo: um período de locação não passa de um ano. */
+const MAX_DAYS = 366;
+
+/**
+ * Expande o pedido em (dia, turno). É aqui que "só terça", "essa semana",
+ * "seg a sex o mês inteiro" e "manhã e tarde todo dia" viram a mesma coisa.
+ */
+function expandSlots(dto: CreateBookingDTO): { date: Date; shiftId: string | null }[] {
+  const start = startOfDay(dto.date);
+  const end = dto.until ? startOfDay(dto.until) : start;
+
+  if (end < start) {
+    throw new BadRequestError('O fim do período não pode ser antes do início');
+  }
+
+  const shiftIds: (string | null)[] =
+    dto.kind === RentalBookingKind.SHIFT
+      ? dto.shiftIds?.length
+        ? [...new Set(dto.shiftIds)]
+        : [dto.shiftId ?? null]
+      : [null];
+
+  const weekdays = dto.weekdays?.length ? new Set(dto.weekdays) : null;
+  const slots: { date: Date; shiftId: string | null }[] = [];
+
+  for (let cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
+    if (weekdays && !weekdays.has(cursor.getDay())) continue;
+
+    for (const shiftId of shiftIds) {
+      slots.push({ date: startOfDay(cursor), shiftId });
+    }
+
+    if (slots.length > MAX_DAYS * shiftIds.length) {
+      throw new BadRequestError('Período longo demais. Divida em partes de até um ano.');
+    }
+  }
+
+  if (slots.length === 0) {
+    throw new BadRequestError('Nenhum dia do período bate com os dias da semana escolhidos');
+  }
+
+  return slots;
+}
+
 export const bookingsService = {
   async list(query: ListBookingsDTO) {
     const pagination = getPagination(query);
@@ -143,22 +187,13 @@ export const bookingsService = {
       throw new ConflictError(`O espaço "${resource.name}" está indisponível`);
     }
 
-    const price =
-      dto.price ?? (await shiftsService.resolvePrice(dto.resourceId, dto.shiftId ?? null));
-
-    // Uma reserva por semana durante `repeatWeeks` semanas, a partir da data informada.
-    const dates = [startOfDay(dto.date)];
-    for (let week = 1; week <= dto.repeatWeeks; week += 1) {
-      const next = startOfDay(dto.date);
-      next.setDate(next.getDate() + week * 7);
-      dates.push(next);
-    }
+    const slots = expandSlots(dto);
 
     const created = [];
     const skipped: { date: Date; reason: string }[] = [];
 
-    for (const date of dates) {
-      const { startsAt, endsAt } = await resolveInterval(date, dto.kind, dto.shiftId ?? null);
+    for (const slot of slots) {
+      const { startsAt, endsAt } = await resolveInterval(slot.date, dto.kind, slot.shiftId);
 
       const conflict = await this.findConflict({
         resourceId: dto.resourceId,
@@ -169,12 +204,15 @@ export const bookingsService = {
 
       if (conflict) {
         // Em série, um dia ocupado não deve derrubar os outros.
-        if (dates.length > 1) {
-          skipped.push({ date, reason: conflict });
+        if (slots.length > 1) {
+          skipped.push({ date: slot.date, reason: conflict });
           continue;
         }
         throw new ScheduleConflictError(conflict);
       }
+
+      // Cada turno tem o seu preço: a noite pode custar menos que a manhã.
+      const price = dto.price ?? (await shiftsService.resolvePrice(dto.resourceId, slot.shiftId));
 
       created.push(
         await prisma.rentalBooking.create({
@@ -183,9 +221,9 @@ export const bookingsService = {
             resourceId: dto.resourceId,
             professionalId: dto.professionalId,
             rentalId: rentalId ?? null,
-            shiftId: dto.kind === RentalBookingKind.SHIFT ? dto.shiftId ?? null : null,
+            shiftId: dto.kind === RentalBookingKind.SHIFT ? slot.shiftId : null,
             kind: dto.kind,
-            date,
+            date: slot.date,
             startsAt,
             endsAt,
             price,
@@ -201,6 +239,59 @@ export const bookingsService = {
     }
 
     return { created, skipped };
+  },
+
+  /**
+   * Simula o pedido sem gravar nada: quais dias entram, quais estão ocupados e
+   * quanto dá no total. É o que permite fechar "o mês inteiro" com o valor na
+   * frente, em vez de descobrir depois de criar 22 reservas.
+   */
+  async preview(dto: CreateBookingDTO) {
+    const slots = expandSlots(dto);
+
+    const shifts = await prisma.shift.findMany({ select: { id: true, name: true } });
+    const nameOf = (shiftId: string | null) =>
+      shiftId ? shifts.find((shift) => shift.id === shiftId)?.name ?? 'Turno' : 'Diária';
+
+    const days: {
+      date: Date;
+      shiftId: string | null;
+      shift: string;
+      price: number;
+      available: boolean;
+      reason: string | null;
+    }[] = [];
+
+    for (const slot of slots) {
+      const { startsAt, endsAt } = await resolveInterval(slot.date, dto.kind, slot.shiftId);
+      const conflict = await this.findConflict({
+        resourceId: dto.resourceId,
+        professionalId: dto.professionalId,
+        startsAt,
+        endsAt,
+      });
+
+      const price = dto.price ?? (await shiftsService.resolvePrice(dto.resourceId, slot.shiftId));
+
+      days.push({
+        date: slot.date,
+        shiftId: slot.shiftId,
+        shift: nameOf(slot.shiftId),
+        price,
+        available: !conflict,
+        reason: conflict,
+      });
+    }
+
+    const free = days.filter((day) => day.available);
+
+    return {
+      days,
+      total: days.length,
+      available: free.length,
+      blocked: days.length - free.length,
+      amount: free.reduce((sum, day) => sum + day.price, 0),
+    };
   },
 
   /** Retorna a descrição do conflito, ou null quando o período está livre. */

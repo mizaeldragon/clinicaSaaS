@@ -73,6 +73,16 @@ bookingsRoutes.get(
   }),
 );
 
+/** Simula o período antes de gravar: quantos turnos, quais barrados, quanto dá. */
+bookingsRoutes.post(
+  '/preview',
+  requirePermission(PERMISSIONS.rentalsManage),
+  validate({ body: createBookingSchema }),
+  asyncHandler(async (req, res) => {
+    res.json(serialize(await bookingsService.preview(req.body)));
+  }),
+);
+
 bookingsRoutes.post(
   '/',
   requirePermission(PERMISSIONS.rentalsManage),

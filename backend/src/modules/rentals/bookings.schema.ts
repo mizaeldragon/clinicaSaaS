@@ -1,22 +1,43 @@
 import { z } from 'zod';
 import { PaymentMethod, RentalBookingKind, RentalBookingStatus } from '@prisma/client';
 
+/**
+ * Uma reserva ou um período inteiro, com a mesma forma.
+ *
+ * A locação real assume vários formatos: um turno solto, "a semana toda",
+ * "terça e quinta de manhã até o fim do mês", "seg a sáb o mês inteiro".
+ * Tudo isso é o mesmo desenho — um intervalo de datas, um filtro de dias da
+ * semana e um ou mais turnos.
+ */
 export const createBookingSchema = z
   .object({
     resourceId: z.string().uuid('Selecione o espaço'),
     professionalId: z.string().uuid('Selecione a profissional'),
+    /** Primeiro dia do período. */
     date: z.coerce.date(),
+    /** Último dia. Ausente = só o dia informado. */
+    until: z.coerce.date().optional(),
+    /** Dias da semana (0=domingo). Vazio = todos os dias do período. */
+    weekdays: z.array(z.coerce.number().int().min(0).max(6)).max(7).optional(),
     kind: z.nativeEnum(RentalBookingKind).default(RentalBookingKind.SHIFT),
+    /** Um turno — mantido para os contratos recorrentes. */
     shiftId: z.string().uuid().nullable().optional(),
+    /** Vários turnos no mesmo dia (manhã + tarde, por exemplo). */
+    shiftIds: z.array(z.string().uuid()).max(10).optional(),
     /** Quando omitido, usa o preço da tabela (recurso × turno). */
     price: z.coerce.number().min(0).optional(),
     notes: z.string().max(500).nullable().optional(),
-    /** Repete a reserva nas próximas N semanas, no mesmo dia da semana. */
-    repeatWeeks: z.coerce.number().int().min(0).max(52).default(0),
   })
-  .refine((data) => data.kind === RentalBookingKind.DAILY || Boolean(data.shiftId), {
-    message: 'Informe o turno',
-    path: ['shiftId'],
+  .refine(
+    (data) =>
+      data.kind === RentalBookingKind.DAILY ||
+      Boolean(data.shiftId) ||
+      Boolean(data.shiftIds?.length),
+    { message: 'Informe o turno', path: ['shiftId'] },
+  )
+  .refine((data) => !data.until || data.until >= data.date, {
+    message: 'O fim do período não pode ser antes do início',
+    path: ['until'],
   });
 
 export const updateBookingSchema = z.object({

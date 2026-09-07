@@ -986,6 +986,42 @@ export const useBookingStats = () =>
     revenueNext30Days: number;
   }>(['booking-stats'], '/rentals/bookings/stats');
 
+export interface BookingPeriod {
+  resourceId: string;
+  professionalId: string;
+  date: string;
+  until?: string;
+  weekdays?: number[];
+  kind: 'SHIFT' | 'DAILY';
+  shiftIds?: string[];
+  price?: number;
+}
+
+export interface BookingPreview {
+  days: {
+    date: string;
+    shiftId: string | null;
+    shift: string;
+    price: number;
+    available: boolean;
+    reason: string | null;
+  }[];
+  total: number;
+  available: number;
+  blocked: number;
+  amount: number;
+}
+
+/** Simula o período antes de gravar: quantos turnos, quais barrados, quanto dá. */
+export function useBookingPreview(body: BookingPeriod | null) {
+  return useQuery<BookingPreview>({
+    queryKey: ['booking-preview', body],
+    queryFn: () => api.post<BookingPreview>('/rentals/bookings/preview', body as never),
+    enabled: Boolean(body),
+    retry: false,
+  });
+}
+
 export function useBookingMutations() {
   const qc = useQueryClient();
   const invalidate = () => {
