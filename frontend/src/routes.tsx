@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Route, Routes } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { ProtectedRoute, ModuleRoute, SuperAdminRoute } from '@/components/layout/guards';
@@ -25,11 +25,13 @@ import { AdminCompaniesPage } from '@/features/admin/AdminCompaniesPage';
 import { AdminPlansPage } from '@/features/admin/AdminPlansPage';
 import { NotFoundPage } from '@/features/misc/NotFoundPage';
 import { PublicBookingPage } from '@/features/public/PublicBookingPage';
+import { LandingPage } from '@/features/landing/LandingPage';
 
 export function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/app" replace />} />
+      {/* Vitrine do produto. Quem já está logado cai direto no painel. */}
+      <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/cadastro" element={<RegisterPage />} />
 

@@ -57,7 +57,13 @@ filas viram no-op.
 cd frontend && npm install && npm run dev
 ```
 
-Painel em `http://localhost:5173` (o Vite já faz proxy de `/api` e `/socket.io`).
+- Landing do produto: `http://localhost:5173/`
+- Painel: `http://localhost:5173/app` (o Vite já faz proxy de `/api` e `/socket.io`)
+
+A landing tem paleta própria (areia, creme e café) declarada em classes locais.
+O painel é **white label** — a empresa escolhe a cor em *Configurações › Empresa*
+e ela pinta menu, botões, gráficos e a página pública de agendamento. A marca do
+produto não muda junto.
 
 ---
 
