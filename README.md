@@ -60,10 +60,11 @@ cd frontend && npm install && npm run dev
 - Landing do produto: `http://localhost:5173/`
 - Painel: `http://localhost:5173/app` (o Vite já faz proxy de `/api` e `/socket.io`)
 
-A landing tem paleta própria (areia, creme e café) declarada em classes locais.
-O painel é **white label** — a empresa escolhe a cor em *Configurações › Empresa*
-e ela pinta menu, botões, gráficos e a página pública de agendamento. A marca do
-produto não muda junto.
+A landing usa a mesma linguagem visual do login: fundo `slate-950` com os halos
+violeta e rosa, alternando seções escuras e claras. O painel é **white label** —
+a empresa escolhe a cor em *Configurações › Empresa* e ela pinta menu, botões,
+gráficos e a página pública de agendamento. Ao sair, a cor da empresa é
+devolvida ao padrão para não vazar para o login nem para a landing.
 
 ---
 

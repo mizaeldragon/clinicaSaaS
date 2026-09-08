@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { api, configureApi } from '@/lib/api';
-import { applyBrandColor } from '@/lib/utils';
+import { applyBrandColor, resetBrandColor } from '@/lib/utils';
 import type { AuthResponse, AuthUser, CompanyContext, ModuleKey } from '@/types';
 
 interface AuthState {
@@ -65,6 +65,7 @@ export const useAuthStore = create<AuthState>()(
           await api.public.post('/auth/logout', { refreshToken }).catch(() => undefined);
         }
         set({ accessToken: null, refreshToken: null, user: null, company: null });
+        resetBrandColor();
       },
 
       refreshContext: async () => {
@@ -108,6 +109,8 @@ configureApi({
     return { accessToken, refreshToken };
   },
   setTokens: ({ accessToken, refreshToken }) => useAuthStore.setState({ accessToken, refreshToken }),
-  onLogout: () =>
-    useAuthStore.setState({ accessToken: null, refreshToken: null, user: null, company: null }),
+  onLogout: () => {
+    useAuthStore.setState({ accessToken: null, refreshToken: null, user: null, company: null });
+    resetBrandColor();
+  },
 });

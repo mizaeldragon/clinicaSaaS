@@ -47,13 +47,25 @@ export function hexToHslVar(hex: string): string | null {
   return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
 }
 
+const BRAND_VARS = ['--primary', '--ring', '--sidebar-accent'] as const;
+
 export function applyBrandColor(hex?: string | null) {
   if (!hex) return;
   const hsl = hexToHslVar(hex);
   if (!hsl) return;
-  document.documentElement.style.setProperty('--primary', hsl);
-  document.documentElement.style.setProperty('--ring', hsl);
-  document.documentElement.style.setProperty('--sidebar-accent', hsl);
+  for (const name of BRAND_VARS) {
+    document.documentElement.style.setProperty(name, hsl);
+  }
+}
+
+/**
+ * Devolve a marca do produto. A cor da empresa é aplicada no documento inteiro,
+ * então sem isso ela ficaria grudada no login e na landing depois do logout.
+ */
+export function resetBrandColor() {
+  for (const name of BRAND_VARS) {
+    document.documentElement.style.removeProperty(name);
+  }
 }
 
 export function debounce<T extends (...args: never[]) => void>(fn: T, delay = 300) {
