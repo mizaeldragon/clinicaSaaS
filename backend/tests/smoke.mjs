@@ -47,10 +47,10 @@ const run = async () => {
   );
 
   const lu = await login('lu@studionails.com', 'studio@12345');
-  check('login do Studio Nails (plano Starter)', Boolean(lu.accessToken));
+  check('login do Studio Nails', Boolean(lu.accessToken));
   check(
-    'Starter recebe apenas 4 módulos',
-    lu.company.modules.length === 4,
+    'o studio assina o mesmo Pro, mas ligou só 4 módulos',
+    lu.company.modules.length === 4 && lu.company.plan.slug === 'pro',
     JSON.stringify(lu.company.modules),
   );
 
@@ -287,7 +287,7 @@ const run = async () => {
     body: { module: 'rentals', enabled: true },
   });
   check(
-    'plano Starter impede habilitar módulo fora do plano',
+    'o plano impede habilitar módulo que ele não cobre',
     toggle.status === 400,
     JSON.stringify(toggle.data),
   );

@@ -21,18 +21,6 @@ const ALL_MODULES: ModuleKey[] = [
 async function seedPlans() {
   const plans: Prisma.PlanUncheckedCreateInput[] = [
     {
-      name: 'Starter',
-      slug: 'starter',
-      description: 'Para quem está começando: agenda, clientes e serviços.',
-      price: 49.9,
-      trialDays: 14,
-      maxUsers: 2,
-      maxProfessionals: 2,
-      maxAppointmentsMonth: 300,
-      modules: ['appointments', 'customers', 'services', 'notifications'],
-      sortOrder: 1,
-    },
-    {
       // A clínica que atende as próprias clientes: equipe, salas, caixa e
       // comissões. Não aluga espaço — e por isso nunca vê "Aluguel" no menu.
       name: 'Pro',
@@ -54,7 +42,7 @@ async function seedPlans() {
         'reports',
         'notifications',
       ],
-      sortOrder: 2,
+      sortOrder: 1,
     },
     {
       // O espaço compartilhado: além de atender, aluga sala/mesa/cadeira por
@@ -69,7 +57,7 @@ async function seedPlans() {
       maxProfessionals: null,
       maxAppointmentsMonth: null,
       modules: ALL_MODULES,
-      sortOrder: 3,
+      sortOrder: 2,
     },
   ];
 
@@ -90,7 +78,14 @@ async function seedPlans() {
     });
   }
 
-  console.log('✔ Planos criados');
+  // Planos antigos que saíram do catálogo somem da vitrine, mas continuam
+  // valendo para quem já assinou.
+  await prisma.plan.updateMany({
+    where: { slug: { notIn: plans.map((p) => p.slug) } },
+    data: { isActive: false, isPublic: false },
+  });
+
+  console.log(`✔ Planos criados (${plans.map((p) => p.name).join(' e ')})`);
 }
 
 async function seedSuperAdmin() {
@@ -454,13 +449,17 @@ async function seedDemoCompany() {
   console.log('  Profissional: juliana@clinicabella.com / bella@12345');
 }
 
-/** Empresa pequena (plano Starter) — mostra o sistema modular em ação. */
+/**
+ * Studio de uma profissional só. Assina o mesmo Pro da clínica, mas ligou
+ * poucos módulos no onboarding — é a diferença entre o que o plano *permite* e
+ * o que a empresa *escolheu*.
+ */
 async function seedSmallStudio() {
   const slug = 'studio-nails-lu';
   const existing = await prisma.company.findUnique({ where: { slug } });
   if (existing) return;
 
-  const plan = await prisma.plan.findUniqueOrThrow({ where: { slug: 'starter' } });
+  const plan = await prisma.plan.findUniqueOrThrow({ where: { slug: 'pro' } });
   const passwordHash = await bcrypt.hash('studio@12345', 10);
 
   const company = await prisma.company.create({
