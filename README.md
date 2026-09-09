@@ -154,7 +154,7 @@ cd backend && npm run test:e2e
 ```
 
 Reseta o banco, recria o seed e roda as duas suítes end-to-end contra a API
-(**139 verificações**):
+(**141 verificações**):
 
 **`test:smoke` (52)** — autenticação e rotação de refresh token, **isolamento entre
 empresas**, feature flags de módulos, prevenção de conflitos de agenda, finalização
@@ -164,7 +164,7 @@ não recebe aluguel nem no menu, nem no dashboard, nem na API; o espaço no Prem
 recebe; e uma empresa nova nasce só com o básico, sem destravar aluguel nem
 quando responde que aluga — o wizard devolve o que ficou fora do plano.
 
-**`test:shared-space` (87)** — turnos e preços, reserva sem sobreposição, **página
+**`test:shared-space` (89)** — turnos e preços, reserva sem sobreposição, **página
 pública sem login**, "profissional do dia" saindo do aluguel, agendamento pelo link,
 **caixa separado** (receita da locatária não entra no da empresa), sala alugada
 protegendo a agenda, **link individual de cada profissional**, painel restrito da

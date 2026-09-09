@@ -5,6 +5,7 @@ import { holidaysService } from './holidays.service';
 import { validate } from '../../shared/middlewares/validate';
 import { PERMISSIONS, requirePermission } from '../../shared/middlewares/rbac';
 import { asyncHandler, serialize } from '../../shared/utils/http';
+import { calendarDate } from '../../shared/utils/zod';
 import { businessHoursSchema, toggleModuleSchema, updateCompanySchema } from './companies.schema';
 
 export const companiesRoutes = Router();
@@ -50,7 +51,7 @@ companiesRoutes.post(
   requirePermission(PERMISSIONS.settingsManage),
   validate({
     body: z.object({
-      date: z.coerce.date(),
+      date: calendarDate,
       name: z.string().min(2, 'Dê um nome ao fechamento').max(120),
     }),
   }),

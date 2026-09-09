@@ -363,7 +363,7 @@ function PeriodSummary({ preview }: { preview: BookingPreview }) {
         <div className="border-t pt-2">
           <p className="text-xs font-medium text-amber-600">
             {blocked.length}{' '}
-            {blocked.length === 1 ? 'dia já ocupado será pulado' : 'dias já ocupados serão pulados'}
+            {blocked.length === 1 ? 'turno já ocupado será pulado' : 'turnos já ocupados serão pulados'}
           </p>
           <BlockedList days={blocked} />
         </div>

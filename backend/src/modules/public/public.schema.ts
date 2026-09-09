@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { calendarDate } from '../../shared/utils/zod';
 
 export const slugParamSchema = z.object({
   slug: z
@@ -10,7 +11,7 @@ export const slugParamSchema = z.object({
 
 export const availabilityQuerySchema = z.object({
   serviceId: z.string().uuid('Selecione um serviço'),
-  date: z.coerce.date(),
+  date: calendarDate,
   professionalId: z.string().uuid().optional(),
   /** Uso interno da remarcação: ignora o horário que está sendo movido. */
   ignoreAppointmentId: z.string().uuid().optional(),
@@ -29,7 +30,7 @@ export const reschedulePublicSchema = z.object({
 });
 
 export const agendaQuerySchema = z.object({
-  from: z.coerce.date(),
+  from: calendarDate,
   days: z.coerce.number().int().min(1).max(31).default(7),
   /** No link individual, só interessa a agenda daquela profissional. */
   professionalId: z.string().uuid().optional(),

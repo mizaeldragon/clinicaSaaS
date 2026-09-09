@@ -775,6 +775,38 @@ const run = async () => {
     JSON.stringify(publicOnClosedDay.data.professionals?.length),
   );
 
+  // Um <input type="date"> manda "2026-12-25", sem hora. Lido como meia-noite
+  // UTC isso vira 24/12 em São Paulo — marcar o Natal fechava a véspera.
+  const natal = await api('/company/holidays', {
+    method: 'POST',
+    token: marcia.accessToken,
+    body: { date: '2027-12-25', name: 'Natal (teste de fuso)' },
+  });
+  check(
+    'data sem hora cai no dia certo, não no anterior',
+    natal.data.date.slice(0, 10) === '2027-12-25',
+    JSON.stringify(natal.data?.date),
+  );
+  await api(`/company/holidays/${natal.data.id}`, { method: 'DELETE', token: marcia.accessToken });
+
+  const periodo = await api('/rentals/bookings/preview', {
+    method: 'POST',
+    token: marcia.accessToken,
+    body: {
+      resourceId: table02.id,
+      professionalId: carolId,
+      date: '2027-03-10',
+      until: '2027-03-12',
+      kind: 'SHIFT',
+      shiftIds: [nightShift.id],
+    },
+  });
+  check(
+    'e o período começa no dia pedido, sem puxar a véspera',
+    periodo.data.total === 3 && periodo.data.days[0].date.slice(0, 10) === '2027-03-10',
+    JSON.stringify(periodo.data.days?.map((d) => d.date.slice(0, 10))),
+  );
+
   await api(`/company/holidays/${closure.data.id}`, { method: 'DELETE', token: marcia.accessToken });
 
   console.log('\n=== 14. Caixa da locatária ===');

@@ -63,3 +63,26 @@ export function dueDateFor(year: number, month: number, day: number): Date {
   const lastDay = new Date(year, month + 1, 0).getDate();
   return new Date(year, month, Math.min(day, lastDay), 12, 0, 0, 0);
 }
+
+/**
+ * Data de calendário vinda do cliente.
+ *
+ * Um `<input type="date">` manda "2026-12-25", sem hora. O parser padrão lê
+ * isso como meia-noite **UTC** — que em São Paulo é 21h do dia 24. Marcar o
+ * Natal acabava fechando a véspera.
+ *
+ * Aqui a data sem hora é montada no fuso local, ancorada ao meio-dia para que
+ * nenhuma virada de horário de verão empurre de novo. Strings com hora
+ * (ISO completo) continuam sendo instantes e passam direto.
+ */
+export function parseCalendarDate(value: string | Date): Date {
+  if (value instanceof Date) return value;
+
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/;
+  if (dateOnly.test(value)) {
+    const [year, month, day] = value.split('-').map(Number);
+    return new Date(year, month - 1, day, 12, 0, 0, 0);
+  }
+
+  return new Date(value);
+}

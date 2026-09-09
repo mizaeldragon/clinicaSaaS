@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { PaymentMethod, RentalBookingKind, RentalBookingStatus } from '@prisma/client';
+import { calendarDate } from '../../shared/utils/zod';
 
 /**
  * Uma reserva ou um período inteiro, com a mesma forma.
@@ -14,9 +15,9 @@ export const createBookingSchema = z
     resourceId: z.string().uuid('Selecione o espaço'),
     professionalId: z.string().uuid('Selecione a profissional'),
     /** Primeiro dia do período. */
-    date: z.coerce.date(),
+    date: calendarDate,
     /** Último dia. Ausente = só o dia informado. */
-    until: z.coerce.date().optional(),
+    until: calendarDate.optional(),
     /** Dias da semana (0=domingo). Vazio = todos os dias do período. */
     weekdays: z.array(z.coerce.number().int().min(0).max(6)).max(7).optional(),
     kind: z.nativeEnum(RentalBookingKind).default(RentalBookingKind.SHIFT),
@@ -47,8 +48,8 @@ export const updateBookingSchema = z.object({
 });
 
 export const listBookingsSchema = z.object({
-  from: z.coerce.date().optional(),
-  to: z.coerce.date().optional(),
+  from: calendarDate.optional(),
+  to: calendarDate.optional(),
   resourceId: z.string().uuid().optional(),
   professionalId: z.string().uuid().optional(),
   status: z.nativeEnum(RentalBookingStatus).optional(),

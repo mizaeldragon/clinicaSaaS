@@ -249,9 +249,18 @@ servidor em UTC — o padrão em produção — os horários sairiam três horas
 deslocados. `config/env.ts` fixa `process.env.TZ` antes de qualquer data ser
 calculada; o valor vem de `TIMEZONE` e o padrão é `America/Sao_Paulo`.
 
-Datas de calendário (feriados, coluna `DATE`) voltam da API à meia-noite UTC e
-por isso são formatadas pela parte da data, nunca pelo horário local — senão
-1º de janeiro apareceria como 31 de dezembro.
+Datas de calendário exigem cuidado nos dois sentidos:
+
+- **Entrando:** um `<input type="date">` manda `"2026-12-25"`, sem hora. O
+  parser padrão lê isso como meia-noite **UTC** — 21h do dia 24 em São Paulo.
+  Marcar o Natal fechava a véspera. O schema `calendarDate`
+  (`shared/utils/zod.ts`) monta a data no fuso local, ancorada ao meio-dia, e é
+  usado em todo campo que representa um **dia**: feriado, início e fim de
+  período de locação, data da agenda pública. Campos que são **instantes**
+  (`startsAt`) continuam com `z.coerce.date()`.
+- **Saindo:** a coluna `DATE` volta à meia-noite UTC, então o frontend formata
+  pela parte da data e nunca pelo horário local — senão 1º de janeiro apareceria
+  como 31 de dezembro.
 
 ### 5.2 Feriados e fechamentos
 
