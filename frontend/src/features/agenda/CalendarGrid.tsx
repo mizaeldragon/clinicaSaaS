@@ -16,35 +16,62 @@ interface CalendarGridProps {
   onSelectSlot: (date: Date) => void;
 }
 
-/** Posiciona eventos sobrepostos lado a lado dentro da coluna do dia. */
+/**
+ * Posiciona eventos sobrepostos lado a lado dentro da coluna do dia.
+ *
+ * A largura é calculada por **grupo de sobreposição**, não pelo dia inteiro:
+ * um atendimento sozinho às 13h ocupa a coluna toda mesmo que outros dois se
+ * cruzem às 10h. Antes todos encolhiam junto.
+ */
 function layout(appointments: Appointment[]) {
   const sorted = [...appointments].sort(
     (a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
   );
 
-  const columns: Appointment[][] = [];
+  const placed: { appointment: Appointment; columnIndex: number; total: number }[] = [];
+
+  // Um grupo termina quando surge um evento que começa depois do fim de todos
+  // os anteriores — daí ninguém mais se cruza e a largura recomeça.
+  let group: Appointment[] = [];
+  let groupEnd = 0;
+
+  const flush = () => {
+    if (group.length === 0) return;
+
+    const columns: Appointment[][] = [];
+    for (const appointment of group) {
+      const start = new Date(appointment.startsAt).getTime();
+      const column = columns.find(
+        (candidate) => new Date(candidate[candidate.length - 1].endsAt).getTime() <= start,
+      );
+      if (column) column.push(appointment);
+      else columns.push([appointment]);
+    }
+
+    for (const appointment of group) {
+      placed.push({
+        appointment,
+        columnIndex: columns.findIndex((column) => column.includes(appointment)),
+        total: columns.length,
+      });
+    }
+
+    group = [];
+    groupEnd = 0;
+  };
 
   for (const appointment of sorted) {
     const start = new Date(appointment.startsAt).getTime();
-    let placed = false;
+    const end = new Date(appointment.endsAt).getTime();
 
-    for (const column of columns) {
-      const last = column[column.length - 1];
-      if (new Date(last.endsAt).getTime() <= start) {
-        column.push(appointment);
-        placed = true;
-        break;
-      }
-    }
+    if (group.length > 0 && start >= groupEnd) flush();
 
-    if (!placed) columns.push([appointment]);
+    group.push(appointment);
+    groupEnd = Math.max(groupEnd, end);
   }
 
-  const total = Math.max(1, columns.length);
-  return sorted.map((appointment) => {
-    const columnIndex = columns.findIndex((column) => column.includes(appointment));
-    return { appointment, columnIndex, total };
-  });
+  flush();
+  return placed;
 }
 
 export function CalendarGrid({
@@ -93,8 +120,10 @@ export function CalendarGrid({
         </div>
 
         {/* Grade de horários */}
+        {/* O rótulo da hora sobe meia linha para encostar na divisória; o
+            respiro no topo evita que o primeiro fique escondido sob o cabeçalho. */}
         <div
-          className="relative grid"
+          className="relative grid pt-2.5"
           style={{ gridTemplateColumns: `64px repeat(${days.length}, minmax(0, 1fr))` }}
         >
           <div className="relative">
@@ -152,11 +181,15 @@ export function CalendarGrid({
                     (start.getHours() - startHour) * HOUR_HEIGHT +
                     (start.getMinutes() / 60) * HOUR_HEIGHT;
                   const height = Math.max(
-                    22,
+                    20,
                     ((end.getTime() - start.getTime()) / 3_600_000) * HOUR_HEIGHT - 2,
                   );
                   const status = APPOINTMENT_STATUS[appointment.status];
                   const color = appointment.professional?.color ?? '#7C3AED';
+                  // Abaixo de ~45px não cabem duas linhas: o serviço sairia
+                  // cortado por baixo do bloco. Fica só o essencial, e o resto
+                  // no title e no detalhe.
+                  const compact = height < 46;
 
                   return (
                     <button
@@ -164,7 +197,8 @@ export function CalendarGrid({
                       type="button"
                       onClick={() => onSelectAppointment(appointment)}
                       className={cn(
-                        'absolute overflow-hidden rounded-md border-l-[3px] px-2 py-1 text-left text-[11px] shadow-soft transition-all hover:z-20 hover:shadow-pop',
+                        'absolute overflow-hidden rounded-md border-l-[3px] px-2 text-left text-[11px] leading-tight shadow-soft transition-all hover:z-20 hover:shadow-pop',
+                        compact ? 'flex items-center py-0' : 'py-1',
                         appointment.status === 'CANCELED' && 'opacity-50 line-through',
                       )}
                       style={{
@@ -175,13 +209,17 @@ export function CalendarGrid({
                         borderLeftColor: color,
                         backgroundColor: `${color}1a`,
                       }}
-                      title={`${appointment.customer.name} — ${status.label}`}
+                      title={`${timeLabel(appointment.startsAt)} · ${appointment.customer.name} — ${appointment.services.map((item) => item.name).join(', ')} (${status.label})`}
                     >
-                      <span className="block truncate font-semibold text-foreground">
-                        {timeLabel(appointment.startsAt)} {appointment.customer.name}
-                      </span>
-                      <span className="block truncate text-muted-foreground">
-                        {appointment.services.map((s) => s.name).join(', ')}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-semibold text-foreground">
+                          {timeLabel(appointment.startsAt)} {appointment.customer.name}
+                        </span>
+                        {compact ? null : (
+                          <span className="block truncate text-muted-foreground">
+                            {appointment.services.map((item) => item.name).join(', ')}
+                          </span>
+                        )}
                       </span>
                     </button>
                   );
