@@ -1,9 +1,8 @@
 import { useNavigate } from 'react-router-dom';
-import { Bell, ChevronDown, LogOut, Menu, Settings, User } from 'lucide-react';
+import { Bell, ChevronDown, LogOut, Menu, Settings } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
 import { useNotificationMutations, useNotifications } from '@/api/queries';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,11 +30,7 @@ export function Topbar({ onOpenMenu }: { onOpenMenu: () => void }) {
         <Menu />
       </Button>
 
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-muted-foreground">
-          {company?.name ?? ''}
-        </p>
-      </div>
+      <div className="min-w-0 flex-1" />
 
       <Popover>
         <PopoverTrigger asChild>
@@ -97,9 +92,12 @@ export function Topbar({ onOpenMenu }: { onOpenMenu: () => void }) {
             type="button"
             className="flex items-center gap-2 rounded-lg px-1.5 py-1 transition-colors hover:bg-secondary"
           >
-            <UserAvatar name={user?.name} src={user?.avatarUrl} className="size-8" />
+            {/* Identidade da empresa: logo e nome que o cliente cadastrou. */}
+            <UserAvatar name={company?.name} src={company?.logoUrl} className="size-8" />
             <div className="hidden text-left sm:block">
-              <p className="max-w-[140px] truncate text-sm font-medium leading-tight">{user?.name}</p>
+              <p className="max-w-[160px] truncate text-sm font-medium leading-tight">
+                {company?.name}
+              </p>
               <p className="text-[11px] leading-tight text-muted-foreground">
                 {user ? USER_ROLE[user.role] : ''}
               </p>
@@ -114,16 +112,6 @@ export function Topbar({ onOpenMenu }: { onOpenMenu: () => void }) {
             <span className="text-xs font-normal">{user?.email}</span>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          {company?.plan ? (
-            <div className="px-2 py-1.5">
-              <Badge variant="secondary">Plano {company.plan.name}</Badge>
-            </div>
-          ) : null}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => navigate('/app/configuracoes')}>
-            <User />
-            Minha conta
-          </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => navigate('/app/configuracoes')}>
             <Settings />
             Configurações

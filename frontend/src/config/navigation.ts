@@ -117,12 +117,8 @@ export const NAV_ITEMS: NavItem[] = [
     permission: 'reports:view',
     group: 'gestão',
   },
-  {
-    label: 'Configurações',
-    to: '/app/configuracoes',
-    icon: Settings,
-    group: 'configuração',
-  },
+  // Configurações não fica no menu lateral: mora no menu da empresa, no topo,
+  // junto da identidade e do sair.
 ];
 
 export const ADMIN_NAV: NavItem[] = [

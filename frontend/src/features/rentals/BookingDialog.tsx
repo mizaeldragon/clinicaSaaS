@@ -28,6 +28,7 @@ import {
   useShifts,
 } from '@/api/queries';
 import { currency } from '@/lib/format';
+import type { BookingPreview } from '@/api/queries';
 import { cn } from '@/lib/utils';
 
 export interface BookingTarget {
@@ -306,25 +307,7 @@ export function BookingDialog({
             />
           </div>
 
-          {preview.data ? (
-            <div className="rounded-lg border bg-muted/40 p-3 text-sm">
-              <p className="font-medium">
-                {preview.data.available} {preview.data.available === 1 ? 'turno' : 'turnos'} ·{' '}
-                {currency(preview.data.amount)}
-              </p>
-              {preview.data.blocked > 0 ? (
-                <p className="mt-1 text-xs text-amber-600">
-                  {preview.data.blocked}{' '}
-                  {preview.data.blocked === 1
-                    ? 'dia já ocupado será pulado'
-                    : 'dias já ocupados serão pulados'}
-                </p>
-              ) : null}
-              {preview.data.available === 0 ? (
-                <p className="mt-1 text-xs text-destructive">Nenhum dia livre neste período.</p>
-              ) : null}
-            </div>
-          ) : null}
+          {preview.data ? <PeriodSummary preview={preview.data} /> : null}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
@@ -341,5 +324,68 @@ export function BookingDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * Resumo do período antes de gravar.
+ *
+ * Mostra os três números juntos — quantos turnos o período gera, quantos estão
+ * livres e quantos já estão ocupados — porque exibir só o total livre faz
+ * parecer que a conta saiu errada quando a dona marcou dois dias e viu um.
+ */
+function PeriodSummary({ preview }: { preview: BookingPreview }) {
+  const blocked = preview.days.filter((day) => !day.available);
+
+  if (preview.available === 0) {
+    return (
+      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm">
+        <p className="font-medium text-destructive">Nenhum dia livre neste período</p>
+        <BlockedList days={blocked} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2 rounded-lg border bg-muted/40 p-3 text-sm">
+      {blocked.length > 0 ? (
+        <p className="text-xs text-muted-foreground">
+          {preview.total} {preview.total === 1 ? 'turno' : 'turnos'} no período
+        </p>
+      ) : null}
+
+      <p className="font-medium">
+        {preview.available} {preview.available === 1 ? 'turno livre' : 'turnos livres'} ·{' '}
+        {currency(preview.amount)}
+      </p>
+
+      {blocked.length > 0 ? (
+        <div className="border-t pt-2">
+          <p className="text-xs font-medium text-amber-600">
+            {blocked.length}{' '}
+            {blocked.length === 1 ? 'dia já ocupado será pulado' : 'dias já ocupados serão pulados'}
+          </p>
+          <BlockedList days={blocked} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function BlockedList({ days }: { days: BookingPreview['days'] }) {
+  return (
+    <ul className="mt-1.5 space-y-1">
+      {days.slice(0, 4).map((day) => (
+        <li key={`${day.date}-${day.shiftId}`} className="text-xs text-muted-foreground">
+          <span className="font-medium capitalize">
+            {format(new Date(day.date), "EEE dd/MM", { locale: ptBR })} · {day.shift}
+          </span>
+          {day.reason ? ` — ${day.reason}` : ''}
+        </li>
+      ))}
+      {days.length > 4 ? (
+        <li className="text-xs text-muted-foreground">e mais {days.length - 4}…</li>
+      ) : null}
+    </ul>
   );
 }

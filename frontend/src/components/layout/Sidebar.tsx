@@ -47,19 +47,14 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           open ? 'translate-x-0' : '-translate-x-full',
         )}
       >
+        {/* Marca do produto. A identidade da empresa fica no topo, à direita. */}
         <div className="flex h-16 items-center gap-3 px-5">
           <div className="flex size-9 items-center justify-center rounded-xl bg-sidebar-accent text-white shadow-lg">
-            {company?.logoUrl ? (
-              <img src={company.logoUrl} alt="" className="size-full rounded-xl object-cover" />
-            ) : (
-              <Sparkles className="size-5" />
-            )}
+            <Sparkles className="size-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold">{company?.name ?? 'Belezza'}</p>
-            <p className="truncate text-[11px] text-sidebar-muted">
-              {company?.plan?.name ? `Plano ${company.plan.name}` : 'Gestão de beleza'}
-            </p>
+            <p className="truncate text-sm font-semibold">Belezza</p>
+            <p className="truncate text-[11px] text-sidebar-muted">Gestão de beleza</p>
           </div>
           <Button
             variant="ghost"
