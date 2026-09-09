@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { AppointmentSource, AppointmentStatus } from '@prisma/client';
 import { prisma } from '../../shared/database/prisma';
 import { tenantContext } from '../../shared/database/tenantContext';
@@ -195,6 +196,10 @@ export async function getPublicAvailability(query: AvailabilityQueryDTO) {
   const service = await prisma.service.findFirst({ where: { id: query.serviceId, isActive: true } });
   if (!service) throw new NotFoundError('Serviço');
 
+  // Feriado e fechamento avulso zeram o dia antes de qualquer outra conta.
+  const holiday = await prisma.holiday.findFirst({ where: { date: day } });
+  if (holiday) return { service, date: day, professionals: [] };
+
   const businessHour = await prisma.businessHour.findFirst({ where: { weekday: day.getDay() } });
   if (businessHour?.isClosed) return { service, date: day, professionals: [] };
 
@@ -228,6 +233,8 @@ export async function getPublicAvailability(query: AvailabilityQueryDTO) {
         status: { in: BLOCKING_STATUSES },
         startsAt: { lt: endOfDay(day) },
         endsAt: { gt: day },
+        // Ao remarcar, o próprio horário não pode contar como ocupado.
+        ...(query.ignoreAppointmentId ? { id: { not: query.ignoreAppointmentId } } : {}),
       },
       select: { professionalId: true, startsAt: true, endsAt: true },
     }),
@@ -397,6 +404,7 @@ export async function createPublicAppointment(
         totalPrice: professional.price,
         notes: dto.notes ?? null,
         source: AppointmentSource.PUBLIC,
+        publicToken: newPublicToken(),
         services: {
           create: {
             companyId,
@@ -440,7 +448,168 @@ export async function createPublicAppointment(
     professional: appointment.professional,
     service: appointment.services[0]?.name,
     requiresApproval,
+    /** Endereço do próprio horário: a cliente consulta, remarca ou cancela por ele. */
+    token: appointment.publicToken,
   };
+}
+
+/* ------------------------------------------------------------------------ */
+/*  O horário da cliente: consultar, remarcar e cancelar sem ter conta        */
+/* ------------------------------------------------------------------------ */
+
+/** Chave secreta do link. Longa o bastante para não ser adivinhada. */
+export function newPublicToken(): string {
+  return crypto.randomBytes(16).toString('hex');
+}
+
+const OPEN_STATUSES: AppointmentStatus[] = [
+  AppointmentStatus.SCHEDULED,
+  AppointmentStatus.CONFIRMED,
+];
+
+async function findByToken(token: string) {
+  const appointment = await prisma.appointment.findFirst({
+    where: { publicToken: token },
+    include: {
+      customer: { select: { name: true, phone: true } },
+      professional: { select: { id: true, name: true, avatarUrl: true, publicSlug: true } },
+      services: { select: { serviceId: true, name: true, price: true, durationMinutes: true } },
+    },
+  });
+
+  if (!appointment) throw new NotFoundError('Agendamento');
+  return appointment;
+}
+
+/** O que a cliente vê ao abrir o link do horário dela. */
+export async function getPublicAppointment(companyId: string, token: string) {
+  const appointment = await findByToken(token);
+  const storefront = await getStorefront(companyId);
+
+  return {
+    company: storefront.company,
+    appointment: {
+      // Devolvido para a grade de remarcação poder ignorar o próprio horário.
+      id: appointment.id,
+      startsAt: appointment.startsAt,
+      endsAt: appointment.endsAt,
+      status: appointment.status,
+      customerName: appointment.customer.name,
+      professional: appointment.professional,
+      service: appointment.services[0] ?? null,
+      totalPrice: appointment.totalPrice,
+      /** Já passou ou já foi encerrado: só resta consultar. */
+      changeable:
+        OPEN_STATUSES.includes(appointment.status) && appointment.startsAt.getTime() > Date.now(),
+    },
+  };
+}
+
+/**
+ * Garante que o horário ainda pode mudar. Atendimento finalizado, cancelado ou
+ * que já começou fica congelado — remarcar depois da hora bagunçaria a agenda
+ * de quem já se organizou.
+ */
+function assertChangeable(appointment: { status: AppointmentStatus; startsAt: Date }) {
+  if (!OPEN_STATUSES.includes(appointment.status)) {
+    throw new ScheduleConflictError('Este agendamento não está mais aberto para alteração');
+  }
+  if (appointment.startsAt.getTime() <= Date.now()) {
+    throw new ScheduleConflictError(
+      'Este horário já começou. Fale com o espaço para reorganizar.',
+    );
+  }
+}
+
+export async function cancelPublicAppointment(companyId: string, token: string, reason?: string) {
+  const appointment = await findByToken(token);
+  assertChangeable(appointment);
+
+  const canceled = await prisma.appointment.update({
+    where: { id: appointment.id },
+    data: {
+      status: AppointmentStatus.CANCELED,
+      canceledAt: new Date(),
+      canceledReason: reason?.trim() || 'Cancelado pela cliente no link público',
+    },
+  });
+
+  emitToPortfolio(
+    companyId,
+    appointment.ownerProfessionalId,
+    SOCKET_EVENTS.appointmentUpdated,
+    canceled,
+  );
+
+  await notificationsService.notifyEvent(companyId, 'APPOINTMENT_CANCELED', {
+    title: 'Cancelamento pelo link',
+    message: `${appointment.customer.name} cancelou ${appointment.startsAt.toLocaleString('pt-BR')}`,
+    data: { appointmentId: appointment.id, source: 'PUBLIC' },
+    userId: await userOfProfessional(appointment.ownerProfessionalId),
+  });
+
+  return { status: canceled.status };
+}
+
+/** Remarca para outro horário livre da mesma profissional e do mesmo serviço. */
+export async function reschedulePublicAppointment(
+  companyId: string,
+  token: string,
+  startsAt: Date,
+) {
+  const appointment = await findByToken(token);
+  assertChangeable(appointment);
+
+  const serviceId = appointment.services[0]?.serviceId;
+  if (!serviceId || !appointment.professionalId) {
+    throw new ScheduleConflictError('Este agendamento precisa ser remarcado pelo espaço');
+  }
+
+  // Passa pela mesma checagem do agendamento novo — turno alugado, jornada,
+  // feriado, sala ocupada. O horário atual é ignorado para não conflitar consigo.
+  const availability = await getPublicAvailability({
+    serviceId,
+    date: startsAt,
+    professionalId: appointment.professionalId,
+    ignoreAppointmentId: appointment.id,
+  });
+
+  const entry = availability.professionals[0];
+  const slot = entry?.slots.find((candidate) => candidate.startsAt.getTime() === startsAt.getTime());
+
+  if (!slot) {
+    throw new ScheduleConflictError('Este horário não está mais livre. Escolha outro, por favor.');
+  }
+
+  const updated = await prisma.appointment.update({
+    where: { id: appointment.id },
+    data: {
+      startsAt: slot.startsAt,
+      endsAt: slot.endsAt,
+      roomId: slot.resourceId,
+      status: AppointmentStatus.SCHEDULED,
+    },
+    include: {
+      customer: { select: { name: true } },
+      professional: { select: { id: true, name: true } },
+    },
+  });
+
+  emitToPortfolio(
+    companyId,
+    appointment.ownerProfessionalId,
+    SOCKET_EVENTS.appointmentUpdated,
+    updated,
+  );
+
+  await notificationsService.notifyEvent(companyId, 'APPOINTMENT_CREATED', {
+    title: 'Horário remarcado pelo link',
+    message: `${updated.customer.name} passou para ${updated.startsAt.toLocaleString('pt-BR')}`,
+    data: { appointmentId: updated.id, source: 'PUBLIC' },
+    userId: await userOfProfessional(appointment.ownerProfessionalId),
+  });
+
+  return { startsAt: updated.startsAt, endsAt: updated.endsAt, status: updated.status };
 }
 
 export type PublicAvailability = Awaited<ReturnType<typeof getPublicAvailability>>;

@@ -16,7 +16,7 @@ export const createProfessionalSchema = z.object({
   name: z.string().min(2).max(120),
   email: z.string().email().optional().or(z.literal('')).transform((v) => (v === '' ? undefined : v)),
   phone: z.string().max(20).optional(),
-  avatarUrl: z.string().url().optional(),
+  avatarUrl: z.string().url().nullable().optional(),
   bio: z.string().max(1000).optional(),
   specialties: z.array(z.string().max(60)).default([]),
   color: z.string().regex(/^#([0-9a-fA-F]{6})$/).default('#7C3AED'),

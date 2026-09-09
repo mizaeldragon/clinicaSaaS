@@ -8,3 +8,6 @@ build/
 coverage/
 .vite/
 *.tsbuildinfo
+
+# imagens enviadas pelos usuários
+backend/uploads/

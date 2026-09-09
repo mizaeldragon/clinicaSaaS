@@ -55,7 +55,7 @@ const CREATE_OPERATIONS = new Set(['create', 'createMany']);
  * (`ownerProfessionalId = null`) ou de uma locatária. A locadora enxerga apenas
  * a carteira da casa; cada locatária, apenas a sua.
  */
-const PORTFOLIO_MODELS = new Set<string>(['Customer', 'Appointment']);
+const PORTFOLIO_MODELS = new Set<string>(['Customer', 'Appointment', 'FinancialTransaction']);
 
 function mergeWhere(where: unknown, companyId: string): Record<string, unknown> {
   const current = (where ?? {}) as Record<string, unknown>;
@@ -91,6 +91,22 @@ function injectCompanyId<T>(data: T, companyId: string): T {
  * com migração devolve 500 para quem estiver online.
  */
 const STALE_PLAN_CODE = '0A000';
+
+/**
+ * Repete uma consulta bruta quando o plano em cache ficou velho.
+ *
+ * O erro descarta o plano ao acontecer, então a segunda tentativa passa. Vale
+ * só para o `$queryRaw`: as operações de modelo não sofrem porque o Prisma as
+ * remonta a cada chamada, e o extension não intercepta consultas brutas.
+ */
+export async function withStalePlanRetry<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    if (!isStalePlan(error)) throw error;
+    return run();
+  }
+}
 
 function isStalePlan(error: unknown): boolean {
   const candidate = error as { code?: string; message?: string };
@@ -156,20 +172,6 @@ function buildClient() {
 
           return query(nextArgs);
         },
-      },
-    },
-  }).$extends({
-    // Camada externa: pega também o $queryRaw, que não passa por $allModels.
-    name: 'stale-plan-retry',
-    query: {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      async $allOperations({ args, query }: any) {
-        try {
-          return await query(args);
-        } catch (error) {
-          if (!isStalePlan(error)) throw error;
-          return query(args);
-        }
       },
     },
   });

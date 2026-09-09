@@ -12,6 +12,20 @@ export const availabilityQuerySchema = z.object({
   serviceId: z.string().uuid('Selecione um serviço'),
   date: z.coerce.date(),
   professionalId: z.string().uuid().optional(),
+  /** Uso interno da remarcação: ignora o horário que está sendo movido. */
+  ignoreAppointmentId: z.string().uuid().optional(),
+});
+
+export const appointmentTokenParamSchema = slugParamSchema.extend({
+  token: z.string().regex(/^[a-f0-9]{32}$/, 'Link inválido'),
+});
+
+export const cancelPublicSchema = z.object({
+  reason: z.string().max(300).optional(),
+});
+
+export const reschedulePublicSchema = z.object({
+  startsAt: z.coerce.date(),
 });
 
 export const agendaQuerySchema = z.object({

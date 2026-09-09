@@ -6,6 +6,7 @@ import cookieParser from 'cookie-parser';
 import pinoHttp from 'pino-http';
 import { env } from './config/env';
 import { routes } from './routes';
+import { UPLOADS_DIR, UPLOADS_ROUTE } from './modules/uploads/uploads.routes';
 import { errorHandler, notFoundHandler } from './shared/middlewares/errorHandler';
 import { globalRateLimiter } from './shared/middlewares/rateLimit';
 import { logger } from './shared/utils/logger';
@@ -15,7 +16,9 @@ export function createApp(): Application {
 
   app.set('trust proxy', 1);
 
-  app.use(helmet());
+  // As imagens enviadas são servidas de outra origem que a do painel, então o
+  // bloqueio padrão de recursos entre origens impediria o <img> de carregar.
+  app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
   app.use(
     cors({
       origin: (origin, callback) => {
@@ -46,6 +49,13 @@ export function createApp(): Application {
   );
 
   app.use(globalRateLimiter);
+
+  // Arquivos enviados. `nosniff` (do helmet) impede que o navegador reinterprete
+  // o tipo; nada aqui é executável.
+  app.use(
+    UPLOADS_ROUTE,
+    express.static(UPLOADS_DIR, { maxAge: '30d', index: false, dotfiles: 'deny' }),
+  );
 
   app.use(env.API_PREFIX, routes);
 

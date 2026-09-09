@@ -152,8 +152,8 @@ reservados, não de uma jornada fixa.
 
 | Valor | Quem é | Ao finalizar um atendimento |
 |---|---|---|
-| `COMPANY` | equipe da casa | gera receita e comissão para a empresa |
-| `PROFESSIONAL` | locatária | **nada** entra no caixa da empresa — ela cobra as próprias clientes e a empresa fatura só o turno |
+| `COMPANY` | equipe da casa | receita no caixa da empresa + comissão |
+| `PROFESSIONAL` | locatária | receita no **caixa dela**, invisível para a casa; sem comissão, porque não repassa percentual a ninguém |
 
 A disponibilidade também muda: equipe própria usa `WorkingHour`; locatária usa os
 `RentalBooking` dela.
@@ -173,7 +173,7 @@ Isso é uma segunda dimensão de isolamento, ortogonal à empresa:
 | Empresa | `companyId` | uma empresa nunca vê outra |
 | Carteira | `ownerProfessionalId` | dentro da empresa, a casa não vê a locatária, e uma locatária não vê a outra |
 
-`Customer.ownerProfessionalId` e `Appointment.ownerProfessionalId` são `null`
+`Customer`, `Appointment` e `FinancialTransaction` têm `ownerProfessionalId`: é `null`
 quando o registro é da casa e apontam para a locatária quando são dela. O campo
 é escalar de propósito: continua válido em `findUnique`/`update`/`delete`.
 
@@ -198,7 +198,11 @@ locatária vão para a sala `professional:{id}` e para o usuário dela, nunca pa
 a empresa inteira.
 
 A mesma pessoa pode ser cliente da casa **e** de uma locatária — são dois
-cadastros, porque são dois negócios. O reconhecimento por telefone no
+cadastros, porque são dois negócios.
+
+O pagamento do turno tem **dois lados**: receita na carteira da casa e despesa na
+carteira de quem alugou, gravadas juntas. Cada uma enxerga o próprio lado, e o
+resultado da locatária já sai líquido do custo do espaço. O reconhecimento por telefone no
 agendamento público acontece dentro da carteira de destino.
 
 Blocos do dashboard (caixa, aluguéis, recursos) passaram a exigir permissão
@@ -236,6 +240,34 @@ Ao criar/alterar um agendamento o serviço valida, dentro de uma transação:
 
 As buscas por conflito rodam sem recorte de carteira — a sala é física e é
 compartilhada, então uma agenda invisível continua ocupando o espaço.
+
+### 5.1 Fuso horário
+
+A agenda trabalha com **horário de parede**: "das 09:00 às 19:00", "turno da
+manhã 08:00–12:00". Todo o motor de conflitos compara minutos do dia, então num
+servidor em UTC — o padrão em produção — os horários sairiam três horas
+deslocados. `config/env.ts` fixa `process.env.TZ` antes de qualquer data ser
+calculada; o valor vem de `TIMEZONE` e o padrão é `America/Sao_Paulo`.
+
+Datas de calendário (feriados, coluna `DATE`) voltam da API à meia-noite UTC e
+por isso são formatadas pela parte da data, nunca pelo horário local — senão
+1º de janeiro apareceria como 31 de dezembro.
+
+### 5.2 Feriados e fechamentos
+
+`Holiday` marca os dias em que a empresa não atende. Vale acima do horário de
+funcionamento: `assertNotHoliday` roda dentro de `assertWithinBusinessHours`, a
+grade do painel devolve vazio e a disponibilidade pública zera o dia. A lista
+nacional é calculada no próprio código (fixos + móveis a partir da Páscoa pelo
+algoritmo de Meeus/Jones/Butcher), sem depender de serviço externo, e a
+importação nunca sobrescreve um fechamento próprio da casa.
+
+### 5.3 O horário da cliente
+
+`Appointment.publicToken` é a credencial de um link sem conta. Por ele a cliente
+consulta, remarca — passando pela mesma validação de um agendamento novo, com o
+próprio horário ignorado — ou cancela. Atendimento finalizado, cancelado ou que
+já começou fica congelado.
 
 ## 6. Segurança
 

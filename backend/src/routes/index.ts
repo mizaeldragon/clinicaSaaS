@@ -22,6 +22,7 @@ import { notificationsRoutes } from '../modules/notifications/notifications.rout
 import { subscriptionsRoutes } from '../modules/subscriptions/subscriptions.routes';
 import { adminRoutes } from '../modules/admin/admin.routes';
 import { auditRoutes } from '../modules/audit/audit.routes';
+import { uploadsRoutes } from '../modules/uploads/uploads.routes';
 
 export const routes = Router();
 
@@ -58,6 +59,7 @@ secured.use('/reports', reportsRoutes);
 secured.use('/notifications', notificationsRoutes);
 secured.use('/subscription', subscriptionsRoutes);
 secured.use('/audit-logs', auditRoutes);
+secured.use('/uploads', uploadsRoutes);
 
 // Painel do SaaS (super admin)
 secured.use('/admin', adminRoutes);

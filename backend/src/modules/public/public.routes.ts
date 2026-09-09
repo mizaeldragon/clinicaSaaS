@@ -1,6 +1,7 @@
 import { Router, type RequestHandler } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
+import { env } from '../../config/env';
 import { prisma } from '../../shared/database/prisma';
 import { tenantContext } from '../../shared/database/tenantContext';
 import { AppError, NotFoundError } from '../../shared/errors/AppError';
@@ -8,17 +9,23 @@ import { validate } from '../../shared/middlewares/validate';
 import { asyncHandler, serialize } from '../../shared/utils/http';
 import {
   agendaQuerySchema,
+  appointmentTokenParamSchema,
   availabilityQuerySchema,
+  cancelPublicSchema,
   createPublicAppointmentSchema,
   professionalSlugParamSchema,
+  reschedulePublicSchema,
   slugParamSchema,
 } from './public.schema';
 import {
+  cancelPublicAppointment,
   createPublicAppointment,
   getProfessionalStorefront,
   getPublicAgenda,
+  getPublicAppointment,
   getPublicAvailability,
   getStorefront,
+  reschedulePublicAppointment,
 } from './public.service';
 
 export const publicRoutes = Router({ mergeParams: true });
@@ -34,9 +41,16 @@ const browseLimiter = rateLimit({
   },
 });
 
+/**
+ * Escrita na página pública (marcar, remarcar, cancelar).
+ *
+ * Continua apertado o bastante para travar abuso, mas não pode barrar o uso
+ * legítimo: várias clientes saem do mesmo IP quando marcam do wi-fi do salão,
+ * e remarcar consome o mesmo teto que marcar.
+ */
 const bookingLimiter = rateLimit({
   windowMs: 10 * 60_000,
-  max: 8,
+  max: env.PUBLIC_WRITE_RATE_LIMIT_MAX,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -152,5 +166,46 @@ publicRoutes.post(
       req.body,
     );
     res.status(201).json(serialize(appointment));
+  }),
+);
+
+/* ---------------------------------------------- o horário da própria cliente */
+
+/** Consulta pelo link recebido na confirmação — sem conta, sem senha. */
+publicRoutes.get(
+  '/agendamento/:token',
+  validate({ params: appointmentTokenParamSchema }),
+  asyncHandler(async (req, res) => {
+    res.json(serialize(await getPublicAppointment(req.companyId as string, req.params.token)));
+  }),
+);
+
+publicRoutes.post(
+  '/agendamento/:token/cancelar',
+  bookingLimiter,
+  validate({ params: appointmentTokenParamSchema, body: cancelPublicSchema }),
+  asyncHandler(async (req, res) => {
+    res.json(
+      serialize(
+        await cancelPublicAppointment(req.companyId as string, req.params.token, req.body.reason),
+      ),
+    );
+  }),
+);
+
+publicRoutes.post(
+  '/agendamento/:token/remarcar',
+  bookingLimiter,
+  validate({ params: appointmentTokenParamSchema, body: reschedulePublicSchema }),
+  asyncHandler(async (req, res) => {
+    res.json(
+      serialize(
+        await reschedulePublicAppointment(
+          req.companyId as string,
+          req.params.token,
+          req.body.startsAt,
+        ),
+      ),
+    );
   }),
 );

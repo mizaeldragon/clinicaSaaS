@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
 export interface Storefront {
@@ -93,14 +93,16 @@ export function usePublicAvailability(
   serviceId?: string,
   date?: string,
   professionalId?: string,
+  ignoreAppointmentId?: string,
 ) {
   return useQuery<PublicAvailability>({
-    queryKey: ['public-availability', slug, serviceId, date, professionalId],
+    queryKey: ['public-availability', slug, serviceId, date, professionalId, ignoreAppointmentId],
     queryFn: () =>
       api.get<PublicAvailability>(`/public/${slug}/availability`, {
         serviceId,
         date,
         professionalId,
+        ignoreAppointmentId,
       }),
     enabled: Boolean(serviceId && date),
   });
@@ -128,6 +130,52 @@ export interface PublicBookingResult {
   professional: { id: string; name: string } | null;
   service: string;
   requiresApproval: boolean;
+  /** Endereço do próprio horário: consultar, remarcar ou cancelar sem conta. */
+  token: string | null;
+}
+
+/* ------------------------------- o horário da cliente, pelo link recebido */
+
+export interface PublicAppointment {
+  company: Storefront['company'];
+  appointment: {
+    id: string;
+    startsAt: string;
+    endsAt: string;
+    status: string;
+    customerName: string;
+    professional: { id: string; name: string; avatarUrl: string | null; publicSlug: string | null } | null;
+    service: { serviceId: string; name: string; price: number; durationMinutes: number } | null;
+    totalPrice: number;
+    changeable: boolean;
+  };
+}
+
+export function usePublicAppointment(slug: string, token?: string) {
+  return useQuery<PublicAppointment>({
+    queryKey: ['public-appointment', slug, token],
+    queryFn: () => api.get<PublicAppointment>(`/public/${slug}/agendamento/${token}`),
+    enabled: Boolean(token),
+    retry: false,
+  });
+}
+
+export function usePublicAppointmentActions(slug: string, token?: string) {
+  const client = useQueryClient();
+  const refresh = () => client.invalidateQueries({ queryKey: ['public-appointment', slug, token] });
+
+  return {
+    cancel: useMutation({
+      mutationFn: (reason?: string) =>
+        api.post(`/public/${slug}/agendamento/${token}/cancelar`, { reason }),
+      onSuccess: refresh,
+    }),
+    reschedule: useMutation({
+      mutationFn: (startsAt: string) =>
+        api.post(`/public/${slug}/agendamento/${token}/remarcar`, { startsAt }),
+      onSuccess: refresh,
+    }),
+  };
 }
 
 export function usePublicBooking(slug: string) {

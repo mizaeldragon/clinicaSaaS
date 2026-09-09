@@ -751,6 +751,58 @@ export function useCompanyMutations() {
   };
 }
 
+export interface Holiday {
+  id: string;
+  date: string;
+  name: string;
+  national: boolean;
+}
+
+export const useHolidays = (year: number) =>
+  useApiQuery<Holiday[]>(['holidays', year], '/company/holidays', { year });
+
+export function useHolidayMutations() {
+  const qc = useQueryClient();
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['holidays'] });
+    qc.invalidateQueries({ queryKey: ['appointments'] });
+  };
+
+  return {
+    create: useMutation({
+      mutationFn: (body: { date: string; name: string }) => api.post('/company/holidays', body),
+      onSuccess: () => {
+        toast.success('Dia fechado');
+        invalidate();
+      },
+      onError: handleError,
+    }),
+    remove: useMutation({
+      mutationFn: (id: string) => api.delete(`/company/holidays/${id}`),
+      onSuccess: () => {
+        toast.success('Dia reaberto');
+        invalidate();
+      },
+      onError: handleError,
+    }),
+    importNational: useMutation({
+      mutationFn: (target: number) =>
+        api.post<{ imported: number; skipped: number }>('/company/holidays/import', {
+          year: target,
+        }),
+      onSuccess: (result) => {
+        toast.success(
+          result.imported > 0
+            ? `${result.imported} feriado(s) adicionado(s)`
+            : 'Os feriados deste ano já estavam na lista',
+        );
+        invalidate();
+      },
+      onError: handleError,
+    }),
+  };
+}
+
 export function useUserMutations() {
   const qc = useQueryClient();
   const invalidate = () => qc.invalidateQueries({ queryKey: ['users'] });

@@ -16,7 +16,7 @@ import {
 } from '../../shared/errors/AppError';
 import { getPagination, paginated } from '../../shared/utils/http';
 import { endOfDay, startOfDay, timeToMinutes } from '../../shared/utils/datetime';
-import { SOCKET_EVENTS, emitToCompany } from '../../websocket/io';
+import { SOCKET_EVENTS, emitToCompany, emitToProfessional } from '../../websocket/io';
 import { logger } from '../../shared/utils/logger';
 import { shiftsService } from '../shifts/shifts.service';
 import type { CreateBookingDTO, ListBookingsDTO, PayBookingDTO, UpdateBookingDTO } from './bookings.schema';
@@ -392,33 +392,52 @@ export const bookingsService = {
         include: BOOKING_INCLUDE,
       });
 
-      const existing = await tx.financialTransaction.findFirst({ where: { rentalBookingId: id } });
-      const description = `Aluguel de turno — ${result.resource.name} (${result.professional.name})`;
+      const movement = {
+        paidAmount: newPaid,
+        paymentStatus: status,
+        paymentMethod: dto.paymentMethod,
+        paidAt: status === PaymentStatus.PAID ? dto.paidAt : null,
+      };
 
-      if (existing) {
-        await tx.financialTransaction.update({
-          where: { id: existing.id },
-          data: {
-            paidAmount: newPaid,
-            paymentStatus: status,
-            paymentMethod: dto.paymentMethod,
-            paidAt: status === PaymentStatus.PAID ? dto.paidAt : null,
-          },
+      /**
+       * O mesmo pagamento tem dois lados: receita no caixa da casa e despesa no
+       * caixa de quem alugou. Cada lado vive na sua carteira, então a locatária
+       * enxerga o custo do turno no próprio resultado sem ver o caixa da casa.
+       */
+      const sides = [
+        {
+          owner: null,
+          type: TransactionType.INCOME,
+          description: `Aluguel de turno — ${result.resource.name} (${result.professional.name})`,
+        },
+        {
+          owner: result.professionalId,
+          type: TransactionType.EXPENSE,
+          description: `Aluguel do espaço — ${result.resource.name}`,
+        },
+      ];
+
+      for (const side of sides) {
+        const existing = await tx.financialTransaction.findFirst({
+          where: { rentalBookingId: id, ownerProfessionalId: side.owner },
         });
-      } else {
+
+        if (existing) {
+          await tx.financialTransaction.update({ where: { id: existing.id }, data: movement });
+          continue;
+        }
+
         await tx.financialTransaction.create({
           data: {
             companyId,
-            type: TransactionType.INCOME,
+            ownerProfessionalId: side.owner,
+            type: side.type,
             origin: TransactionOrigin.RENTAL,
-            description,
+            description: side.description,
             amount: total,
-            paidAmount: newPaid,
-            paymentMethod: dto.paymentMethod,
-            paymentStatus: status,
             competenceDate: booking.date,
-            paidAt: status === PaymentStatus.PAID ? dto.paidAt : null,
             rentalBookingId: id,
+            ...movement,
           },
         });
       }
@@ -427,6 +446,7 @@ export const bookingsService = {
     });
 
     emitToCompany(companyId, SOCKET_EVENTS.financialUpdated, { bookingId: id });
+    emitToProfessional(updated.professionalId, SOCKET_EVENTS.financialUpdated, { bookingId: id });
     return updated;
   },
 

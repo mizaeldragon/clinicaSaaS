@@ -23,6 +23,18 @@ export const percent = (value: number | null | undefined, digits = 1): string =>
 export const number = (value: number | null | undefined): string =>
   new Intl.NumberFormat('pt-BR').format(Number(value ?? 0));
 
+/**
+ * Data de calendário (coluna DATE), sem hora.
+ *
+ * A API devolve "2026-01-01T00:00:00.000Z". Interpretar isso no fuso local
+ * jogaria para 31/12 — então só a parte da data conta, ancorada ao meio-dia
+ * para nenhum horário de verão empurrar de novo.
+ */
+export function calendarDate(value: string | Date): Date {
+  const iso = typeof value === 'string' ? value.slice(0, 10) : value.toISOString().slice(0, 10);
+  return new Date(`${iso}T12:00:00`);
+}
+
 export function dateLabel(value: string | Date | null | undefined): string {
   const date = toDate(value);
   if (!date) return '—';

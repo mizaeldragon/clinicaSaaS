@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input, Textarea } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { ImageUpload } from '@/components/ImageUpload';
 import { Checkbox, Label, Switch } from '@/components/ui/primitives';
 import {
   Select,
@@ -34,6 +35,7 @@ const EMPTY = {
   commissionValue: '',
   revenueOwner: 'COMPANY' as 'COMPANY' | 'PROFESSIONAL',
   publicBookingEnabled: true,
+  avatarUrl: null as string | null,
 };
 
 export function ProfessionalDialog({
@@ -67,6 +69,7 @@ export function ProfessionalDialog({
         commissionValue: professional.commissionValue ? String(professional.commissionValue) : '',
         revenueOwner: professional.revenueOwner ?? 'COMPANY',
         publicBookingEnabled: professional.publicBookingEnabled ?? true,
+        avatarUrl: professional.avatarUrl ?? null,
       });
       setSpecialties(professional.specialties ?? []);
       setServiceIds(professional.services?.map((s) => s.serviceId) ?? []);
@@ -95,6 +98,7 @@ export function ProfessionalDialog({
       serviceIds,
       revenueOwner: form.revenueOwner,
       publicBookingEnabled: form.publicBookingEnabled,
+      avatarUrl: form.avatarUrl,
       commissionType: form.commissionType === 'NONE' ? null : form.commissionType,
       commissionValue:
         form.commissionType === 'NONE' || !form.commissionValue ? null : Number(form.commissionValue),
@@ -115,6 +119,14 @@ export function ProfessionalDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <ImageUpload
+            label="Foto"
+            rounded="full"
+            value={form.avatarUrl}
+            onChange={(url) => set('avatarUrl', url)}
+            hint="Aparece na agenda e no link público dela. JPG, PNG ou WEBP, até 4 MB."
+          />
+
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="name">Nome *</Label>

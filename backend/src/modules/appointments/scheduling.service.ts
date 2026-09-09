@@ -258,12 +258,22 @@ export async function assertProfessionalAvailable(
   }
 }
 
+/** Feriado ou fechamento avulso: a empresa não atende naquele dia. */
+export async function assertNotHoliday(date: Date, client: TxClient = prisma): Promise<void> {
+  const holiday = await client.holiday.findFirst({ where: { date: startOfDay(date) } });
+  if (holiday) {
+    throw new ScheduleConflictError(`A empresa não atende neste dia (${holiday.name})`);
+  }
+}
+
 /** Valida o horário de funcionamento da empresa. */
 export async function assertWithinBusinessHours(
   startsAt: Date,
   endsAt: Date,
   client: TxClient = prisma,
 ): Promise<void> {
+  await assertNotHoliday(startsAt, client);
+
   const weekday = startsAt.getDay();
   const businessHour = await client.businessHour.findFirst({ where: { weekday } });
   if (!businessHour) return; // empresa sem horário configurado: não bloqueia
@@ -311,9 +321,10 @@ export async function getAvailableSlots(params: {
   const dayStart = startOfDay(date);
   const dayEnd = endOfDay(date);
 
-  const [workingHour, businessHour, timeOffs, appointments] = await Promise.all([
+  const [workingHour, businessHour, holiday, timeOffs, appointments] = await Promise.all([
     prisma.workingHour.findFirst({ where: { professionalId, weekday } }),
     prisma.businessHour.findFirst({ where: { weekday } }),
+    prisma.holiday.findFirst({ where: { date: dayStart } }),
     prisma.timeOff.findMany({
       where: { professionalId, startsAt: { lt: dayEnd }, endsAt: { gt: dayStart } },
     }),
@@ -336,6 +347,7 @@ export async function getAvailableSlots(params: {
     ),
   ]);
 
+  if (holiday) return [];
   if (!workingHour || workingHour.isOff) return [];
   if (businessHour?.isClosed) return [];
 

@@ -25,6 +25,7 @@ import { AdminCompaniesPage } from '@/features/admin/AdminCompaniesPage';
 import { AdminPlansPage } from '@/features/admin/AdminPlansPage';
 import { NotFoundPage } from '@/features/misc/NotFoundPage';
 import { PublicBookingPage } from '@/features/public/PublicBookingPage';
+import { PublicAppointmentPage } from '@/features/public/PublicAppointmentPage';
 import { LandingPage } from '@/features/landing/LandingPage';
 
 export function AppRoutes() {
@@ -37,6 +38,8 @@ export function AppRoutes() {
 
       {/* Página pública de agendamento — sem login */}
       <Route path="/e/:slug" element={<PublicBookingPage />} />
+      {/* O horário da própria cliente, pelo link que ela recebeu. */}
+      <Route path="/e/:slug/agendamento/:token" element={<PublicAppointmentPage />} />
       {/* Link individual: cada profissional divulga o seu. */}
       <Route path="/e/:slug/:professionalSlug" element={<PublicBookingPage />} />
 

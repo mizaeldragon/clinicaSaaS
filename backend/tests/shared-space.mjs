@@ -260,11 +260,11 @@ const run = async () => {
 
   const detail = await api(`/appointments/${created.id}`, { token: ana.accessToken });
   check(
-    'receita da locatária NÃO entra no caixa do espaço',
-    detail.data.transactions.length === 0,
+    'a receita vai para o caixa da própria locatária',
+    detail.data.transactions.length === 1 && Number(detail.data.transactions[0].amount) > 0,
     JSON.stringify(detail.data.transactions),
   );
-  check('e não gera comissão', detail.data.commissions.length === 0);
+  check('e não gera comissão — ela não repassa percentual a ninguém', detail.data.commissions.length === 0);
 
   const customers = await api('/customers', { token: marcia.accessToken });
   const helena = customers.data.data.find((c) => c.name === 'Helena Prado');
@@ -349,8 +349,24 @@ const run = async () => {
   const onlyHerAgenda = anaAgenda.data.data.every((a) => a.professional?.id === ana.user.professionalId);
   check('locatária vê só a própria agenda', onlyHerAgenda);
 
-  const forbidden = await api('/financial/dashboard', { token: ana.accessToken });
-  check('locatária não acessa o financeiro do espaço', forbidden.status === 403, String(forbidden.status));
+  const anaFinancial = await api('/financial/dashboard', { token: ana.accessToken });
+  const marciaFinancial = await api('/financial/dashboard', { token: marcia.accessToken });
+  check(
+    'locatária abre o financeiro e vê o caixa dela, não o do espaço',
+    anaFinancial.status === 200 &&
+      Number(anaFinancial.data.month.income) !== Number(marciaFinancial.data.month.income),
+    JSON.stringify({
+      ana: anaFinancial.data?.month?.income,
+      marcia: marciaFinancial.data?.month?.income,
+    }),
+  );
+
+  const rentalsForbidden = await api('/rentals', { token: ana.accessToken });
+  check(
+    'mas não acessa os aluguéis da casa',
+    rentalsForbidden.status === 403,
+    String(rentalsForbidden.status),
+  );
 
   console.log('\n=== 9. Parede entre carteiras ===');
 
@@ -403,9 +419,9 @@ const run = async () => {
 
   const anaDashboard = await api('/dashboard', { token: ana.accessToken });
   check(
-    'dashboard da locatária não traz o caixa do espaço',
-    anaDashboard.data.financial === null && anaDashboard.data.rentals === null,
-    JSON.stringify({ financial: anaDashboard.data.financial, rentals: anaDashboard.data.rentals }),
+    'dashboard da locatária traz o caixa dela, sem o bloco de aluguéis da casa',
+    anaDashboard.data.financial !== null && anaDashboard.data.rentals === null,
+    JSON.stringify({ status: anaDashboard.status, data: anaDashboard.data }).slice(0, 300),
   );
 
   // A guarda de exclusão conta atendimentos e turnos — dados que a locadora não
@@ -642,6 +658,168 @@ const run = async () => {
     },
   });
   check('período invertido é recusado', rejected.status === 400, String(rejected.status));
+
+  console.log('\n=== 12. A cliente mexe no próprio horário ===');
+
+  // A disponibilidade é relida agora: os testes anteriores já ocuparam horários.
+  const freshDay = nextWeekday(4); // outra quinta da Ana, ainda intocada
+  const fresh = await api(
+    `/public/${SLUG}/availability?serviceId=${corte.id}&date=${freshDay.toISOString()}&professionalId=${anaSlots.professional.id}`,
+  );
+  const freeSlots = fresh.data.professionals[0]?.slots ?? [];
+  check('há horário livre para a cliente marcar', freeSlots.length >= 2, String(freeSlots.length));
+
+  const anaSlot = freeSlots[0];
+  const ownBooking = await api(`/public/${SLUG}/appointments`, {
+    method: 'POST',
+    body: {
+      serviceId: corte.id,
+      professionalId: anaSlots.professional.id,
+      startsAt: anaSlot.startsAt,
+      customer: { name: 'Sofia Prado', phone: '(11) 95000-1234' },
+    },
+  });
+  check('agendamento devolve o link do horário', Boolean(ownBooking.data?.token), JSON.stringify(ownBooking.data));
+
+  const ownToken = ownBooking.data.token;
+  const ownView = await api(`/public/${SLUG}/agendamento/${ownToken}`);
+  check(
+    'a cliente abre o próprio horário sem login',
+    ownView.status === 200 && ownView.data.appointment.customerName === 'Sofia Prado',
+    JSON.stringify(ownView.data?.error),
+  );
+  check('e o horário está aberto para alteração', ownView.data.appointment.changeable === true);
+
+  const newSlot = freeSlots[freeSlots.length - 1];
+  const ownMoved = await api(`/public/${SLUG}/agendamento/${ownToken}/remarcar`, {
+    method: 'POST',
+    body: { startsAt: newSlot.startsAt },
+  });
+  check(
+    'remarca sozinha para outro horário livre',
+    ownMoved.status === 200 && new Date(ownMoved.data.startsAt).getTime() === new Date(newSlot.startsAt).getTime(),
+    JSON.stringify(ownMoved.data),
+  );
+
+  // A Ana alugou a manhã: 15h está fora do turno dela.
+  const afternoon = new Date(freshDay);
+  afternoon.setHours(15, 0, 0, 0);
+  const outOfShift = await api(`/public/${SLUG}/agendamento/${ownToken}/remarcar`, {
+    method: 'POST',
+    body: { startsAt: afternoon.toISOString() },
+  });
+  check('não remarca para fora do turno alugado', outOfShift.status === 409, String(outOfShift.status));
+
+  const ownCanceled = await api(`/public/${SLUG}/agendamento/${ownToken}/cancelar`, {
+    method: 'POST',
+    body: { reason: 'Imprevisto' },
+  });
+  check(
+    'cancela sozinha',
+    ownCanceled.status === 200 && ownCanceled.data.status === 'CANCELED',
+    JSON.stringify({ status: ownCanceled.status, data: ownCanceled.data }),
+  );
+
+  const afterCancel = await api(`/public/${SLUG}/agendamento/${ownToken}`);
+  check('depois de cancelado, o link não aceita mais mudança', afterCancel.data.appointment.changeable === false);
+
+  const ghostToken = await api(`/public/${SLUG}/agendamento/${'0'.repeat(32)}`);
+  check('link inexistente devolve 404', ghostToken.status === 404, String(ghostToken.status));
+
+  console.log('\n=== 13. Feriado fecha o dia ===');
+
+  const imported = await api('/company/holidays/import', {
+    method: 'POST',
+    token: marcia.accessToken,
+    body: { year: new Date().getFullYear() },
+  });
+  check('importa os feriados nacionais do ano', imported.data.imported >= 10, JSON.stringify(imported.data));
+
+  const holidays = await api('/company/holidays', { token: marcia.accessToken });
+  const christmas = holidays.data.find((h) => h.name === 'Natal');
+  check('o Natal está na lista', Boolean(christmas), JSON.stringify(holidays.data?.length));
+
+  // Um dia de trabalho normal, fechado à mão.
+  const closedDay = nextWeekday(4);
+  const closure = await api('/company/holidays', {
+    method: 'POST',
+    token: marcia.accessToken,
+    body: { date: closedDay.toISOString(), name: 'Recesso da equipe' },
+  });
+  check('a dona fecha um dia avulso', closure.status === 201, JSON.stringify(closure.data));
+
+  const onClosedDay = new Date(closedDay);
+  onClosedDay.setHours(10, 0, 0, 0);
+  const holidayBlocked = await api('/appointments', {
+    method: 'POST',
+    token: marcia.accessToken,
+    body: {
+      customerId: helena.id,
+      professionalId: marciaPro.id,
+      startsAt: onClosedDay.toISOString(),
+      services: [{ serviceId: services.data.data.find((s) => s.name === 'Limpeza de pele').id, quantity: 1 }],
+    },
+  });
+  check(
+    'não agenda em dia fechado',
+    holidayBlocked.status === 409 && String(holidayBlocked.data.error.message).includes('Recesso'),
+    JSON.stringify(holidayBlocked.data),
+  );
+
+  const publicOnClosedDay = await api(
+    `/public/${SLUG}/availability?serviceId=${corte.id}&date=${closedDay.toISOString()}`,
+  );
+  check(
+    'e o link público não oferece horário nenhum nesse dia',
+    publicOnClosedDay.data.professionals.length === 0,
+    JSON.stringify(publicOnClosedDay.data.professionals?.length),
+  );
+
+  await api(`/company/holidays/${closure.data.id}`, { method: 'DELETE', token: marcia.accessToken });
+
+  console.log('\n=== 14. Caixa da locatária ===');
+
+  const anaFinance = await login('ana@marciavaz.com.br', 'marcia@12345');
+  const anaCash = await api('/financial/dashboard', { token: anaFinance.accessToken });
+  check('locatária tem caixa próprio', anaCash.status === 200, String(anaCash.status));
+  check(
+    'com a receita do atendimento dela',
+    Number(anaCash.data.month.income) > 0,
+    JSON.stringify(anaCash.data?.month),
+  );
+
+  // A dona registra o pagamento de um turno da Ana: o mesmo evento gera receita
+  // no caixa da casa e despesa no caixa da locatária.
+  const pendingBookings = await api('/rentals/bookings?paymentStatus=PENDING&perPage=50', {
+    token: marcia.accessToken,
+  });
+  const anaBooking = pendingBookings.data.data.find((b) => b.professional.name === 'Ana Ribeiro');
+  check('há turno da Ana em aberto para cobrar', Boolean(anaBooking), String(pendingBookings.data.data?.length));
+
+  const settled = await api(`/rentals/bookings/${anaBooking.id}/pay`, {
+    method: 'POST',
+    token: marcia.accessToken,
+    body: { amount: Number(anaBooking.price), paymentMethod: 'PIX' },
+  });
+  check('a dona registra o pagamento do turno', settled.status === 200, JSON.stringify(settled.data?.error));
+
+  const ownerCash = await api('/financial/transactions?perPage=100', { token: marcia.accessToken });
+  check(
+    'e essa receita NÃO aparece no caixa da casa',
+    !ownerCash.data.data.some((t) => t.description.includes('Cliente da Ana')),
+    JSON.stringify(ownerCash.data.data.map((t) => t.description)),
+  );
+
+  const anaTx = await api('/financial/transactions?perPage=100', { token: anaFinance.accessToken });
+  check(
+    'a locatária vê o aluguel que pagou como despesa dela',
+    anaTx.data.data.some((t) => t.type === 'EXPENSE' && t.description.includes('Aluguel do espaço')),
+    JSON.stringify(anaTx.data.data.map((t) => `${t.type}:${t.description}`)),
+  );
+  check(
+    'e o mesmo aluguel é receita no caixa da casa',
+    ownerCash.data.data.some((t) => t.type === 'INCOME' && t.description.includes('Aluguel de turno')),
+  );
 
   console.log(`\n──────────────────────────────\n  ${pass} passaram · ${fail} falharam\n`);
   process.exit(fail > 0 ? 1 : 0);

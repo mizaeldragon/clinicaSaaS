@@ -39,7 +39,12 @@ Sobe PostgreSQL em `localhost:5433` e Redis em `localhost:6380`
 cd backend && npm install && cp .env.example .env && npx prisma migrate dev && npm run seed && npm run dev
 ```
 
-API em `http://localhost:3333/api/v1`.
+API em `http://localhost:3333/api/v1`. As imagens enviadas ficam em
+`backend/uploads/` e são servidas em `/uploads`.
+
+O processo roda no fuso **America/Sao_Paulo** (`TIMEZONE` no `.env`), fixado
+antes de qualquer data ser calculada — a agenda trabalha com horário de parede e
+sairia deslocada num servidor em UTC.
 
 ### 3. Worker de filas (opcional, em outro terminal)
 
@@ -149,7 +154,7 @@ cd backend && npm run test:e2e
 ```
 
 Reseta o banco, recria o seed e roda as duas suítes end-to-end contra a API
-(**117 verificações**):
+(**139 verificações**):
 
 **`test:smoke` (52)** — autenticação e rotação de refresh token, **isolamento entre
 empresas**, feature flags de módulos, prevenção de conflitos de agenda, finalização
@@ -159,7 +164,7 @@ não recebe aluguel nem no menu, nem no dashboard, nem na API; o espaço no Prem
 recebe; e uma empresa nova nasce só com o básico, sem destravar aluguel nem
 quando responde que aluga — o wizard devolve o que ficou fora do plano.
 
-**`test:shared-space` (65)** — turnos e preços, reserva sem sobreposição, **página
+**`test:shared-space` (87)** — turnos e preços, reserva sem sobreposição, **página
 pública sem login**, "profissional do dia" saindo do aluguel, agendamento pelo link,
 **caixa separado** (receita da locatária não entra no da empresa), sala alugada
 protegendo a agenda, **link individual de cada profissional**, painel restrito da
@@ -171,7 +176,11 @@ verdade uma profissional que tem agenda ou turnos. Fecha percorrendo o
 **cadastro de uma locatária nova do zero** (profissional → acesso vinculado →
 primeiro login → carteira vazia → link público no ar) e os **formatos reais de
 locação**: a semana toda, o mês inteiro em dias fixos, dois turnos no mesmo dia,
-período repetido sem duplicar e período invertido recusado.
+período repetido sem duplicar e período invertido recusado. Fecha com o que a
+vida real cobra: **a cliente remarca e cancela sozinha** pelo link que recebeu,
+**feriado fecha o dia** na agenda e no link público, e a locatária tem **caixa
+próprio** — a receita dela não aparece para a casa, e o aluguel que ela paga
+entra como despesa dela e receita da casa, no mesmo evento.
 
 As suítes esperam o seed limpo — rode sempre pelo `test:e2e`.
 

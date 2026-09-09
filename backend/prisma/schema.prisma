@@ -242,6 +242,7 @@ model Company {
   subscription          Subscription?
   modules               CompanyModule[]
   businessHours         BusinessHour[]
+  holidays              Holiday[]
   shifts                Shift[]
   rentalBookings        RentalBooking[]
   resourceShiftPrices   ResourceShiftPrice[]
@@ -298,6 +299,25 @@ model CompanyModule {
   @@unique([companyId, module])
   @@index([companyId, enabled])
   @@map("company_modules")
+}
+
+/// Dia em que a empresa não atende: feriado nacional importado ou fechamento
+/// avulso ("reforma", "recesso"). Vale acima do horário de funcionamento.
+model Holiday {
+  id        String   @id @default(uuid())
+  companyId String
+  date      DateTime @db.Date
+  name      String
+  /// Importado da lista nacional — protege contra apagar sem querer o que é
+  /// fechamento próprio da casa.
+  national  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, date])
+  @@index([companyId, date])
+  @@map("holidays")
 }
 
 model BusinessHour {
@@ -427,8 +447,9 @@ model Professional {
   rentals        Rental[]
   rentalBookings RentalBooking[]
   /// Carteira própria (quando locatária): clientes e atendimentos que são dela.
-  ownedCustomers    Customer[]    @relation("CustomerPortfolio")
-  ownedAppointments Appointment[] @relation("AppointmentPortfolio")
+  ownedCustomers    Customer[]             @relation("CustomerPortfolio")
+  ownedAppointments Appointment[]          @relation("AppointmentPortfolio")
+  ownedTransactions FinancialTransaction[] @relation("FinancialPortfolio")
 
   @@unique([companyId, publicSlug])
   @@index([companyId, isActive])
@@ -550,6 +571,9 @@ model Appointment {
   completedAt     DateTime?
   /// INTERNAL quando criado no painel, PUBLIC quando veio da página de agendamento.
   source          AppointmentSource @default(INTERNAL)
+  /// Chave secreta do link que a cliente recebe para consultar, remarcar ou
+  /// cancelar o próprio horário sem ter conta no sistema.
+  publicToken     String?           @unique
   /// Carteira: null = atendimento da casa; preenchido = atendimento de uma
   /// locatária (não entra no caixa nem na agenda da locadora).
   ownerProfessionalId String?
@@ -814,6 +838,8 @@ model FinancialTransaction {
   appointmentId   String?
   rentalPaymentId String?
   rentalBookingId String?
+  /// Carteira: null = caixa da casa; preenchido = caixa daquela locatária.
+  ownerProfessionalId String?
   notes           String?
   createdById     String?
   createdAt       DateTime          @default(now())
@@ -825,7 +851,9 @@ model FinancialTransaction {
   appointment   Appointment?     @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
   rentalPayment RentalPayment?   @relation(fields: [rentalPaymentId], references: [id], onDelete: SetNull)
   rentalBooking RentalBooking?   @relation(fields: [rentalBookingId], references: [id], onDelete: SetNull)
+  ownerProfessional Professional? @relation("FinancialPortfolio", fields: [ownerProfessionalId], references: [id], onDelete: SetNull)
 
+  @@index([companyId, ownerProfessionalId, competenceDate])
   @@index([companyId, type, competenceDate])
   @@index([companyId, paymentStatus, dueDate])
   @@map("financial_transactions")

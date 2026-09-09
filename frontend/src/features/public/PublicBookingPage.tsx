@@ -188,6 +188,7 @@ export function PublicBookingPage() {
         {step === 'done' ? (
           <Confirmation
             company={company}
+            slug={slug}
             result={booking.data}
             onRestart={() => {
               setStep('service');
@@ -320,7 +321,7 @@ export function PublicBookingPage() {
                       )}
                     >
                       <span className="text-[11px] uppercase text-muted-foreground">
-                        {format(day, 'EEE', { locale: ptBR }).replace('.', '')}
+                        {format(day, 'EEE', { locale: ptBR }).replace('.', '').slice(0, 3)}
                       </span>
                       <span className="text-lg font-semibold">{day.getDate()}</span>
                       <span className="text-[10px] text-muted-foreground">
@@ -495,11 +496,19 @@ export function PublicBookingPage() {
 
 function Confirmation({
   company,
+  slug,
   result,
   onRestart,
 }: {
   company: Storefront['company'];
-  result?: { startsAt: string; professional: { name: string } | null; service: string; requiresApproval: boolean };
+  slug: string;
+  result?: {
+    startsAt: string;
+    professional: { name: string } | null;
+    service: string;
+    requiresApproval: boolean;
+    token?: string | null;
+  };
   onRestart: () => void;
 }) {
   return (
@@ -527,6 +536,21 @@ function Confirmation({
         ) : null}
         <p className="pt-2 text-xs text-muted-foreground">{company.name}</p>
       </div>
+
+      {result?.token ? (
+        <div className="mx-auto max-w-sm rounded-xl border border-primary/30 bg-primary/5 p-4 text-left">
+          <p className="text-sm font-medium">Precisa mudar depois?</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Guarde este link — por ele você remarca ou cancela sozinha, sem precisar ligar.
+          </p>
+          <Button asChild variant="outline" size="sm" className="mt-3 w-full">
+            <a href={`/e/${slug}/agendamento/${result.token}`}>
+              <CalendarDays />
+              Abrir meu horário
+            </a>
+          </Button>
+        </div>
+      ) : null}
 
       <div className="flex flex-col items-center gap-2">
         {company.whatsapp ? (

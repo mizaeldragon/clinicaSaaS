@@ -46,6 +46,8 @@ import {
 import { useAuthStore } from '@/stores/auth.store';
 import { toast } from 'sonner';
 import { applyBrandColor } from '@/lib/utils';
+import { ImageUpload } from '@/components/ImageUpload';
+import { HolidaysCard } from './HolidaysCard';
 import { currency, dateTimeLabel, weekdayName } from '@/lib/format';
 import type { UserRole } from '@/types';
 
@@ -85,6 +87,7 @@ export function SettingsPage() {
     addressCity: '',
     addressState: '',
     primaryColor: '#7C3AED',
+    logoUrl: null as string | null,
   });
   const [hours, setHours] = useState(DEFAULT_HOURS);
   const [publicSettings, setPublicSettings] = useState({
@@ -120,6 +123,7 @@ export function SettingsPage() {
       addressCity: company.addressCity ?? '',
       addressState: company.addressState ?? '',
       primaryColor: company.primaryColor ?? '#7C3AED',
+      logoUrl: company.logoUrl ?? null,
     });
 
     setPublicSettings({
@@ -240,6 +244,13 @@ export function SettingsPage() {
                   </div>
                 </div>
               </div>
+
+              <ImageUpload
+                label="Logo"
+                value={form.logoUrl}
+                onChange={(url) => setForm((f) => ({ ...f, logoUrl: url }))}
+                hint="Aparece no painel e na página pública de agendamento. JPG, PNG ou WEBP, até 4 MB."
+              />
 
               <div className="space-y-1.5">
                 <Label>Cor principal</Label>
@@ -450,6 +461,8 @@ export function SettingsPage() {
               </Button>
             </CardContent>
           </Card>
+
+          <HolidaysCard canManage={isAdmin} />
         </TabsContent>
 
         {/* -------------------------------------------------------- Módulos */}

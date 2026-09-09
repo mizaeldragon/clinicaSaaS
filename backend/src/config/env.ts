@@ -1,6 +1,17 @@
 import 'dotenv/config';
 import { z } from 'zod';
 
+/**
+ * Fuso do sistema, fixado antes de qualquer data ser calculada.
+ *
+ * A agenda trabalha com horário de parede — "das 09:00 às 19:00", "turno da
+ * manhã 08:00–12:00" — e todo o motor de conflitos compara minutos do dia. Num
+ * servidor em UTC (o padrão em produção) esses horários sairiam três horas
+ * deslocados. Como este módulo é importado antes de tudo, basta definir aqui.
+ */
+const TIMEZONE = process.env.TIMEZONE ?? 'America/Sao_Paulo';
+process.env.TZ = TIMEZONE;
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().default(3333),
@@ -22,12 +33,24 @@ const envSchema = z.object({
   CORS_ORIGINS: z.string().default('http://localhost:5173'),
 
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60_000),
-  RATE_LIMIT_MAX: z.coerce.number().default(300),
+  /**
+   * Teto por IP. Um salão inteiro sai por uma conexão só, e cada tela do painel
+   * dispara várias chamadas — 300/min estourava com cinco pessoas trabalhando.
+   * O limite que protege de força bruta é o do login, logo abaixo.
+   */
+  RATE_LIMIT_MAX: z.coerce.number().default(1000),
   LOGIN_RATE_LIMIT_MAX: z.coerce.number().default(10),
+  /** Marcar, remarcar e cancelar pela página pública, por IP a cada 10 min. */
+  PUBLIC_WRITE_RATE_LIMIT_MAX: z.coerce.number().default(30),
 
   LOG_LEVEL: z.string().default('info'),
 
   DEFAULT_TRIAL_DAYS: z.coerce.number().default(14),
+
+  TIMEZONE: z.string().default('America/Sao_Paulo'),
+
+  /** Base pública da API — usada para montar o endereço das imagens enviadas. */
+  PUBLIC_URL: z.string().default('http://localhost:3333'),
 });
 
 const parsed = envSchema.safeParse(process.env);

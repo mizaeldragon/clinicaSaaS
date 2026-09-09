@@ -138,8 +138,39 @@ export async function request<T = unknown>(path: string, options: RequestOptions
   return payload as T;
 }
 
+/**
+ * Envio de arquivo. Vai fora do `request` porque o corpo é FormData: o
+ * navegador precisa montar o `Content-Type` com o boundary sozinho.
+ */
+export async function upload<T = unknown>(path: string, form: FormData, retry = true): Promise<T> {
+  const { accessToken } = getTokens();
+
+  const res = await fetch(buildUrl(path), {
+    method: 'POST',
+    headers: { ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
+    body: form,
+  });
+
+  if (res.status === 401 && retry) {
+    const newToken = await refreshAccessToken();
+    if (newToken) return upload<T>(path, form, false);
+  }
+
+  const payload = await res.json().catch(() => null);
+
+  if (!res.ok) {
+    throw new ApiError(
+      res.status,
+      payload?.error ?? { code: 'UNKNOWN', message: 'Não foi possível enviar o arquivo' },
+    );
+  }
+
+  return payload as T;
+}
+
 export const api = {
   get: <T>(path: string, params?: Record<string, unknown>) => request<T>(path, { params }),
+  upload,
   post: <T>(path: string, body?: unknown, params?: Record<string, unknown>) =>
     request<T>(path, { method: 'POST', body, params }),
   patch: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PATCH', body }),

@@ -20,6 +20,7 @@ import { JOB_NAMES, QUEUE_NAMES, enqueue } from '../../queues';
 import { commissionsService } from '../commissions/commissions.service';
 import { financialService } from '../financial/financial.service';
 import { notificationsService } from '../notifications/notifications.service';
+import { newPublicToken } from '../public/public.service';
 import {
   assertNoConflicts,
   assertNoTimeOff,
@@ -157,6 +158,9 @@ export const appointmentsService = {
           status: dto.status,
           totalPrice,
           notes: dto.notes,
+          // Vale também para o horário marcado no balcão: dá o link para a
+          // cliente consultar, remarcar ou cancelar sem ligar.
+          publicToken: newPublicToken(),
           createdById: createdById ?? null,
           services: {
             create: items.map((i) => ({
@@ -310,13 +314,17 @@ export const appointmentsService = {
       });
 
       if (dto.status === 'COMPLETED') {
-        // Atendimento de locatária não entra no caixa da empresa: ela cobra as
-        // próprias clientes e a empresa fatura apenas o aluguel do turno.
         const belongsToCompany = updated.ownerProfessionalId === null;
 
-        if (belongsToCompany && modules.includes(ModuleKey.financial)) {
+        // A receita é sempre registrada — o que muda é em qual caixa. O
+        // atendimento da locatária entra no caixa dela, e a carteira mantém
+        // isso invisível para a casa, que fatura apenas o aluguel do turno.
+        if (modules.includes(ModuleKey.financial)) {
           await financialService.registerAppointmentIncome(tx, companyId, updated, dto.payment, userId);
         }
+
+        // Comissão só existe entre a casa e a equipe dela: quem aluga o espaço
+        // cobra a própria cliente e não repassa percentual a ninguém.
         if (belongsToCompany && modules.includes(ModuleKey.commissions) && updated.professionalId) {
           await commissionsService.generateForAppointment(tx, companyId, updated.id);
         }

@@ -64,6 +64,9 @@ function permissionsFor(
     );
     own.add(PERMISSIONS.appointmentsManage);
     own.add(PERMISSIONS.customersManage);
+    // Caixa próprio: o recorte de carteira garante que ela só alcance o dela.
+    own.add(PERMISSIONS.financialView);
+    own.add(PERMISSIONS.financialManage);
     return [...own];
   }
 

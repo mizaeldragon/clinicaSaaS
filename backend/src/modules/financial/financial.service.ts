@@ -1,9 +1,10 @@
 import { PaymentStatus, Prisma, TransactionOrigin, TransactionType } from '@prisma/client';
-import { prisma, TxClient } from '../../shared/database/prisma';
+import { prisma, TxClient, withStalePlanRetry } from '../../shared/database/prisma';
 import { BadRequestError, NotFoundError } from '../../shared/errors/AppError';
 import { getPagination, paginated } from '../../shared/utils/http';
 import { endOfDay, endOfMonth, startOfDay, startOfMonth } from '../../shared/utils/datetime';
 import { SOCKET_EVENTS, emitToCompany } from '../../websocket/io';
+import { currentPortfolioOwner, emitToPortfolio } from '../../shared/services/portfolio.service';
 import type {
   CreateTransactionDTO,
   DashboardQueryDTO,
@@ -90,17 +91,24 @@ export const financialService = {
     const paidAmount =
       dto.paymentStatus === PaymentStatus.PAID ? dto.paidAmount || dto.amount : dto.paidAmount;
 
+    // O lançamento nasce na carteira de quem o criou: a locatária tem o caixa
+    // dela, e ele não se mistura com o da casa.
+    const ownerProfessionalId = currentPortfolioOwner();
+
     const transaction = await prisma.financialTransaction.create({
       data: {
         ...dto,
         companyId,
+        ownerProfessionalId,
         paidAmount,
         paidAt: dto.paymentStatus === PaymentStatus.PAID ? dto.paidAt ?? new Date() : dto.paidAt,
         createdById: userId ?? null,
       } as Prisma.FinancialTransactionUncheckedCreateInput,
     });
 
-    emitToCompany(companyId, SOCKET_EVENTS.financialUpdated, { id: transaction.id });
+    emitToPortfolio(companyId, ownerProfessionalId, SOCKET_EVENTS.financialUpdated, {
+      id: transaction.id,
+    });
     return transaction;
   },
 
@@ -153,7 +161,15 @@ export const financialService = {
   async registerAppointmentIncome(
     tx: TxClient,
     companyId: string,
-    appointment: { id: string; customerId: string; totalPrice: Prisma.Decimal | number; startsAt: Date; customer?: { name: string } },
+    appointment: {
+      id: string;
+      customerId: string;
+      totalPrice: Prisma.Decimal | number;
+      startsAt: Date;
+      customer?: { name: string };
+      /** Carteira do atendimento: null = casa, preenchido = locatária. */
+      ownerProfessionalId?: string | null;
+    },
     payment?: { method: import('@prisma/client').PaymentMethod; amount?: number; paid: boolean },
     userId?: string,
   ) {
@@ -185,6 +201,7 @@ export const financialService = {
         competenceDate: appointment.startsAt,
         customerId: appointment.customerId,
         appointmentId: appointment.id,
+        ownerProfessionalId: appointment.ownerProfessionalId ?? null,
         createdById: userId ?? null,
       },
     });
@@ -249,14 +266,19 @@ export const financialService = {
         where: { type: 'EXPENSE', competenceDate: { gte: from, lte: to } },
         _sum: { amount: true },
       }),
-      prisma.$queryRaw<{ day: Date; type: string; total: Prisma.Decimal }[]>`
-        SELECT date_trunc('day', "competenceDate") AS day, "type", SUM("amount") AS total
-        FROM "financial_transactions"
-        WHERE "companyId" = ${await currentCompanyId()}
-          AND "competenceDate" BETWEEN ${from} AND ${to}
-        GROUP BY 1, 2
-        ORDER BY 1 ASC
-      `,
+      // A consulta bruta não passa pelo extension: empresa e carteira entram
+      // à mão, senão a locatária veria a série diária do caixa da casa.
+      withStalePlanRetry(
+        async () => prisma.$queryRaw<{ day: Date; type: string; total: Prisma.Decimal }[]>`
+          SELECT date_trunc('day', "competenceDate") AS day, "type", SUM("amount") AS total
+          FROM "financial_transactions"
+          WHERE "companyId" = ${await currentCompanyId()}
+            AND "ownerProfessionalId" IS NOT DISTINCT FROM ${currentPortfolioOwner()}
+            AND "competenceDate" BETWEEN ${from} AND ${to}
+          GROUP BY 1, 2
+          ORDER BY 1 ASC
+        `,
+      ),
     ]);
 
     const categories = await prisma.expenseCategory.findMany();
