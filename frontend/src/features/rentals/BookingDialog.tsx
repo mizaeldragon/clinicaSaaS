@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { endOfMonth, endOfWeek, format } from 'date-fns';
+import { endOfMonth, endOfWeek, format, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,14 +40,16 @@ export interface BookingTarget {
 
 type Period = 'day' | 'week' | 'month' | 'custom';
 
+/** O atalho diz onde o período **termina** — ele sempre começa no dia aberto. */
 const PERIOD_LABEL: Record<Period, string> = {
   day: 'Só este dia',
-  week: 'Esta semana',
-  month: 'Este mês',
+  week: 'Até o fim da semana',
+  month: 'Até o fim do mês',
   custom: 'Escolher período',
 };
 
 const WEEKDAY_LABELS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
+const WEEKDAY_NAMES = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
 
 function toggle<T>(list: T[], value: T): T[] {
   return list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
@@ -117,6 +119,32 @@ export function BookingDialog({
     : null;
 
   const preview = useBookingPreview(body);
+
+  /**
+   * Dias corridos que o período cobre.
+   *
+   * O período começa no dia que está aberto no mapa, não no começo da semana:
+   * abrindo numa sexta, "até o fim da semana" alcança só sexta e sábado. Sem
+   * dizer isso, marcar quarta e quinta e ver dois turnos parece erro de conta.
+   */
+  const rangeDays = useMemo(() => {
+    const start = startOfDay(date);
+    const end = until ? startOfDay(until) : start;
+    if (end < start) return [];
+
+    const list: Date[] = [];
+    for (let cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
+      list.push(new Date(cursor));
+    }
+    return list;
+  }, [date, until]);
+
+  // Dia da semana marcado que não aparece nenhuma vez no período escolhido.
+  const outOfRange = useMemo(() => {
+    if (weekdays.length === 0 || rangeDays.length === 0) return [];
+    const present = new Set(rangeDays.map((day) => day.getDay()));
+    return weekdays.filter((weekday) => !present.has(weekday)).sort();
+  }, [weekdays, rangeDays]);
 
   function reset() {
     setProfessionalId('');
@@ -253,6 +281,14 @@ export function BookingDialog({
             </div>
           </div>
 
+          {rangeDays.length > 0 ? (
+            <p className="-mt-1 text-xs text-muted-foreground">
+              De {format(rangeDays[0], "EEE dd/MM", { locale: ptBR })} até{' '}
+              {format(rangeDays[rangeDays.length - 1], "EEE dd/MM", { locale: ptBR })} ·{' '}
+              {rangeDays.length} {rangeDays.length === 1 ? 'dia' : 'dias'}
+            </p>
+          ) : null}
+
           {period === 'custom' ? (
             <div className="space-y-1.5">
               <Label htmlFor="until">Até o dia *</Label>
@@ -289,9 +325,17 @@ export function BookingDialog({
                   );
                 })}
               </div>
-              <p className="text-xs text-muted-foreground">
-                Nenhum marcado = todos os dias do período.
-              </p>
+              {outOfRange.length > 0 ? (
+                <p className="text-xs text-amber-600">
+                  {outOfRange.map((weekday) => WEEKDAY_NAMES[weekday]).join(' e ')}{' '}
+                  {outOfRange.length === 1 ? 'não cai' : 'não caem'} dentro deste período — só
+                  contam os dias a partir de {format(rangeDays[0], "dd/MM", { locale: ptBR })}.
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Nenhum marcado = todos os dias do período.
+                </p>
+              )}
             </div>
           ) : null}
 
