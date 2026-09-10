@@ -25,29 +25,27 @@ profissional até a clínica com salas, equipe, recepção e aluguel de espaços
 Pré-requisitos: **Node.js 20+** e um **PostgreSQL 14+** rodando na máquina
 (instalação nativa; o pgAdmin ou o DBeaver servem para olhar o banco).
 
-### 1. Banco de dados
+### 1. Banco de dados, `.env`, migrations e seed
 
-Crie o banco uma única vez, trocando `SUA_SENHA` pela senha do usuário
-`postgres` da sua instalação:
-
-```bash
-psql -U postgres -h localhost -c "CREATE DATABASE belezza"
+```powershell
+.\scripts\setup-local.ps1
 ```
 
-Ou pelo DBeaver: clique com o direito na conexão → *Create* → *Database* →
-nome `belezza`.
+O script pede a senha do usuário `postgres`, cria o banco `belezza` se ele
+ainda não existir, grava a `DATABASE_URL` no `backend/.env` (com a senha
+codificada, para um `@` ou `#` não quebrar a URL), aplica as migrations e roda
+o seed. Pode ser rodado de novo à vontade — se o banco já existe, ele passa
+adiante. Aceita `-Database`, `-Port` e `-SkipSeed`.
+
+Na mão, se preferir: crie o banco (`psql -U postgres -h localhost -c "CREATE
+DATABASE belezza"`, ou no DBeaver com o direito na conexão → *Create* →
+*Database*), copie `.env.example` para `.env`, troque `SUA_SENHA` na
+`DATABASE_URL` e rode `npx prisma migrate deploy && npm run seed`.
 
 ### 2. Backend
 
 ```bash
-cd backend && npm install && cp .env.example .env
-```
-
-Abra `backend/.env` e troque `SUA_SENHA` na `DATABASE_URL` pela senha do
-`postgres`. Depois:
-
-```bash
-npx prisma migrate deploy && npm run seed && npm run dev
+cd backend && npm install && npm run dev
 ```
 
 API em `http://localhost:3333/api/v1`. As imagens enviadas ficam em
