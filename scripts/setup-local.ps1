@@ -58,7 +58,9 @@ try {
   } else {
     $lines += "DATABASE_URL=`"$url`""
   }
-  Set-Content -Path $envFile -Value $lines -Encoding utf8
+  # Sem BOM: o Set-Content do PowerShell 5.1 carimba um e ele sujaria a
+  # primeira chave do .env se algum dia ela deixar de ser um comentário.
+  [IO.File]::WriteAllLines($envFile, $lines, (New-Object Text.UTF8Encoding $false))
   Write-Host '[ok] DATABASE_URL gravada em backend/.env' -ForegroundColor Green
 
   # ------------------------------------------------------ migrations e seed
