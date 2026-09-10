@@ -22,21 +22,32 @@ profissional até a clínica com salas, equipe, recepção e aluguel de espaços
 
 ## Como rodar
 
-Pré-requisitos: **Node.js 20+**, **Docker** (ou um PostgreSQL e um Redis próprios).
+Pré-requisitos: **Node.js 20+** e um **PostgreSQL 14+** rodando na máquina
+(instalação nativa; o pgAdmin ou o DBeaver servem para olhar o banco).
 
-### 1. Banco de dados e Redis
+### 1. Banco de dados
+
+Crie o banco uma única vez, trocando `SUA_SENHA` pela senha do usuário
+`postgres` da sua instalação:
 
 ```bash
-docker compose up -d
+psql -U postgres -h localhost -c "CREATE DATABASE belezza"
 ```
 
-Sobe PostgreSQL em `localhost:5433` e Redis em `localhost:6380`
-(portas altas para não conflitar com instâncias locais já existentes).
+Ou pelo DBeaver: clique com o direito na conexão → *Create* → *Database* →
+nome `belezza`.
 
 ### 2. Backend
 
 ```bash
-cd backend && npm install && cp .env.example .env && npx prisma migrate dev && npm run seed && npm run dev
+cd backend && npm install && cp .env.example .env
+```
+
+Abra `backend/.env` e troque `SUA_SENHA` na `DATABASE_URL` pela senha do
+`postgres`. Depois:
+
+```bash
+npx prisma migrate deploy && npm run seed && npm run dev
 ```
 
 API em `http://localhost:3333/api/v1`. As imagens enviadas ficam em
@@ -46,15 +57,16 @@ O processo roda no fuso **America/Sao_Paulo** (`TIMEZONE` no `.env`), fixado
 antes de qualquer data ser calculada — a agenda trabalha com horário de parede e
 sairia deslocada num servidor em UTC.
 
-### 3. Worker de filas (opcional, em outro terminal)
+### 3. Filas (opcional)
+
+O `.env.example` vem com `REDIS_ENABLED=false`: a API sobe sem Redis e as filas
+viram no-op — some só o disparo automático de lembretes e das cobranças
+recorrentes de aluguel. Para ligá-las, suba um Redis, ponha `REDIS_ENABLED=true`
+e rode o worker em outro terminal:
 
 ```bash
 cd backend && npm run dev:worker
 ```
-
-Processa lembretes de agendamento, cobranças recorrentes de aluguel e notificações.
-Sem Redis, defina `REDIS_ENABLED=false` no `.env` — a API continua funcionando e as
-filas viram no-op.
 
 ### 4. Frontend
 
@@ -70,6 +82,10 @@ violeta e rosa, alternando seções escuras e claras. O painel é **white label*
 a empresa escolhe a cor em *Configurações › Empresa* e ela pinta menu, botões,
 gráficos e a página pública de agendamento. Ao sair, a cor da empresa é
 devolvida ao padrão para não vazar para o login nem para a landing.
+
+> O `docker-compose.yml` na raiz continua no repositório como atalho opcional
+> (PostgreSQL em `5433`, Redis em `6380`) para quem preferir containers a uma
+> instalação local. Não é o caminho padrão.
 
 ---
 
