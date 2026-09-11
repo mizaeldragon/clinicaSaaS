@@ -1,6 +1,19 @@
 import { z } from 'zod';
 import { UserRole } from '@prisma/client';
+import { ALL_PERMISSIONS } from '../../shared/middlewares/rbac';
 
+/**
+ * Permissões avulsas só podem sair do catálogo.
+ *
+ * Aceitar qualquer texto deixaria o banco com permissões que nenhum código
+ * confere — e um dia alguém criaria uma rota com esse nome sem perceber que já
+ * havia gente com ela marcada.
+ */
+const permissionList = z
+  .array(z.enum(ALL_PERMISSIONS as [string, ...string[]]))
+  .max(ALL_PERMISSIONS.length);
+
+/** SUPER_ADMIN fica fora: é o dono da plataforma, não um papel de empresa. */
 const assignableRoles = z.enum([
   UserRole.COMPANY_ADMIN,
   UserRole.MANAGER,
@@ -14,7 +27,7 @@ export const createUserSchema = z.object({
   password: z.string().min(8, 'A senha deve ter no mínimo 8 caracteres').max(72),
   phone: z.string().max(20).optional(),
   role: assignableRoles,
-  permissions: z.array(z.string()).optional(),
+  permissions: permissionList.optional(),
   professionalId: z.string().uuid().optional(),
 });
 
@@ -24,7 +37,7 @@ export const updateUserSchema = z.object({
   phone: z.string().max(20).nullable().optional(),
   avatarUrl: z.string().url().nullable().optional(),
   role: assignableRoles.optional(),
-  permissions: z.array(z.string()).optional(),
+  permissions: permissionList.optional(),
   isActive: z.boolean().optional(),
   password: z.string().min(8).max(72).optional(),
   professionalId: z.string().uuid().nullable().optional(),

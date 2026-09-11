@@ -8,7 +8,7 @@ import {
   NotFoundError,
   UnauthorizedError,
 } from '../../shared/errors/AppError';
-import { comparePassword, hashPassword } from '../../shared/utils/hash';
+import { burnPasswordTime, comparePassword, hashPassword } from '../../shared/utils/hash';
 import {
   AccessTokenPayload,
   generateRefreshToken,
@@ -159,7 +159,13 @@ export const authService = {
       }),
     );
 
-    if (users.length === 0) throw new UnauthorizedError('E-mail ou senha inválidos');
+    if (users.length === 0) {
+      // Gasta o mesmo tempo de um bcrypt real antes de recusar: responder na
+      // hora para e-mail inexistente e devagar para um cadastrado revelaria,
+      // só pelo relógio, quem tem conta aqui.
+      await burnPasswordTime(dto.password);
+      throw new UnauthorizedError('E-mail ou senha inválidos');
+    }
 
     let candidate = users[0];
 
@@ -280,7 +286,28 @@ export const authService = {
         },
       });
 
-      if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
+      if (!stored) throw new UnauthorizedError('Sessão expirada. Faça login novamente.');
+
+      // Refresh token já revogado sendo apresentado de novo.
+      //
+      // Como a rotação revoga o antigo no mesmo instante em que entrega o novo,
+      // o cliente honesto nunca reapresenta um revogado. Quem faz isso está com
+      // uma cópia — ou foi o ladrão, ou é a vítima chegando depois dele. Nos
+      // dois casos não dá para saber qual, então derrubamos a família inteira:
+      // todo mundo refaz o login e a cópia roubada morre junto.
+      if (stored.revokedAt) {
+        await prisma.refreshToken.updateMany({
+          where: { userId: stored.userId, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+        logger.warn(
+          { userId: stored.userId },
+          'Refresh token revogado reapresentado — todas as sessões do usuário foram encerradas',
+        );
+        throw new UnauthorizedError('Sessão encerrada por segurança. Faça login novamente.');
+      }
+
+      if (stored.expiresAt < new Date()) {
         throw new UnauthorizedError('Sessão expirada. Faça login novamente.');
       }
       if (!stored.user.isActive) throw new UnauthorizedError('Usuário inativo');

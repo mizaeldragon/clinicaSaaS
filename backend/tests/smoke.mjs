@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import crypto from 'node:crypto';
+import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
 
 const BASE = 'http://localhost:3333/api/v1';
@@ -556,6 +557,167 @@ const run = async () => {
   );
 
   await db.$disconnect();
+
+  console.log('\n=== 14. Segurança ===');
+
+  // --- Token forjado -------------------------------------------------------
+  // Um token so tem valor se foi assinado com o nosso segredo, pelo algoritmo
+  // que esperamos e para este sistema. Cada tentativa abaixo falha uma dessas.
+  const bellaToken = bella.accessToken;
+  const [, payloadB64] = bellaToken.split('.');
+  const claims = JSON.parse(Buffer.from(payloadB64, 'base64url').toString());
+
+  const semAssinatura =
+    Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url') +
+    '.' +
+    payloadB64 +
+    '.';
+  check(
+    'token sem assinatura ("alg: none") é recusado',
+    (await api('/auth/me', { token: semAssinatura })).status === 401,
+  );
+
+  const outroSegredo = jwt.sign(claims, 'segredo-que-nao-e-o-nosso', { algorithm: 'HS256' });
+  check(
+    'token assinado com outro segredo é recusado',
+    (await api('/auth/me', { token: outroSegredo })).status === 401,
+  );
+
+  const outroEmissor = jwt.sign(
+    { sub: claims.sub, companyId: claims.companyId, role: claims.role, permissions: claims.permissions },
+    process.env.JWT_SECRET,
+    { algorithm: 'HS256', expiresIn: '15m', issuer: 'outro-sistema', audience: 'belezza-app' },
+  );
+  check(
+    'token do nosso segredo mas de outro emissor é recusado',
+    (await api('/auth/me', { token: outroEmissor })).status === 401,
+  );
+
+  // --- Desligar alguém corta o acesso agora --------------------------------
+  const demitida = await api('/users', {
+    method: 'POST',
+    token: bella.accessToken,
+    body: {
+      name: 'Recepção Temporária',
+      email: 'temporaria@clinicabella.com',
+      password: 'temp@12345',
+      role: 'RECEPTIONIST',
+    },
+  });
+  const sessaoDela = await login('temporaria@clinicabella.com', 'temp@12345');
+  check(
+    'a conta nova funciona antes de ser desligada',
+    (await api('/customers', { token: sessaoDela.accessToken })).status === 200,
+  );
+
+  await api(`/users/${demitida.data.id}`, {
+    method: 'PATCH',
+    token: bella.accessToken,
+    body: { isActive: false },
+  });
+  const depoisDeDesligada = await api('/customers', { token: sessaoDela.accessToken });
+  check(
+    'desligar a conta corta o acesso na hora, não quando o token vencer',
+    depoisDeDesligada.status === 401,
+    String(depoisDeDesligada.status),
+  );
+
+  // --- Refresh token roubado -----------------------------------------------
+  const vitima = await login('recepcao@clinicabella.com', 'bella@12345');
+  const girou = await api('/auth/refresh', {
+    method: 'POST',
+    body: { refreshToken: vitima.refreshToken },
+  });
+  check('a rotação entrega um par novo', girou.status === 200);
+
+  // O antigo já foi revogado pela rotação. Reapresentá-lo significa que existe
+  // uma cópia circulando — e não dá para saber se quem chegou é a dona.
+  const reapresentado = await api('/auth/refresh', {
+    method: 'POST',
+    body: { refreshToken: vitima.refreshToken },
+  });
+  check('refresh revogado reapresentado é recusado', reapresentado.status === 401);
+
+  const aindaValia = await api('/auth/refresh', {
+    method: 'POST',
+    body: { refreshToken: girou.data.refreshToken },
+  });
+  check(
+    'e derruba junto a sessão boa — a cópia roubada morre com ela',
+    aindaValia.status === 401,
+    String(aindaValia.status),
+  );
+
+  // --- Upload ---------------------------------------------------------------
+  // O Content-Type do upload é escrito por quem envia. O que vale são os bytes.
+  const disfarcado = new FormData();
+  disfarcado.append(
+    'file',
+    new Blob([Buffer.from('<?php system($_GET["c"]); ?>')], { type: 'image/png' }),
+    'inocente.png',
+  );
+  const upload = await fetch(`${BASE}/uploads`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${bella.accessToken}` },
+    body: disfarcado,
+  });
+  check(
+    'arquivo que não é imagem é recusado mesmo dizendo ser PNG',
+    upload.status === 400,
+    String(upload.status),
+  );
+
+  const pngDeVerdade = new FormData();
+  pngDeVerdade.append(
+    'file',
+    new Blob([
+      Buffer.concat([
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+        Buffer.alloc(64),
+      ]),
+    ], { type: 'image/png' }),
+    'logo.png',
+  );
+  const uploadOk = await fetch(`${BASE}/uploads`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${bella.accessToken}` },
+    body: pngDeVerdade,
+  });
+  check('e um PNG de verdade passa', uploadOk.status === 201, String(uploadOk.status));
+
+  // --- Permissões inventadas ------------------------------------------------
+  const permissaoFalsa = await api('/users', {
+    method: 'POST',
+    token: bella.accessToken,
+    body: {
+      name: 'Gerente Curioso',
+      email: 'curioso@clinicabella.com',
+      password: 'curioso@12345',
+      role: 'MANAGER',
+      permissions: ['users:manage', 'tudo:liberado'],
+    },
+  });
+  check(
+    'permissão fora do catálogo é recusada no cadastro',
+    permissaoFalsa.status === 400,
+    JSON.stringify(permissaoFalsa.data),
+  );
+
+  // --- Enumeração de contas -------------------------------------------------
+  const contaQueExiste = await api('/auth/login', {
+    method: 'POST',
+    body: { email: 'admin@clinicabella.com', password: 'senha-errada' },
+  });
+  const contaQueNaoExiste = await api('/auth/login', {
+    method: 'POST',
+    body: { email: 'ninguem-aqui@exemplo.com', password: 'senha-errada' },
+  });
+  check(
+    'login não revela se o e-mail tem conta',
+    contaQueExiste.status === contaQueNaoExiste.status &&
+      contaQueExiste.data.error.message === contaQueNaoExiste.data.error.message,
+    JSON.stringify({ existe: contaQueExiste.data.error, naoExiste: contaQueNaoExiste.data.error }),
+  );
 
   console.log(`\n──────────────────────────────\n  ${pass} passaram · ${fail} falharam\n`);
   process.exit(fail > 0 ? 1 : 0);

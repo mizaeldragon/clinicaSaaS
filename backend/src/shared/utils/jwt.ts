@@ -13,14 +13,35 @@ export interface AccessTokenPayload {
   isRenter?: boolean;
 }
 
+/**
+ * O algoritmo é fixado na assinatura E na conferência.
+ *
+ * Sem fixar, quem recebe o token escolhe como verificá-lo a partir do cabeçalho
+ * que o próprio token traz — é a família de ataques de confusão de algoritmo.
+ * Emissor e público entram pela mesma razão: um token assinado com este segredo
+ * para outro fim não vale como sessão aqui.
+ */
+const ALGORITHM = 'HS256' as const;
+const ISSUER = 'belezza';
+const AUDIENCE = 'belezza-app';
+
 export function signAccessToken(payload: AccessTokenPayload): string {
-  const options: SignOptions = { expiresIn: env.JWT_EXPIRES_IN as SignOptions['expiresIn'] };
+  const options: SignOptions = {
+    expiresIn: env.JWT_EXPIRES_IN as SignOptions['expiresIn'],
+    algorithm: ALGORITHM,
+    issuer: ISSUER,
+    audience: AUDIENCE,
+  };
   return jwt.sign(payload, env.JWT_SECRET, options);
 }
 
 export function verifyAccessToken(token: string): AccessTokenPayload {
   try {
-    return jwt.verify(token, env.JWT_SECRET) as AccessTokenPayload;
+    return jwt.verify(token, env.JWT_SECRET, {
+      algorithms: [ALGORITHM],
+      issuer: ISSUER,
+      audience: AUDIENCE,
+    }) as AccessTokenPayload;
   } catch {
     throw new UnauthorizedError('Token inválido ou expirado');
   }

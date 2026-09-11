@@ -44,7 +44,7 @@ export const PERMISSIONS = {
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 
-const ALL_PERMISSIONS = Object.values(PERMISSIONS) as Permission[];
+export const ALL_PERMISSIONS = Object.values(PERMISSIONS) as Permission[];
 
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   SUPER_ADMIN: ALL_PERMISSIONS,

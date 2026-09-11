@@ -5,6 +5,7 @@ import { BadRequestError, ConflictError, NotFoundError, PlanLimitError } from '.
 import { hashPassword } from '../../shared/utils/hash';
 import { getPagination, paginated } from '../../shared/utils/http';
 import { getCompanyContext } from '../../shared/services/companyContext.service';
+import { invalidateUserContext } from '../../shared/services/userContext.service';
 import type { CreateUserDTO, ListUsersDTO, UpdateUserDTO } from './users.schema';
 
 const SAFE_SELECT = {
@@ -144,6 +145,10 @@ export const usersService = {
 
       const updated = await prisma.user.update({ where: { id }, data, select: SAFE_SELECT });
 
+      // O estado da conta é lido em cache a cada requisição; sem limpar aqui,
+      // uma desativação demoraria até meio minuto para valer.
+      invalidateUserContext(id);
+
       // Alterações sensíveis encerram as sessões ativas do usuário.
       if (dto.password || dto.isActive === false || dto.role) {
         await prisma.refreshToken.updateMany({
@@ -176,6 +181,8 @@ export const usersService = {
         where: { userId: id, revokedAt: null },
         data: { revokedAt: new Date() },
       });
+      // Corta o acesso agora, não quando o cache expirar.
+      invalidateUserContext(id);
     });
   },
 };

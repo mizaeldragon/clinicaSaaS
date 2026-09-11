@@ -22,7 +22,20 @@ export function createApp(): Application {
   app.use(
     cors({
       origin: (origin, callback) => {
-        if (!origin || env.corsOrigins.includes(origin) || env.corsOrigins.includes('*')) {
+        // Sem Origin é chamada que não veio de navegador (app, curl, webhook):
+        // essas se defendem pelo token, não pelo CORS.
+        if (!origin) {
+          callback(null, true);
+          return;
+        }
+        if (env.corsOrigins.includes(origin)) {
+          callback(null, true);
+          return;
+        }
+        // O curinga vale só fora de produção. Liberar toda origem junto com
+        // `credentials` deixaria qualquer site abrir chamadas autenticadas em
+        // nome de quem estivesse logado.
+        if (!env.isProduction && env.corsOrigins.includes('*')) {
           callback(null, true);
           return;
         }
@@ -32,8 +45,9 @@ export function createApp(): Application {
     }),
   );
   app.use(compression());
-  app.use(express.json({ limit: '2mb' }));
-  app.use(express.urlencoded({ extended: true }));
+  // Só JSON. Formulário urlencoded não é usado por nenhuma rota, e o parser
+  // arrasta o `qs` junto — superfície sem contrapartida.
+  app.use(express.json({ limit: '1mb' }));
   app.use(cookieParser());
 
   app.use(

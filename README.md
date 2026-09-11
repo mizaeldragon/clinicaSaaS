@@ -225,6 +225,91 @@ viraria mês grátis.
 
 ---
 
+## Segurança
+
+O que protege o sistema, e por quê.
+
+### Sessão
+
+| | |
+|---|---|
+| Access token | JWT de 15 min, **HS256 fixado** na assinatura e na conferência, com emissor e público próprios |
+| Refresh token | valor aleatório de 48 bytes; o banco guarda só o HMAC, nunca o token |
+| Rotação | cada uso revoga o anterior e emite um par novo |
+| **Reuso de token revogado** | derruba **todas** as sessões da pessoa |
+| Conta desativada | corta o acesso **na requisição seguinte**, não quando o token vencer |
+
+Fixar o algoritmo fecha a família de ataques de confusão: sem isso, quem
+recebe o token decide como verificá-lo a partir do cabeçalho que o próprio
+token traz.
+
+A detecção de reuso parte de um fato simples: como a rotação revoga o antigo no
+mesmo instante em que entrega o novo, **o cliente honesto nunca reapresenta um
+revogado**. Quem faz isso está com uma cópia — ou é o ladrão, ou é a vítima
+chegando depois dele. Não dá para saber qual, então a família inteira cai e
+todos refazem o login.
+
+A conferência da conta a cada requisição custa uma leitura em cache de 30s, e é
+o que faz demitir alguém valer na hora. Quem revoga limpa o cache no ato.
+
+### Senha
+
+Bcrypt com **12 rodadas** (o custo fica dentro do hash, então as senhas antigas
+migram sozinhas na próxima troca). O login gasta o mesmo tempo para e-mail que
+existe e que não existe — sem isso, o relógio sozinho entregaria quem tem conta
+aqui. O token de redefinição vale 1 hora, serve uma vez, e o banco guarda só o
+hash dele.
+
+### Entrada
+
+- **Zod em todo body, query e param** — nada chega ao controller sem passar
+- **Nenhum `$queryRaw`** no projeto: consulta bruta não passa pela extension que
+  isola empresa e carteira
+- **Upload conferido nos bytes**, não no `Content-Type` (que quem envia escreve):
+  só JPG, PNG e WEBP de verdade entram. **SVG é recusado de propósito** — ele
+  executa script quando aberto direto. Nome sorteado, 4 MB, 40 envios por IP a
+  cada 10 min
+- Permissões avulsas só saem do catálogo; `SUPER_ADMIN` não é atribuível por
+  ninguém de dentro de uma empresa
+
+### Limites por IP
+
+| Rota | Teto |
+|---|---|
+| Geral | 1000/min |
+| Login, esqueci e redefinir senha | 10 **falhas** por 15 min (acerto não conta) |
+| Página pública — navegar | 120/min |
+| Página pública — marcar, remarcar, cancelar | 30 por 10 min |
+| Upload | 40 por 10 min |
+
+Contar só o erro no login é o que separa força bruta de um salão inteiro
+entrando pela mesma conexão de manhã.
+
+### Log
+
+O log de produção é lido por quem tem acesso ao painel da hospedagem e fica
+guardado por semanas. `Authorization`, `Cookie`, o token do webhook, senhas,
+tokens e as chaves do `.env` são **apagados** antes de escrever — um
+`Authorization` gravado ali é uma sessão viva para quem ler o arquivo.
+
+### Cabeçalhos e origem
+
+`helmet` com `nosniff`, e CORS por lista explícita. O curinga `*` só vale fora
+de produção: liberar toda origem junto com `credentials` deixaria qualquer site
+abrir chamadas autenticadas em nome de quem estivesse logado.
+
+### Dependências
+
+`npm audit` no backend: **zero vulnerabilidades**.
+
+No frontend restam dois avisos moderados do `react-router` — nenhum alcança
+este app: um é de hidratação em SSR (a aplicação é SPA pura, não tem SSR), o
+outro é redirecionamento aberto via `<Link>`/`useNavigate`, e **nenhum destino
+de navegação aqui vem da URL ou de entrada do usuário**. A correção exige subir
+para a v7, uma troca de major que merece sua própria janela.
+
+---
+
 ## Testes
 
 ```bash
@@ -232,9 +317,9 @@ cd backend && npm run test:e2e
 ```
 
 Reseta o banco, recria o seed e roda as duas suítes end-to-end contra a API
-(**166 verificações**):
+(**178 verificações**):
 
-**`test:smoke` (68)** — autenticação e rotação de refresh token, **isolamento entre
+**`test:smoke` (80)** — autenticação e rotação de refresh token, **isolamento entre
 empresas**, feature flags de módulos, prevenção de conflitos de agenda, finalização
 de atendimento gerando receita e comissão, dashboards, aluguéis, permissões por
 papel, painel do super admin e o **plano decidindo os módulos**: a clínica no Pro
@@ -245,7 +330,12 @@ com **senha e cobrança**: a troca de senha derruba a senha antiga, "esqueci
 minha senha" responde igual para e-mail com e sem conta, o link do e-mail
 redefine uma vez só, e a tela de cobrança traz os preços certos, recusa assinar
 sem gateway com erro claro em vez de 500 e **não tranca ninguém** quando não há
-como pagar.
+como pagar. Fecha em **segurança**: token sem assinatura, assinado com outro
+segredo ou de outro emissor é recusado; desligar uma conta corta o acesso na
+hora, não quando o token vencer; um refresh revogado reapresentado derruba
+todas as sessões daquela pessoa; arquivo que não é imagem é recusado mesmo se
+declarar `image/png`; permissão fora do catálogo não entra; e o login responde
+igual para e-mail com e sem conta.
 
 **`test:shared-space` (98)** — turnos e preços, reserva sem sobreposição, **página
 pública sem login**, "profissional do dia" saindo do aluguel, agendamento pelo link,

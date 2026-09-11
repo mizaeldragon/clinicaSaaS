@@ -2,6 +2,7 @@ import { RequestHandler } from 'express';
 import { AppError, ForbiddenError, UnauthorizedError } from '../errors/AppError';
 import { PortfolioScope, SCOPE_ALL, tenantContext } from '../database/tenantContext';
 import { getCompanyContext } from '../services/companyContext.service';
+import { getUserContext } from '../services/userContext.service';
 import { asyncHandler } from '../utils/http';
 
 /**
@@ -28,6 +29,21 @@ function resolveScope(user: Express.AuthenticatedUser): PortfolioScope {
 
 export const tenantMiddleware: RequestHandler = asyncHandler(async (req, _res, next) => {
   if (!req.user) throw new UnauthorizedError();
+
+  // O token é de quando a pessoa entrou; a conta pode ter mudado desde então.
+  // Conferir aqui é o que faz desativar e excluir valerem na hora, em vez de
+  // só quando o token vencesse.
+  const account = await getUserContext(req.user.id);
+
+  if (!account || !account.isActive) {
+    throw new UnauthorizedError('Esta conta não está mais ativa.');
+  }
+
+  // Empresa do token diferente da empresa da conta: token emitido antes de uma
+  // mudança de vínculo. Não serve mais.
+  if (account.companyId !== req.user.companyId) {
+    throw new UnauthorizedError('Sessão desatualizada. Entre novamente.');
+  }
 
   // Super admin do SaaS opera fora do escopo de uma empresa.
   if (req.user.role === 'SUPER_ADMIN' && !req.user.companyId) {
