@@ -38,7 +38,6 @@ import {
   useCompanyMutations,
   usePlans,
   useSubscription,
-  useSubscriptionMutations,
   useUserMutations,
   useProfessionals,
   useUsers,
@@ -78,7 +77,6 @@ export function SettingsPage() {
 
   const companyMutations = useCompanyMutations();
   const userMutations = useUserMutations();
-  const subscriptionMutations = useSubscriptionMutations();
 
   const [form, setForm] = useState({
     name: '',
@@ -681,17 +679,10 @@ export function SettingsPage() {
                     </div>
 
                     {!current && isAdmin ? (
-                      <Button
-                        className="w-full"
-                        variant="outline"
-                        loading={subscriptionMutations.changePlan.isPending}
-                        onClick={async () => {
-                          await subscriptionMutations.changePlan.mutateAsync(plan.slug).catch(() => undefined);
-                          await refreshContext().catch(() => undefined);
-                        }}
-                      >
-                        Mudar para {plan.name}
-                      </Button>
+                      <p className="rounded-lg border bg-muted/40 p-2.5 text-xs text-muted-foreground">
+                        Para mudar para o {plan.name}, escolha o plano em{' '}
+                        <strong>Assinar</strong>, acima — a troca emite a cobrança junto.
+                      </p>
                     ) : null}
                   </CardContent>
                 </Card>

@@ -719,6 +719,48 @@ const run = async () => {
     JSON.stringify({ existe: contaQueExiste.data.error, naoExiste: contaQueNaoExiste.data.error }),
   );
 
+  // --- Nao existe caminho de liberar a assinatura sem pagar ---------------
+  // Ja existiu: POST /subscription/change-plan gravava ACTIVE com mais um mes
+  // de validade sem falar com o gateway. Empresa com o teste vencido se
+  // liberava sozinha, de graca, quantas vezes quisesse.
+  const assinaturaAntes = await db.subscription.findUnique({
+    where: { companyId: bella.company.id },
+  });
+
+  const burlar = await api('/subscription/change-plan', {
+    method: 'POST',
+    token: bella.accessToken,
+    body: { planSlug: 'premium' },
+  });
+  check(
+    'nao ha rota que troque o plano sem emitir cobranca',
+    burlar.status === 404,
+    String(burlar.status),
+  );
+  const cancelarDeLado = await api('/subscription/cancel', {
+    method: 'POST',
+    token: bella.accessToken,
+  });
+  check(
+    'nem que cancele por fora do gateway',
+    cancelarDeLado.status === 404,
+    String(cancelarDeLado.status),
+  );
+
+  const assinaturaDepois = await db.subscription.findUnique({
+    where: { companyId: bella.company.id },
+  });
+  check(
+    'e a assinatura fica exatamente como estava',
+    assinaturaDepois.status === assinaturaAntes.status &&
+      String(assinaturaDepois.currentPeriodEnd) === String(assinaturaAntes.currentPeriodEnd) &&
+      assinaturaDepois.planId === assinaturaAntes.planId,
+    JSON.stringify({
+      antes: { status: assinaturaAntes.status, ate: assinaturaAntes.currentPeriodEnd },
+      depois: { status: assinaturaDepois.status, ate: assinaturaDepois.currentPeriodEnd },
+    }),
+  );
+
   console.log(`\n──────────────────────────────\n  ${pass} passaram · ${fail} falharam\n`);
   process.exit(fail > 0 ? 1 : 0);
 };

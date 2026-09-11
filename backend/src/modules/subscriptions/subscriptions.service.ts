@@ -1,9 +1,7 @@
-import { ModuleKey, SubscriptionStatus } from '@prisma/client';
+import { ModuleKey } from '@prisma/client';
 import { prisma } from '../../shared/database/prisma';
 import { tenantContext } from '../../shared/database/tenantContext';
-import { BadRequestError, NotFoundError } from '../../shared/errors/AppError';
-import { invalidateCompanyContext } from '../../shared/services/companyContext.service';
-import { CORE_MODULES } from '../companies/company.constants';
+import { NotFoundError } from '../../shared/errors/AppError';
 
 export const subscriptionsService = {
   /** Planos disponíveis para contratação. */
@@ -49,72 +47,6 @@ export const subscriptionsService = {
         },
       },
     };
-  },
-
-  /**
-   * Troca de plano. Os módulos ativos são recalculados: o que não existe no
-   * novo plano é desativado automaticamente (mantendo os módulos essenciais).
-   */
-  async changePlan(companyId: string, planSlug: string) {
-    return tenantContext.runAsSystem(async () => {
-      const plan = await prisma.plan.findUnique({ where: { slug: planSlug } });
-      if (!plan || !plan.isActive) throw new NotFoundError('Plano');
-
-      const subscription = await prisma.subscription.findUnique({ where: { companyId } });
-      if (!subscription) throw new NotFoundError('Assinatura');
-
-      const currentModules = await prisma.companyModule.findMany({
-        where: { companyId, enabled: true },
-      });
-
-      const toDisable = currentModules
-        .map((m) => m.module)
-        .filter((m) => !plan.modules.includes(m) && !CORE_MODULES.includes(m));
-
-      const periodEnd = new Date();
-      periodEnd.setMonth(
-        periodEnd.getMonth() + (plan.billingInterval === 'YEARLY' ? 12 : plan.billingInterval === 'QUARTERLY' ? 3 : 1),
-      );
-
-      await prisma.$transaction([
-        prisma.subscription.update({
-          where: { companyId },
-          data: {
-            planId: plan.id,
-            status: SubscriptionStatus.ACTIVE,
-            currentPeriodStart: new Date(),
-            currentPeriodEnd: periodEnd,
-          },
-        }),
-        prisma.companyModule.updateMany({
-          where: { companyId, module: { in: toDisable } },
-          data: { enabled: false },
-        }),
-        prisma.company.update({ where: { id: companyId }, data: { status: 'ACTIVE' } }),
-      ]);
-
-      invalidateCompanyContext(companyId);
-
-      return { plan, disabledModules: toDisable };
-    });
-  },
-
-  async cancel(companyId: string) {
-    return tenantContext.runAsSystem(async () => {
-      const subscription = await prisma.subscription.findUnique({ where: { companyId } });
-      if (!subscription) throw new NotFoundError('Assinatura');
-      if (subscription.status === 'CANCELED') {
-        throw new BadRequestError('A assinatura já está cancelada');
-      }
-
-      const updated = await prisma.subscription.update({
-        where: { companyId },
-        data: { status: SubscriptionStatus.CANCELED, canceledAt: new Date() },
-      });
-
-      invalidateCompanyContext(companyId);
-      return updated;
-    });
   },
 
   /** Módulos disponíveis em cada plano — usado na tela de upgrade. */

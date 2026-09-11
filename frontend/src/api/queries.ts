@@ -837,21 +837,6 @@ export function useUserMutations() {
   };
 }
 
-export function useSubscriptionMutations() {
-  const qc = useQueryClient();
-  return {
-    changePlan: useMutation({
-      mutationFn: (planSlug: string) => api.post('/subscription/change-plan', { planSlug }),
-      onSuccess: () => {
-        toast.success('Plano alterado com sucesso');
-        qc.invalidateQueries({ queryKey: ['subscription'] });
-        qc.invalidateQueries({ queryKey: ['company-modules'] });
-      },
-      onError: handleError,
-    }),
-  };
-}
-
 /* ------------------------------------------------ Mutations do Super Admin */
 export function useAdminMutations() {
   const qc = useQueryClient();

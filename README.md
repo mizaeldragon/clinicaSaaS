@@ -298,6 +298,19 @@ tokens e as chaves do `.env` são **apagados** antes de escrever — um
 de produção: liberar toda origem junto com `credentials` deixaria qualquer site
 abrir chamadas autenticadas em nome de quem estivesse logado.
 
+### Uma porta que ficou aberta e foi fechada
+
+Quando a cobrança pelo Asaas entrou, as rotas antigas de assinatura ficaram no
+lugar. `POST /subscription/change-plan` gravava `ACTIVE` com mais um mês de
+validade **sem falar com o gateway**: qualquer empresa com o teste vencido se
+liberava sozinha, de graça, quantas vezes quisesse. `POST /subscription/cancel`
+tinha o defeito espelhado — encerrava no painel e deixava a cobrança correndo
+no Asaas.
+
+As duas saíram. `/subscription` é somente leitura; trocar de plano e cancelar
+moram em `/billing`, que fala com o gateway. Há teste garantindo que nenhuma
+das duas volte.
+
 ### Dependências
 
 `npm audit` no backend: **zero vulnerabilidades**.
@@ -317,9 +330,9 @@ cd backend && npm run test:e2e
 ```
 
 Reseta o banco, recria o seed e roda as duas suítes end-to-end contra a API
-(**178 verificações**):
+(**181 verificações**):
 
-**`test:smoke` (80)** — autenticação e rotação de refresh token, **isolamento entre
+**`test:smoke` (83)** — autenticação e rotação de refresh token, **isolamento entre
 empresas**, feature flags de módulos, prevenção de conflitos de agenda, finalização
 de atendimento gerando receita e comissão, dashboards, aluguéis, permissões por
 papel, painel do super admin e o **plano decidindo os módulos**: a clínica no Pro

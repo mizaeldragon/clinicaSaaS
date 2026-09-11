@@ -1,11 +1,18 @@
 import { Router } from 'express';
-import { z } from 'zod';
 import { subscriptionsService } from './subscriptions.service';
-import { validate } from '../../shared/middlewares/validate';
-import { PERMISSIONS, requirePermission } from '../../shared/middlewares/rbac';
 import { asyncHandler, serialize } from '../../shared/utils/http';
-import { recordAudit } from '../../shared/services/audit.service';
 
+/**
+ * Somente leitura: qual é o plano, o que ele permite e quanto da cota já foi
+ * usada.
+ *
+ * Trocar de plano e cancelar moram em `/billing`, porque as duas coisas
+ * precisam falar com o gateway. Já existiram aqui, e era um furo: `change-plan`
+ * gravava `ACTIVE` com mais um mês de validade sem cobrar nada, então qualquer
+ * empresa com o teste vencido se liberava sozinha, de graça e quantas vezes
+ * quisesse. `cancel` tinha o defeito espelhado — encerrava no painel e deixava
+ * a cobrança correndo no Asaas.
+ */
 export const subscriptionsRoutes = Router();
 
 subscriptionsRoutes.get(
@@ -19,34 +26,5 @@ subscriptionsRoutes.get(
   '/',
   asyncHandler(async (req, res) => {
     res.json(serialize(await subscriptionsService.current(req.companyId as string)));
-  }),
-);
-
-subscriptionsRoutes.post(
-  '/change-plan',
-  requirePermission(PERMISSIONS.settingsManage),
-  validate({ body: z.object({ planSlug: z.string().min(1) }) }),
-  asyncHandler(async (req, res) => {
-    const result = await subscriptionsService.changePlan(
-      req.companyId as string,
-      req.body.planSlug,
-    );
-    await recordAudit({
-      action: 'subscription.plan_changed',
-      entity: 'Subscription',
-      after: req.body,
-      ip: req.ip,
-    });
-    res.json(serialize(result));
-  }),
-);
-
-subscriptionsRoutes.post(
-  '/cancel',
-  requirePermission(PERMISSIONS.settingsManage),
-  asyncHandler(async (req, res) => {
-    const result = await subscriptionsService.cancel(req.companyId as string);
-    await recordAudit({ action: 'subscription.canceled', entity: 'Subscription', ip: req.ip });
-    res.json(serialize(result));
   }),
 );
