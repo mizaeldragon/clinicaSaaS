@@ -26,7 +26,7 @@ const DEMO_ACCOUNTS = import.meta.env.DEV
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, accessToken, user } = useAuthStore();
+  const { login, completeTwoFactor, accessToken, user } = useAuthStore();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -34,6 +34,9 @@ export function LoginPage() {
   const [needsCompany, setNeedsCompany] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  // Preenchido quando a conta tem segundo fator: a senha passou, falta o código.
+  const [challenge, setChallenge] = useState<string | null>(null);
+  const [code, setCode] = useState('');
 
   if (accessToken && user) {
     return <Navigate to={user.role === 'SUPER_ADMIN' ? '/admin' : '/app'} replace />;
@@ -43,10 +46,12 @@ export function LoginPage() {
     event.preventDefault();
     setLoading(true);
     try {
-      await login(email, password, companySlug || undefined);
-      const role = useAuthStore.getState().user?.role;
-      const from = (location.state as { from?: string } | null)?.from;
-      navigate(role === 'SUPER_ADMIN' ? '/admin' : (from ?? '/app'), { replace: true });
+      const pendente = await login(email, password, companySlug || undefined);
+      if (pendente) {
+        setChallenge(pendente.challengeToken);
+        return;
+      }
+      concluir();
     } catch (error) {
       if (error instanceof ApiError && error.code === 'BAD_REQUEST' && error.details) {
         setNeedsCompany(true);
@@ -59,6 +64,74 @@ export function LoginPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function concluir() {
+    const role = useAuthStore.getState().user?.role;
+    const from = (location.state as { from?: string } | null)?.from;
+    navigate(role === 'SUPER_ADMIN' ? '/admin' : (from ?? '/app'), { replace: true });
+  }
+
+  async function handleTwoFactor(event: React.FormEvent) {
+    event.preventDefault();
+    if (!challenge) return;
+    setLoading(true);
+    try {
+      await completeTwoFactor(challenge, code);
+      concluir();
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : 'Código inválido.');
+      setCode('');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Senha aceita, faltando o código: uma tela só, sem nada para distrair.
+  if (challenge) {
+    return (
+      <AuthShell
+        title="Confirme que é você"
+        subtitle="Digite o código de seis dígitos do seu aplicativo autenticador."
+        footer={
+          <button
+            type="button"
+            className="font-medium text-primary hover:underline"
+            onClick={() => {
+              setChallenge(null);
+              setCode('');
+              setPassword('');
+            }}
+          >
+            Entrar com outra conta
+          </button>
+        }
+      >
+        <form className="space-y-4" onSubmit={handleTwoFactor}>
+          <div className="space-y-1.5">
+            <Label htmlFor="code">Código</Label>
+            <Input
+              id="code"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              autoFocus
+              required
+              placeholder="000000"
+              className="text-center text-lg tracking-[0.4em]"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Perdeu o celular? Use um dos códigos de recuperação que você guardou.
+            </p>
+          </div>
+
+          <Button type="submit" className="w-full" size="lg" loading={loading}>
+            Entrar
+          </Button>
+        </form>
+      </AuthShell>
+    );
   }
 
   return (

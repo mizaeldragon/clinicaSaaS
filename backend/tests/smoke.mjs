@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
+import { generateSync } from 'otplib';
 import { PrismaClient } from '@prisma/client';
 
 const BASE = 'http://localhost:3333/api/v1';
@@ -600,11 +601,11 @@ const run = async () => {
     body: {
       name: 'Recepção Temporária',
       email: 'temporaria@clinicabella.com',
-      password: 'temp@12345',
+      password: 'jabuticaba-nervosa-71',
       role: 'RECEPTIONIST',
     },
   });
-  const sessaoDela = await login('temporaria@clinicabella.com', 'temp@12345');
+  const sessaoDela = await login('temporaria@clinicabella.com', 'jabuticaba-nervosa-71');
   check(
     'a conta nova funciona antes de ser desligada',
     (await api('/customers', { token: sessaoDela.accessToken })).status === 200,
@@ -760,6 +761,178 @@ const run = async () => {
       depois: { status: assinaturaDepois.status, ate: assinaturaDepois.currentPeriodEnd },
     }),
   );
+
+  console.log('\n=== 15. Verificação em duas etapas ===');
+
+  const dono = await login('lu@studionails.com', 'studio@12345');
+  const T = dono.accessToken;
+
+  const zero = await api('/auth/2fa', { token: T });
+  check('começa desligada', zero.data.enabled === false);
+
+  const setup = await api('/auth/2fa/setup', { method: 'POST', token: T });
+  check(
+    'a configuração devolve o segredo e o endereço do QR',
+    setup.status === 200 &&
+      typeof setup.data.secret === 'string' &&
+      setup.data.otpauthUrl.startsWith('otpauth://totp/'),
+    JSON.stringify(setup.data?.otpauthUrl?.slice(0, 40)),
+  );
+
+  const aindaDesligada = await api('/auth/2fa', { token: T });
+  check(
+    'e não liga nada antes de a pessoa provar que o aplicativo funciona',
+    aindaDesligada.data.enabled === false,
+  );
+
+  const errado = await api('/auth/2fa/enable', {
+    method: 'POST',
+    token: T,
+    body: { code: '000000' },
+  });
+  check('código errado não ativa', errado.status === 400);
+
+  const ligar = await api('/auth/2fa/enable', {
+    method: 'POST',
+    token: T,
+    body: { code: generateSync({ secret: setup.data.secret }) },
+  });
+  check(
+    'código certo ativa e entrega os códigos de recuperação',
+    ligar.status === 200 && ligar.data.recoveryCodes.length === 8,
+    JSON.stringify(ligar.data).slice(0, 90),
+  );
+
+  // --- o login muda de forma ------------------------------------------------
+  const comSenha = await api('/auth/login', {
+    method: 'POST',
+    body: { email: 'lu@studionails.com', password: 'studio@12345' },
+  });
+  check(
+    'a senha sozinha para de abrir a conta',
+    comSenha.data.twoFactorRequired === true && comSenha.data.accessToken === undefined,
+    JSON.stringify(Object.keys(comSenha.data)),
+  );
+
+  const passe = comSenha.data.challengeToken;
+  const passeComoSessao = await api('/customers', { token: passe });
+  check(
+    'e o passe do desafio não serve como sessão',
+    passeComoSessao.status === 401,
+    String(passeComoSessao.status),
+  );
+
+  const codigoErrado = await api('/auth/2fa/login', {
+    method: 'POST',
+    body: { challengeToken: passe, code: '111111' },
+  });
+  check('código errado não completa o login', codigoErrado.status === 401);
+
+  const entrou = await api('/auth/2fa/login', {
+    method: 'POST',
+    body: { challengeToken: passe, code: generateSync({ secret: setup.data.secret }) },
+  });
+  check(
+    'com o código do aplicativo, entra',
+    entrou.status === 200 && Boolean(entrou.data.accessToken),
+    String(entrou.status),
+  );
+
+  // --- perdeu o celular -----------------------------------------------------
+  const outroPasse = (
+    await api('/auth/login', {
+      method: 'POST',
+      body: { email: 'lu@studionails.com', password: 'studio@12345' },
+    })
+  ).data.challengeToken;
+  const deRecuperacao = ligar.data.recoveryCodes[0];
+  const comRecuperacao = await api('/auth/2fa/login', {
+    method: 'POST',
+    body: { challengeToken: outroPasse, code: deRecuperacao },
+  });
+  check('um código de recuperação também entra', comRecuperacao.status === 200);
+
+  const maisUmPasse = (
+    await api('/auth/login', {
+      method: 'POST',
+      body: { email: 'lu@studionails.com', password: 'studio@12345' },
+    })
+  ).data.challengeToken;
+  const reusado = await api('/auth/2fa/login', {
+    method: 'POST',
+    body: { challengeToken: maisUmPasse, code: deRecuperacao },
+  });
+  check('mas o mesmo código de recuperação não serve duas vezes', reusado.status === 401);
+
+  // --- o segredo não fica legível no banco ---------------------------------
+  const noBanco = await db.user.findFirstOrThrow({ where: { email: 'lu@studionails.com' } });
+  check(
+    'o segredo do 2FA está cifrado no banco',
+    !noBanco.twoFactorSecret.includes(setup.data.secret) && noBanco.twoFactorSecret.includes('.'),
+    noBanco.twoFactorSecret.slice(0, 24),
+  );
+  const codigosNoBanco = await db.recoveryCode.findMany({ where: { userId: noBanco.id } });
+  check(
+    'e os códigos de recuperação, em hash',
+    codigosNoBanco.every((c) => !ligar.data.recoveryCodes.includes(c.codeHash)),
+  );
+
+  // --- desligar exige senha E código ---------------------------------------
+  const sessao = entrou.data.accessToken;
+  const semSenha = await api('/auth/2fa/disable', {
+    method: 'POST',
+    token: sessao,
+    body: { password: 'errada@12345', code: generateSync({ secret: setup.data.secret }) },
+  });
+  check('desligar com a senha errada não passa', semSenha.status === 400);
+
+  const desligou = await api('/auth/2fa/disable', {
+    method: 'POST',
+    token: sessao,
+    body: { password: 'studio@12345', code: generateSync({ secret: setup.data.secret }) },
+  });
+  check('com senha e código, desliga', desligou.status === 204, String(desligou.status));
+
+  const voltouAoNormal = await api('/auth/login', {
+    method: 'POST',
+    body: { email: 'lu@studionails.com', password: 'studio@12345' },
+  });
+  check('e o login volta a abrir direto', Boolean(voltouAoNormal.data.accessToken));
+
+  console.log('\n=== 16. Senha vazada ===');
+
+  // "password" aparece em centenas de milhares de vazamentos — é a primeira
+  // coisa que qualquer lista de ataque testa.
+  const senhaVazada = await api('/users', {
+    method: 'POST',
+    token: bella.accessToken,
+    body: {
+      name: 'Teste Vazada',
+      email: 'vazada@clinicabella.com',
+      password: 'password',
+      role: 'RECEPTIONIST',
+    },
+  });
+  const bloqueou = senhaVazada.status === 400;
+  check(
+    bloqueou
+      ? 'senha de lista de vazamento é recusada no cadastro'
+      : 'senha vazada — checagem indisponível, seguiu sem barrar (falha em aberto)',
+    bloqueou || senhaVazada.status === 201,
+    JSON.stringify(senhaVazada.data).slice(0, 120),
+  );
+
+  const senhaBoa = await api('/users', {
+    method: 'POST',
+    token: bella.accessToken,
+    body: {
+      name: 'Teste Senha Boa',
+      email: 'senhaboa@clinicabella.com',
+      password: 'jacaranda-molhado-42',
+      role: 'RECEPTIONIST',
+    },
+  });
+  check('e uma senha que nunca vazou passa', senhaBoa.status === 201, String(senhaBoa.status));
 
   console.log(`\n──────────────────────────────\n  ${pass} passaram · ${fail} falharam\n`);
   process.exit(fail > 0 ? 1 : 0);

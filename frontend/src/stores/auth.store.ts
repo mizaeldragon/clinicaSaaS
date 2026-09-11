@@ -11,7 +11,16 @@ interface AuthState {
   company: CompanyContext | null;
   hydrated: boolean;
 
-  login: (email: string, password: string, companySlug?: string) => Promise<void>;
+  /**
+   * Devolve o desafio quando a conta tem segundo fator: a sessão só nasce
+   * depois do código. Sem isso a tela não teria como saber que falta um passo.
+   */
+  login: (
+    email: string,
+    password: string,
+    companySlug?: string,
+  ) => Promise<{ twoFactorRequired: true; challengeToken: string } | null>;
+  completeTwoFactor: (challengeToken: string, code: string) => Promise<void>;
   register: (payload: RegisterPayload) => Promise<void>;
   logout: () => Promise<void>;
   logoutAll: () => Promise<void>;
@@ -47,10 +56,20 @@ export const useAuthStore = create<AuthState>()(
       },
 
       login: async (email, password, companySlug) => {
-        const data = await api.public.post<AuthResponse>('/auth/login', {
-          email,
-          password,
-          companySlug,
+        const data = await api.public.post<
+          AuthResponse | { twoFactorRequired: true; challengeToken: string }
+        >('/auth/login', { email, password, companySlug });
+
+        if ('twoFactorRequired' in data) return data;
+
+        get().setSession(data);
+        return null;
+      },
+
+      completeTwoFactor: async (challengeToken, code) => {
+        const data = await api.public.post<AuthResponse>('/auth/2fa/login', {
+          challengeToken,
+          code,
         });
         get().setSession(data);
       },

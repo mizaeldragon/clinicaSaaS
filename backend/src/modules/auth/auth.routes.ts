@@ -13,6 +13,9 @@ import {
   refreshSchema,
   registerCompanySchema,
   resetPasswordSchema,
+  twoFactorDisableSchema,
+  twoFactorEnableSchema,
+  twoFactorLoginSchema,
 } from './auth.schema';
 
 export const authRoutes = Router();
@@ -61,6 +64,47 @@ authRoutes.post(
   authRateLimiter,
   validate({ body: resetPasswordSchema }),
   asyncHandler(authController.resetPassword),
+);
+
+/**
+ * Segundo fator.
+ *
+ * `/2fa/login` fica sob o limitador do login — é a segunda metade dele, e sem
+ * teto alguém tentaria os seis dígitos em sequência até acertar: são só um
+ * milhão de combinações, e um código vale por 90 segundos.
+ */
+authRoutes.post(
+  '/2fa/login',
+  authRateLimiter,
+  validate({ body: twoFactorLoginSchema }),
+  asyncHandler(authController.twoFactorLogin),
+);
+
+authRoutes.get('/2fa', authenticate, asyncHandler(authController.twoFactorStatus));
+
+authRoutes.post('/2fa/setup', authenticate, asyncHandler(authController.twoFactorBegin));
+
+authRoutes.post(
+  '/2fa/enable',
+  authenticate,
+  validate({ body: twoFactorEnableSchema }),
+  asyncHandler(authController.twoFactorEnable),
+);
+
+authRoutes.post(
+  '/2fa/disable',
+  authenticate,
+  authRateLimiter,
+  validate({ body: twoFactorDisableSchema }),
+  asyncHandler(authController.twoFactorDisable),
+);
+
+authRoutes.post(
+  '/2fa/recovery-codes',
+  authenticate,
+  authRateLimiter,
+  validate({ body: twoFactorEnableSchema }),
+  asyncHandler(authController.twoFactorRecoveryCodes),
 );
 
 authRoutes.get('/me', authenticate, asyncHandler(authController.me));

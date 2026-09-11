@@ -55,6 +55,13 @@ const envSchema = z.object({
   /** Base do painel. Entra nos e-mails: link de redefinir senha, de pagar. */
   APP_URL: z.string().default('http://localhost:5173'),
 
+  /**
+   * Chave da cifra dos segredos do segundo fator. Sem ela derivamos do
+   * REFRESH_TOKEN_SECRET, e aí trocar aquele inutiliza os 2FA de todo mundo —
+   * por isso em produção vale definir a própria.
+   */
+  ENCRYPTION_KEY: z.string().min(32).optional(),
+
   // -------------------------------------------------------------- cobrança
   /**
    * Asaas. Sem chave, a cobrança fica desligada: o painel diz que o pagamento

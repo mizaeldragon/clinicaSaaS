@@ -1194,3 +1194,54 @@ export function useResetPassword() {
     onError: handleError,
   });
 }
+
+// ===========================================================================
+//  Verificação em duas etapas
+// ===========================================================================
+
+export function useTwoFactor() {
+  return useQuery({
+    queryKey: ['two-factor'],
+    queryFn: () =>
+      api.get<{ enabled: boolean; enabledAt: string | null; recoveryCodesLeft: number }>('/auth/2fa'),
+  });
+}
+
+export function useTwoFactorMutations() {
+  const qc = useQueryClient();
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['two-factor'] });
+
+  return {
+    setup: useMutation({
+      mutationFn: () => api.post<{ secret: string; otpauthUrl: string }>('/auth/2fa/setup', {}),
+      onError: handleError,
+    }),
+    enable: useMutation({
+      mutationFn: (body: { code: string }) =>
+        api.post<{ recoveryCodes: string[] }>('/auth/2fa/enable', body),
+      onSuccess: () => {
+        toast.success('Verificação em duas etapas ativada');
+        invalidate();
+      },
+      onError: handleError,
+    }),
+    disable: useMutation({
+      mutationFn: (body: { password: string; code: string }) =>
+        api.post('/auth/2fa/disable', body),
+      onSuccess: () => {
+        toast.success('Verificação em duas etapas desligada');
+        invalidate();
+      },
+      onError: handleError,
+    }),
+    regenerate: useMutation({
+      mutationFn: (body: { code: string }) =>
+        api.post<{ recoveryCodes: string[] }>('/auth/2fa/recovery-codes', body),
+      onSuccess: () => {
+        toast.success('Códigos novos gerados — os anteriores não valem mais');
+        invalidate();
+      },
+      onError: handleError,
+    }),
+  };
+}

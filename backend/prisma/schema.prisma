@@ -336,6 +336,23 @@ model SubscriptionPayment {
   @@map("subscription_payments")
 }
 
+/// Código de recuperação do segundo fator: a saída de quem perdeu o celular.
+///
+/// Guardamos só o hash, como no refresh token — quem ler o banco não entra na
+/// conta de ninguém. Cada código morre no primeiro uso.
+model RecoveryCode {
+  id        String    @id @default(uuid())
+  userId    String
+  codeHash  String    @unique
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("recovery_codes")
+}
+
 /// Pedido de redefinição de senha. Guardamos o hash do token — quem ler o banco
 /// não consegue redefinir a senha de ninguém.
 model PasswordReset {
@@ -412,8 +429,14 @@ model User {
   permissions  String[]  @default([])
   isActive     Boolean   @default(true)
   lastLoginAt  DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+
+  /// Segundo fator (TOTP). O segredo fica cifrado — quem ler o banco não
+  /// consegue gerar os códigos de ninguém.
+  twoFactorSecret    String?
+  twoFactorEnabledAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   company        Company?        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   professional   Professional?
@@ -421,6 +444,7 @@ model User {
   auditLogs      AuditLog[]
   notifications  Notification[]
   passwordResets PasswordReset[]
+  recoveryCodes  RecoveryCode[]
 
   @@unique([companyId, email])
   @@index([email])

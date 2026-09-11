@@ -11,3 +11,7 @@ coverage/
 
 # imagens enviadas pelos usuários
 backend/uploads/
+
+# dumps do banco — nunca versionar
+backups/
+*.dump

@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { authService } from './auth.service';
+import { twoFactorService } from './twoFactor.service';
 import { UnauthorizedError } from '../../shared/errors/AppError';
 import { serialize } from '../../shared/utils/http';
 import { recordAudit } from '../../shared/services/audit.service';
@@ -61,6 +62,44 @@ export const authController = {
   async resetPassword(req: Request, res: Response) {
     await authService.resetPassword(req.body);
     res.status(204).send();
+  },
+
+  // ------------------------------------------------------- segundo fator
+  async twoFactorLogin(req: Request, res: Response) {
+    const result = await authService.completeTwoFactorLogin(
+      req.body.challengeToken,
+      req.body.code,
+      meta(req),
+    );
+    res.json(serialize(result));
+  },
+
+  async twoFactorStatus(req: Request, res: Response) {
+    if (!req.user) throw new UnauthorizedError();
+    res.json(serialize(await twoFactorService.status(req.user.id)));
+  },
+
+  async twoFactorBegin(req: Request, res: Response) {
+    if (!req.user) throw new UnauthorizedError();
+    res.json(serialize(await twoFactorService.begin(req.user.id)));
+  },
+
+  async twoFactorEnable(req: Request, res: Response) {
+    if (!req.user) throw new UnauthorizedError();
+    res.json(serialize(await twoFactorService.enable(req.user.id, req.body.code)));
+  },
+
+  async twoFactorDisable(req: Request, res: Response) {
+    if (!req.user) throw new UnauthorizedError();
+    await twoFactorService.disable(req.user.id, req.body.password, req.body.code);
+    res.status(204).send();
+  },
+
+  async twoFactorRecoveryCodes(req: Request, res: Response) {
+    if (!req.user) throw new UnauthorizedError();
+    res.json(
+      serialize(await twoFactorService.regenerateRecoveryCodes(req.user.id, req.body.code)),
+    );
   },
 
   async me(req: Request, res: Response) {

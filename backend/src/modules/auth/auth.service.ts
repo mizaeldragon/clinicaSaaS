@@ -14,13 +14,20 @@ import {
   generateRefreshToken,
   hashRefreshToken,
   signAccessToken,
+  signTwoFactorChallenge,
+  verifyTwoFactorChallenge,
 } from '../../shared/utils/jwt';
+import { twoFactorService } from './twoFactor.service';
 import { PERMISSIONS, resolvePermissions } from '../../shared/middlewares/rbac';
 import { uniqueSlug } from '../../shared/utils/slug';
 import { env } from '../../config/env';
 import { CORE_MODULES, DEFAULT_BUSINESS_HOURS } from '../companies/company.constants';
 import { getCompanyContext, invalidateCompanyContext } from '../../shared/services/companyContext.service';
 import { mailer } from '../../shared/services/mailer.service';
+import {
+  breachMessage,
+  checkBreachedPassword,
+} from '../../shared/services/breachedPassword.service';
 import { logger } from '../../shared/utils/logger';
 import type {
   ChangePasswordDTO,
@@ -29,6 +36,17 @@ import type {
   RegisterCompanyDTO,
   ResetPasswordDTO,
 } from './auth.schema';
+
+/**
+ * Recusa a senha se ela já circula em listas de vazamento.
+ *
+ * Vale nos três pontos em que uma senha nasce: cadastro, troca e redefinição.
+ * Deixar passar num deles bastaria — é por onde o atacante entraria.
+ */
+async function assertPasswordNotBreached(password: string): Promise<void> {
+  const result = await checkBreachedPassword(password);
+  if (result.breached) throw new BadRequestError(breachMessage(result.count));
+}
 
 /** 1 hora: tempo de ler o e-mail, curto o bastante para não virar chave. */
 const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000;
@@ -147,8 +165,65 @@ async function issueSession(
   };
 }
 
+/** O login termina com a sessão aberta ou com o pedido do segundo fator. */
+export type LoginResult = AuthResult | { twoFactorRequired: true; challengeToken: string };
+
+/**
+ * Avisa por e-mail quando a conta é aberta de um aparelho que nunca apareceu.
+ *
+ * Não impede nada — é detecção. Se a senha da Márcia vazar, o sistema não tem
+ * como saber que quem entrou não é ela; mas ela sabe, e descobre em minutos em
+ * vez de descobrir quando a agenda já estiver bagunçada.
+ *
+ * O "aparelho" é o `User-Agent` da sessão. É grosseiro de propósito: navegador
+ * novo, computador novo ou celular novo geram o aviso, e é esse o alarme que
+ * interessa. Nunca joga exceção — um e-mail que falha não pode impedir alguém
+ * de entrar no próprio sistema.
+ */
+async function warnAboutNewDevice(
+  user: { id: string; name: string; email: string },
+  meta: SessionMeta,
+): Promise<void> {
+  try {
+    const userAgent = meta.userAgent ?? 'desconhecido';
+
+    const seenBefore = await tenantContext.runAsSystem(() =>
+      prisma.refreshToken.findFirst({ where: { userId: user.id, userAgent } }),
+    );
+    if (seenBefore) return;
+
+    // Primeira sessão da conta: é o próprio cadastro, não há o que estranhar.
+    const anySession = await tenantContext.runAsSystem(() =>
+      prisma.refreshToken.count({ where: { userId: user.id } }),
+    );
+    if (anySession <= 1) return;
+
+    const quando = new Date().toLocaleString('pt-BR', { timeZone: env.TIMEZONE });
+
+    await mailer.send({
+      to: user.email,
+      subject: 'Novo acesso à sua conta — Belezza',
+      text:
+        `Olá, ${user.name}.
+
+` +
+        `Sua conta foi acessada de um aparelho que ainda não conhecíamos, em ${quando}.
+
+` +
+        `Se foi você, pode ignorar este aviso.
+
+` +
+        `Se não foi, troque a senha agora e encerre as outras sessões em ` +
+        `Configurações › Minha conta.`,
+      action: { label: 'Revisar minha conta', url: `${env.APP_URL}/app/configuracoes?tab=conta` },
+    });
+  } catch (error) {
+    logger.warn({ error, userId: user.id }, 'Falha ao avisar sobre aparelho novo');
+  }
+}
+
 export const authService = {
-  async login(dto: LoginDTO, meta: SessionMeta): Promise<AuthResult> {
+  async login(dto: LoginDTO, meta: SessionMeta): Promise<LoginResult> {
     const users = await tenantContext.runAsSystem(() =>
       prisma.user.findMany({
         where: { email: dto.email, isActive: true },
@@ -187,11 +262,48 @@ export const authService = {
       throw new ForbiddenError('Empresa bloqueada. Entre em contato com o suporte.');
     }
 
+    // Senha certa não basta quando há segundo fator: a sessão só nasce depois
+    // do código. É exatamente aqui que uma senha roubada para de valer.
+    if (candidate.twoFactorEnabledAt) {
+      return { twoFactorRequired: true, challengeToken: signTwoFactorChallenge(candidate.id) };
+    }
+
     await tenantContext.runAsSystem(() =>
       prisma.user.update({ where: { id: candidate.id }, data: { lastLoginAt: new Date() } }),
     );
 
-    return issueSession(candidate, meta);
+    const session = await issueSession(candidate, meta);
+    await warnAboutNewDevice(candidate, meta);
+    return session;
+  },
+
+  /** Segunda metade do login: troca o passe do desafio por uma sessão. */
+  async completeTwoFactorLogin(
+    challengeToken: string,
+    code: string,
+    meta: SessionMeta,
+  ): Promise<AuthResult> {
+    const userId = verifyTwoFactorChallenge(challengeToken);
+
+    if (!(await twoFactorService.verifyCode(userId, code))) {
+      throw new UnauthorizedError('Código inválido ou já usado.');
+    }
+
+    const user = await tenantContext.runAsSystem(() =>
+      prisma.user.findUnique({
+        where: { id: userId },
+        include: { professional: { select: { id: true, revenueOwner: true } } },
+      }),
+    );
+    if (!user || !user.isActive) throw new UnauthorizedError('Conta indisponível.');
+
+    await tenantContext.runAsSystem(() =>
+      prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } }),
+    );
+
+    const session = await issueSession(user, meta);
+    await warnAboutNewDevice(user, meta);
+    return session;
   },
 
   async registerCompany(dto: RegisterCompanyDTO, meta: SessionMeta): Promise<AuthResult> {
@@ -225,6 +337,7 @@ export const authService = {
       const trialEndsAt = new Date();
       trialEndsAt.setDate(trialEndsAt.getDate() + (plan.trialDays || env.DEFAULT_TRIAL_DAYS));
 
+      await assertPasswordNotBreached(dto.admin.password);
       const passwordHash = await hashPassword(dto.admin.password);
 
       // Módulos iniciais: básicos limitados ao que o plano oferece.
@@ -352,6 +465,8 @@ export const authService = {
       const valid = await comparePassword(dto.currentPassword, user.passwordHash);
       if (!valid) throw new BadRequestError('Senha atual incorreta');
 
+      await assertPasswordNotBreached(dto.newPassword);
+
       await prisma.user.update({
         where: { id: userId },
         data: { passwordHash: await hashPassword(dto.newPassword) },
@@ -435,6 +550,8 @@ export const authService = {
       if (!reset || reset.usedAt || reset.expiresAt <= new Date()) {
         throw new BadRequestError('Este link expirou ou já foi usado. Peça outro.');
       }
+
+      await assertPasswordNotBreached(dto.newPassword);
 
       await prisma.$transaction([
         prisma.user.update({

@@ -6,6 +6,10 @@ import { hashPassword } from '../../shared/utils/hash';
 import { getPagination, paginated } from '../../shared/utils/http';
 import { getCompanyContext } from '../../shared/services/companyContext.service';
 import { invalidateUserContext } from '../../shared/services/userContext.service';
+import {
+  breachMessage,
+  checkBreachedPassword,
+} from '../../shared/services/breachedPassword.service';
 import type { CreateUserDTO, ListUsersDTO, UpdateUserDTO } from './users.schema';
 
 const SAFE_SELECT = {
@@ -21,6 +25,12 @@ const SAFE_SELECT = {
   createdAt: true,
   professional: { select: { id: true, name: true } },
 } satisfies Prisma.UserSelect;
+
+/** Mesma regra do cadastro pela tela de entrada: senha vazada não entra. */
+async function assertPasswordNotBreached(password: string): Promise<void> {
+  const result = await checkBreachedPassword(password);
+  if (result.breached) throw new BadRequestError(breachMessage(result.count));
+}
 
 export const usersService = {
   async list(companyId: string, query: ListUsersDTO) {
@@ -90,6 +100,8 @@ export const usersService = {
         if (professional.userId) throw new ConflictError('Este profissional já possui um usuário vinculado');
       }
 
+      await assertPasswordNotBreached(dto.password);
+
       const user = await prisma.user.create({
         data: {
           companyId,
@@ -112,6 +124,8 @@ export const usersService = {
 
   async update(companyId: string, id: string, dto: UpdateUserDTO, currentUserId: string) {
     return tenantContext.runAsSystem(async () => {
+      if (dto.password) await assertPasswordNotBreached(dto.password);
+
       const user = await prisma.user.findFirst({ where: { id, companyId } });
       if (!user) throw new NotFoundError('Usuário');
 

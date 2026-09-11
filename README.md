@@ -311,6 +311,63 @@ As duas saíram. `/subscription` é somente leitura; trocar de plano e cancelar
 moram em `/billing`, que fala com o gateway. Há teste garantindo que nenhuma
 das duas volte.
 
+### Verificação em duas etapas
+
+É a única proteção que continua valendo depois que a senha vaza — e senha vaza
+por fora do sistema: site falso, um serviço de terceiro invadido, alguém
+olhando por cima do ombro.
+
+Cada pessoa liga a sua em *Configurações › Minha conta*: QR Code, o primeiro
+código para provar que o aplicativo funciona, e oito códigos de recuperação
+mostrados **uma vez só**. Serve qualquer autenticador (Google, Microsoft,
+1Password, Bitwarden).
+
+| | |
+|---|---|
+| Só liga depois de conferir um código | quem fechou a tela no meio não fica trancado |
+| Senha certa devolve um **passe de 5 min**, não a sessão | e o passe não abre nenhuma rota do sistema |
+| Segredo **cifrado** no banco (AES-256-GCM) | um dump não vira cópia dos autenticadores |
+| Códigos de recuperação em **hash**, uso único | quem lê o banco não entra em conta nenhuma |
+| Desligar exige **senha e código** | notebook destrancado não remove a proteção |
+
+### Senha vazada é recusada
+
+Antes de aceitar qualquer senha nova — cadastro, troca, redefinição ou usuário
+criado pela empresa — consultamos a base de vazamentos conhecidos. É a defesa
+contra *credential stuffing*, o ataque que passa por baixo de todo o resto: se
+a pessoa repete aqui a senha de um site que vazou, o invasor acerta na primeira
+tentativa e **nenhum limite de força bruta chega a disparar**.
+
+A consulta usa k-anonimato: saem apenas os cinco primeiros caracteres do SHA-1
+da senha, voltam alguns milhares de sufixos, e a comparação acontece aqui
+dentro. A senha não sai da máquina. Se a consulta não responde, a senha passa —
+travar a troca de senha por causa de um serviço de terceiro fora do ar seria
+pior que a falta da checagem.
+
+### Aviso de acesso novo
+
+Entrou de um aparelho que nunca apareceu, chega um e-mail. Não previne nada — é
+detecção. Se a senha vazar, o sistema não tem como saber que não é você; mas
+você sabe, e descobre em minutos em vez de descobrir com a agenda bagunçada.
+
+### Backup
+
+```powershell
+.\scriptsackup-db.ps1                 # ultimos 14, em ./backups
+.\scriptsackup-db.ps1 -Destino D:kp -Keep 30
+```
+
+É a única resposta real a ransomware e a erro humano — nenhuma outra defesa
+recupera dado apagado. Restaurar:
+
+```bash
+pg_restore --clean --if-exists -d "<URL>" arquivo.dump
+```
+
+> Um backup que mora no mesmo disco que o banco não é backup: ransomware cifra
+> a pasta inteira. Aponte `-Destino` para outro disco ou sincronize para uma
+> nuvem depois.
+
 ### Dependências
 
 `npm audit` no backend: **zero vulnerabilidades**.
@@ -330,9 +387,9 @@ cd backend && npm run test:e2e
 ```
 
 Reseta o banco, recria o seed e roda as duas suítes end-to-end contra a API
-(**181 verificações**):
+(**199 verificações**):
 
-**`test:smoke` (83)** — autenticação e rotação de refresh token, **isolamento entre
+**`test:smoke` (101)** — autenticação e rotação de refresh token, **isolamento entre
 empresas**, feature flags de módulos, prevenção de conflitos de agenda, finalização
 de atendimento gerando receita e comissão, dashboards, aluguéis, permissões por
 papel, painel do super admin e o **plano decidindo os módulos**: a clínica no Pro

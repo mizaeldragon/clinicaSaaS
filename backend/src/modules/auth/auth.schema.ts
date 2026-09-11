@@ -45,6 +45,25 @@ export const resetPasswordSchema = z.object({
   newPassword: z.string().min(8, 'A nova senha deve ter no mínimo 8 caracteres').max(72),
 });
 
+/** Seis dígitos do aplicativo ou um código de recuperação (`a1b2-c3d4`). */
+const twoFactorCode = z
+  .string()
+  .trim()
+  .min(6, 'Informe o código')
+  .max(12, 'Código inválido');
+
+export const twoFactorLoginSchema = z.object({
+  challengeToken: z.string().min(20),
+  code: twoFactorCode,
+});
+
+export const twoFactorEnableSchema = z.object({ code: twoFactorCode });
+
+export const twoFactorDisableSchema = z.object({
+  password: z.string().min(1, 'Informe a senha'),
+  code: twoFactorCode,
+});
+
 export type LoginDTO = z.infer<typeof loginSchema>;
 export type RegisterCompanyDTO = z.infer<typeof registerCompanySchema>;
 export type RefreshDTO = z.infer<typeof refreshSchema>;

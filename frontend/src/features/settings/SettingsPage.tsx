@@ -50,6 +50,7 @@ import { moduleLabel } from '@/lib/modules';
 import { HolidaysCard } from './HolidaysCard';
 import { BillingCard } from './BillingCard';
 import { ChangePasswordCard, SessionsCard } from './ChangePasswordCard';
+import { TwoFactorCard } from './TwoFactorCard';
 import { currency, dateTimeLabel, weekdayName } from '@/lib/format';
 import type { UserRole } from '@/types';
 
@@ -166,6 +167,8 @@ export function SettingsPage() {
 
         {/* ------------------------------------------------------- Empresa */}
         <TabsContent value="conta" className="space-y-4">
+          {/* Primeiro o segundo fator: é o que mais muda o risco da conta. */}
+          <TwoFactorCard />
           <ChangePasswordCard />
           <SessionsCard onLogoutAll={logoutAll} />
         </TabsContent>
