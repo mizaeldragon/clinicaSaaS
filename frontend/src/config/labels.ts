@@ -12,14 +12,77 @@ import type {
 
 type Tone = 'default' | 'secondary' | 'outline' | 'success' | 'warning' | 'danger' | 'info' | 'muted';
 
-export const APPOINTMENT_STATUS: Record<AppointmentStatus, { label: string; tone: Tone; dot: string }> = {
-  SCHEDULED: { label: 'Agendado', tone: 'info', dot: 'bg-sky-500' },
-  CONFIRMED: { label: 'Confirmado', tone: 'default', dot: 'bg-violet-500' },
-  IN_PROGRESS: { label: 'Em atendimento', tone: 'warning', dot: 'bg-amber-500' },
-  COMPLETED: { label: 'Finalizado', tone: 'success', dot: 'bg-emerald-500' },
-  CANCELED: { label: 'Cancelado', tone: 'danger', dot: 'bg-rose-500' },
-  NO_SHOW: { label: 'Não compareceu', tone: 'muted', dot: 'bg-slate-400' },
+/**
+ * Situação de cada atendimento, e a cor que ela pinta na agenda.
+ *
+ * A cor é do **status**, não da profissional. Olhando a semana, o que se quer
+ * saber de relance é o que já aconteceu, o que ainda vai acontecer e o que deu
+ * errado — quem atende está escrito no bloco, e aparece na bolinha ao lado do
+ * horário.
+ *
+ * As cores são fixas de propósito, mesmo num painel white label: verde
+ * significa "aconteceu" em qualquer empresa, e amarrar isso à marca faria o
+ * mesmo verde querer dizer coisas diferentes em cada uma.
+ *
+ * `color` é o traço e a borda; o preenchimento é a mesma cor bem diluída.
+ */
+export const APPOINTMENT_STATUS: Record<
+  AppointmentStatus,
+  { label: string; tone: Tone; dot: string; color: string; hint: string }
+> = {
+  SCHEDULED: {
+    label: 'Agendado',
+    tone: 'info',
+    dot: 'bg-sky-500',
+    color: '#0EA5E9',
+    hint: 'Marcado, ainda sem confirmação da cliente',
+  },
+  CONFIRMED: {
+    label: 'Confirmado',
+    tone: 'default',
+    dot: 'bg-violet-500',
+    color: '#7C3AED',
+    hint: 'A cliente confirmou que vem',
+  },
+  IN_PROGRESS: {
+    label: 'Em atendimento',
+    tone: 'warning',
+    dot: 'bg-amber-500',
+    color: '#F59E0B',
+    hint: 'Acontecendo agora',
+  },
+  COMPLETED: {
+    label: 'Finalizado',
+    tone: 'success',
+    dot: 'bg-emerald-500',
+    color: '#10B981',
+    hint: 'Atendida e lançada no caixa',
+  },
+  CANCELED: {
+    label: 'Cancelado',
+    tone: 'danger',
+    dot: 'bg-rose-500',
+    color: '#F43F5E',
+    hint: 'Desmarcado antes da hora',
+  },
+  NO_SHOW: {
+    label: 'Não compareceu',
+    tone: 'muted',
+    dot: 'bg-slate-400',
+    color: '#64748B',
+    hint: 'A cliente não apareceu e não avisou',
+  },
 };
+
+/** A ordem em que os status aparecem na legenda: o caminho normal, e depois o que deu errado. */
+export const APPOINTMENT_STATUS_ORDER: AppointmentStatus[] = [
+  'SCHEDULED',
+  'CONFIRMED',
+  'IN_PROGRESS',
+  'COMPLETED',
+  'CANCELED',
+  'NO_SHOW',
+];
 
 export const RESOURCE_STATUS: Record<ResourceStatus, { label: string; tone: Tone }> = {
   AVAILABLE: { label: 'Disponível', tone: 'success' },

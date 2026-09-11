@@ -185,7 +185,9 @@ export function CalendarGrid({
                     ((end.getTime() - start.getTime()) / 3_600_000) * HOUR_HEIGHT - 2,
                   );
                   const status = APPOINTMENT_STATUS[appointment.status];
-                  const color = appointment.professional?.color ?? '#7C3AED';
+                  // A cor do bloco é a do status; a da profissional vira a
+                  // bolinha, para não perder de quem é o horário.
+                  const proColor = appointment.professional?.color ?? '#7C3AED';
                   // Abaixo de ~45px não cabem duas linhas: o serviço sairia
                   // cortado por baixo do bloco. Fica só o essencial, e o resto
                   // no title e no detalhe.
@@ -206,14 +208,21 @@ export function CalendarGrid({
                         height,
                         left: `calc(${(columnIndex / total) * 100}% + 2px)`,
                         width: `calc(${100 / total}% - 4px)`,
-                        borderLeftColor: color,
-                        backgroundColor: `${color}1a`,
+                        borderLeftColor: status.color,
+                        backgroundColor: `${status.color}1f`,
                       }}
                       title={`${timeLabel(appointment.startsAt)} · ${appointment.customer.name} — ${appointment.services.map((item) => item.name).join(', ')} (${status.label})`}
                     >
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate font-semibold text-foreground">
-                          {timeLabel(appointment.startsAt)} {appointment.customer.name}
+                        <span className="flex items-center gap-1.5 truncate font-semibold text-foreground">
+                          <span
+                            className="size-1.5 shrink-0 rounded-full"
+                            style={{ backgroundColor: proColor }}
+                            aria-hidden
+                          />
+                          <span className="truncate">
+                            {timeLabel(appointment.startsAt)} {appointment.customer.name}
+                          </span>
                         </span>
                         {compact ? null : (
                           <span className="block truncate text-muted-foreground">

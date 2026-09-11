@@ -1,5 +1,6 @@
 import { isSameDay } from 'date-fns';
 import { CalendarPlus, Clock } from 'lucide-react';
+import { APPOINTMENT_STATUS } from '@/config/labels';
 import { EmptyState } from '@/components/ui/feedback';
 import { UserAvatar } from '@/components/ui/primitives';
 import { AppointmentStatusBadge } from '@/components/StatusBadge';
@@ -58,7 +59,10 @@ export function MobileAgenda({
 
             <div className="space-y-2">
               {dayAppointments.map((appointment) => {
-                const color = appointment.professional?.color ?? '#7C3AED';
+                // A faixa da esquerda mostra a situação, como na semana; a
+                // profissional continua no avatar da direita.
+                const status = APPOINTMENT_STATUS[appointment.status];
+                const proColor = appointment.professional?.color ?? '#7C3AED';
                 return (
                   <button
                     key={appointment.id}
@@ -71,7 +75,7 @@ export function MobileAgenda({
                   >
                     <div
                       className="w-1 shrink-0 rounded-full"
-                      style={{ backgroundColor: color }}
+                      style={{ backgroundColor: status.color }}
                       aria-hidden
                     />
                     <div className="min-w-0 flex-1 space-y-1">
@@ -92,7 +96,7 @@ export function MobileAgenda({
                     {appointment.professional ? (
                       <UserAvatar
                         name={appointment.professional.name}
-                        color={color}
+                        color={proColor}
                         className="size-9 self-center"
                       />
                     ) : null}

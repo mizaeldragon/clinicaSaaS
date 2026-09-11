@@ -27,6 +27,7 @@ import { MobileAgenda } from './MobileAgenda';
 import { AppointmentDialog } from './AppointmentDialog';
 import { AppointmentDetail } from './AppointmentDetail';
 import { RentedShiftsBand } from './RentedShiftsBand';
+import { StatusLegend } from './StatusLegend';
 import type { Appointment } from '@/types';
 
 type View = 'day' | 'week' | 'month';
@@ -218,6 +219,11 @@ export function AgendaPage() {
         />
       ) : (
         <Card className="overflow-hidden">
+          {/* O que cada cor significa, e quantos de cada no período aberto. */}
+          <div className="border-b px-4 py-2.5">
+            <StatusLegend statuses={(appointments ?? []).map((item) => item.status)} />
+          </div>
+
           {view === 'month' ? (
             <MonthGrid
               reference={reference}

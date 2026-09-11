@@ -7,6 +7,7 @@ import {
   startOfMonth,
   startOfWeek,
 } from 'date-fns';
+import { APPOINTMENT_STATUS } from '@/config/labels';
 import { cn } from '@/lib/utils';
 import { timeLabel } from '@/lib/format';
 import type { Appointment } from '@/types';
@@ -75,7 +76,8 @@ export function MonthGrid({
 
                 <div className="space-y-1">
                   {dayAppointments.slice(0, 3).map((appointment) => {
-                    const color = appointment.professional?.color ?? '#7C3AED';
+                    const status = APPOINTMENT_STATUS[appointment.status];
+                    const proColor = appointment.professional?.color ?? '#7C3AED';
                     return (
                       <button
                         key={appointment.id}
@@ -85,9 +87,13 @@ export function MonthGrid({
                           'flex w-full items-center gap-1 truncate rounded px-1.5 py-0.5 text-left text-[11px] transition-colors hover:brightness-95',
                           appointment.status === 'CANCELED' && 'opacity-50 line-through',
                         )}
-                        style={{ backgroundColor: `${color}1a` }}
+                        style={{ backgroundColor: `${status.color}1f` }}
+                        title={`${appointment.customer.name} — ${status.label}`}
                       >
-                        <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+                        <span
+                          className="size-1.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: proColor }}
+                        />
                         <span className="shrink-0 font-medium">{timeLabel(appointment.startsAt)}</span>
                         <span className="truncate text-muted-foreground">
                           {appointment.customer.name}

@@ -354,8 +354,22 @@ async function seedDemoCompany() {
 
       if (endsAt.getHours() >= 18) continue;
 
+      // A situação segue a data: o que já passou foi atendido (ou a cliente
+      // faltou), o que vem pela frente ainda está por acontecer. Marcar como
+      // finalizado um horário de amanhã deixaria a agenda mentindo — e o caixa
+      // junto, porque finalizar lança receita.
       const isPast = startsAt < new Date();
-      const status = isPast ? (i % 7 === 0 ? 'NO_SHOW' : 'COMPLETED') : 'SCHEDULED';
+      const status = isPast
+        ? i % 7 === 0
+          ? 'NO_SHOW'
+          : 'COMPLETED'
+        : // Futuro: a maioria só marcada, algumas já confirmadas, e uma ou
+          // outra desmarcada — é o que a agenda de uma semana real mostra.
+          (created + i) % 9 === 2
+          ? 'CANCELED'
+          : (created + i) % 3 === 0
+            ? 'CONFIRMED'
+            : 'SCHEDULED';
 
       const appointment = await prisma.appointment.create({
         data: {

@@ -472,6 +472,19 @@ Não há `$queryRaw` no projeto, e é de propósito: consulta bruta não passa p
 extension, então empresa e carteira teriam de ser escritas à mão em cada uma —
 esquecer um dos dois filtros vazaria dados entre negócios.
 
+### A agenda é lida pela cor
+
+Cada bloco é pintado pela **situação** do atendimento, não pela profissional:
+azul agendado, violeta confirmado, âmbar em atendimento, verde finalizado,
+rosa cancelado, cinza não compareceu. É o que a dona quer ver de relance ao
+abrir a semana — o que já aconteceu, o que ainda vem e o que deu errado. Quem
+atende continua identificada pela bolinha ao lado do horário.
+
+As cores são fixas mesmo num painel white label: verde significa "aconteceu" em
+qualquer empresa, e amarrá-lo à marca faria o mesmo verde dizer coisas
+diferentes em cada uma. A legenda acima da grade conta quantos há de cada
+situação no período aberto.
+
 Feature flags (`CompanyModule`) são validados no servidor via `requireModule(...)`.
 O frontend esconde o menu, mas quem decide o acesso é a API.
 
