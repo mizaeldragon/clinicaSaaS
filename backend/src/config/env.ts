@@ -51,6 +51,40 @@ const envSchema = z.object({
 
   /** Base pública da API — usada para montar o endereço das imagens enviadas. */
   PUBLIC_URL: z.string().default('http://localhost:3333'),
+
+  /** Base do painel. Entra nos e-mails: link de redefinir senha, de pagar. */
+  APP_URL: z.string().default('http://localhost:5173'),
+
+  // -------------------------------------------------------------- cobrança
+  /**
+   * Asaas. Sem chave, a cobrança fica desligada: o painel diz que o pagamento
+   * não está configurado em vez de estourar, e o trial nunca bloqueia ninguém.
+   */
+  ASAAS_API_KEY: z.string().optional(),
+  ASAAS_ENV: z.enum(['sandbox', 'production']).default('sandbox'),
+  /**
+   * Segredo combinado com o Asaas no cadastro do webhook. Ele o devolve no
+   * header `asaas-access-token`; sem conferir isso, qualquer um poderia
+   * postar "pagamento confirmado" no nosso endpoint.
+   */
+  ASAAS_WEBHOOK_TOKEN: z.string().optional(),
+  /**
+   * Dias de tolerância depois do vencimento antes de trancar o painel. O boleto
+   * compensa em dias úteis; trancar no dia seguinte puniria quem já pagou.
+   */
+  BILLING_GRACE_DAYS: z.coerce.number().default(5),
+
+  // ------------------------------------------------------------------ e-mail
+  /** Sem SMTP_HOST o e-mail vira log — desenvolvimento não precisa de caixa. */
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().default(587),
+  SMTP_SECURE: z
+    .string()
+    .default('false')
+    .transform((v) => v === 'true'),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASSWORD: z.string().optional(),
+  MAIL_FROM: z.string().default('Belezza <nao-responda@belezza.app>'),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -67,6 +101,10 @@ export const env = {
   corsOrigins: parsed.data.CORS_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean),
   isProduction: parsed.data.NODE_ENV === 'production',
   isDevelopment: parsed.data.NODE_ENV === 'development',
+  /** Cobrança só existe se houver chave do Asaas. */
+  billingEnabled: Boolean(parsed.data.ASAAS_API_KEY),
+  /** Sem SMTP o e-mail é registrado no log em vez de enviado. */
+  mailEnabled: Boolean(parsed.data.SMTP_HOST),
 };
 
 export type Env = typeof env;

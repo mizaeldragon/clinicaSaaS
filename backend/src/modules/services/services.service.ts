@@ -3,6 +3,7 @@ import { prisma, TxClient } from '../../shared/database/prisma';
 import { BadRequestError, NotFoundError } from '../../shared/errors/AppError';
 import { getPagination, paginated } from '../../shared/utils/http';
 import { tenantContext } from '../../shared/database/tenantContext';
+import { currentPortfolioOwner } from '../../shared/services/portfolio.service';
 import type {
   CreateCategoryDTO,
   CreateServiceDTO,
@@ -96,11 +97,27 @@ export const servicesService = {
 
     return prisma.$transaction(async (tx) => {
       const service = await tx.service.create({
-        data: { ...data, companyId } as Prisma.ServiceUncheckedCreateInput,
+        // A carteira de quem cria é a dona do serviço: o que a locatária
+        // cadastra fica no catálogo dela, e a casa não vê o preço que ela pratica.
+        data: {
+          ...data,
+          companyId,
+          ownerProfessionalId: currentPortfolioOwner(),
+        } as Prisma.ServiceUncheckedCreateInput,
       });
 
-      if (professionalIds?.length) {
-        await this.syncProfessionals(tx, companyId, service.id, professionalIds);
+      // A locatária é a única profissional da carteira dela: um serviço que ela
+      // cadastra e não fica ligado a ninguém não apareceria no link público
+      // dela nem na agenda — ela cadastraria no vazio.
+      const owner = currentPortfolioOwner();
+      const linked = professionalIds?.length
+        ? professionalIds
+        : owner
+          ? [owner]
+          : [];
+
+      if (linked.length) {
+        await this.syncProfessionals(tx, companyId, service.id, linked);
       }
 
       return service;

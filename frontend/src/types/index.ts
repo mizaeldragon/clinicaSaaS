@@ -97,6 +97,7 @@ export interface CompanyContext {
   } | null;
   subscriptionStatus: string | null;
   trialEndsAt: string | null;
+  currentPeriodEnd: string | null;
 }
 
 export interface AuthResponse {
@@ -343,4 +344,58 @@ export interface Plan {
     appointmentsMonth: number | null;
   };
   modules: ModuleKey[];
+}
+
+// --------------------------------------------------------------------- cobrança
+
+export type BillingType = 'BOLETO' | 'PIX' | 'CREDIT_CARD';
+
+export type SubscriptionPaymentStatus =
+  | 'PENDING'
+  | 'CONFIRMED'
+  | 'RECEIVED'
+  | 'OVERDUE'
+  | 'REFUNDED'
+  | 'CANCELED';
+
+export interface SubscriptionPayment {
+  id: string;
+  status: SubscriptionPaymentStatus;
+  billingType: BillingType;
+  value: number;
+  dueDate: string;
+  paidAt: string | null;
+  invoiceUrl: string | null;
+  bankSlipUrl: string | null;
+  pixPayload: string | null;
+}
+
+/**
+ * Por que a empresa ainda pode (ou não pode mais) usar o painel. Espelha
+ * `AccessState` do backend — a regra é calculada lá, aqui só é exibida.
+ */
+export type AccessState =
+  | { kind: 'ok' }
+  | { kind: 'trial'; endsAt: string; daysLeft: number }
+  | { kind: 'trial_expired'; endsAt: string }
+  | { kind: 'past_due'; dueAt: string; blocksAt: string; daysLeft: number }
+  | { kind: 'past_due_blocked'; dueAt: string }
+  | { kind: 'canceled' };
+
+export interface BillingOverview {
+  gateway: { enabled: boolean; environment: 'sandbox' | 'production' };
+  subscription: {
+    id: string;
+    status: string;
+    billingType: BillingType | null;
+    trialEndsAt: string | null;
+    currentPeriodEnd: string | null;
+    canceledAt: string | null;
+    active: boolean;
+  };
+  plan: { id: string; name: string; slug: string; price: number };
+  access: AccessState;
+  documentOnFile: boolean;
+  openPayment: SubscriptionPayment | null;
+  payments: SubscriptionPayment[];
 }

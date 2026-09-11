@@ -48,6 +48,8 @@ import { toast } from 'sonner';
 import { applyBrandColor } from '@/lib/utils';
 import { ImageUpload } from '@/components/ImageUpload';
 import { HolidaysCard } from './HolidaysCard';
+import { BillingCard } from './BillingCard';
+import { ChangePasswordCard, SessionsCard } from './ChangePasswordCard';
 import { currency, dateTimeLabel, weekdayName } from '@/lib/format';
 import type { UserRole } from '@/types';
 
@@ -62,7 +64,7 @@ export function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = searchParams.get('tab') ?? 'empresa';
 
-  const { user, refreshContext } = useAuthStore();
+  const { user, refreshContext, logoutAll } = useAuthStore();
   const isAdmin = user?.role === 'COMPANY_ADMIN';
 
   const { data: company, isLoading } = useCompany();
@@ -80,6 +82,7 @@ export function SettingsPage() {
   const [form, setForm] = useState({
     name: '',
     type: 'OTHER',
+    document: '',
     email: '',
     phone: '',
     whatsapp: '',
@@ -116,6 +119,7 @@ export function SettingsPage() {
     setForm({
       name: company.name ?? '',
       type: company.type ?? 'OTHER',
+      document: company.document ?? '',
       email: company.email ?? '',
       phone: company.phone ?? '',
       whatsapp: company.whatsapp ?? '',
@@ -156,11 +160,17 @@ export function SettingsPage() {
           <TabsTrigger value="empresa">Empresa</TabsTrigger>
           <TabsTrigger value="modulos">Módulos</TabsTrigger>
           {isAdmin ? <TabsTrigger value="usuarios">Usuários</TabsTrigger> : null}
-          <TabsTrigger value="plano">Plano</TabsTrigger>
+          <TabsTrigger value="plano">Plano e cobrança</TabsTrigger>
+          <TabsTrigger value="conta">Minha conta</TabsTrigger>
           {isAdmin ? <TabsTrigger value="auditoria">Auditoria</TabsTrigger> : null}
         </TabsList>
 
         {/* ------------------------------------------------------- Empresa */}
+        <TabsContent value="conta" className="space-y-4">
+          <ChangePasswordCard />
+          <SessionsCard onLogoutAll={logoutAll} />
+        </TabsContent>
+
         <TabsContent value="empresa" className="space-y-4">
           <Card>
             <CardHeader>
@@ -194,6 +204,17 @@ export function SettingsPage() {
               </div>
 
               <div className="grid gap-4 sm:grid-cols-3">
+                <div className="space-y-1.5">
+                  <Label>CPF / CNPJ</Label>
+                  <Input
+                    value={form.document}
+                    placeholder="Só números"
+                    onChange={(e) => setForm((f) => ({ ...f, document: e.target.value }))}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Usado para emitir a cobrança da mensalidade
+                  </p>
+                </div>
                 <div className="space-y-1.5">
                   <Label>E-mail</Label>
                   <Input
@@ -584,6 +605,9 @@ export function SettingsPage() {
 
         {/* ---------------------------------------------------------- Plano */}
         <TabsContent value="plano" className="space-y-4">
+          {/* A cobrança vem primeiro: é a única parte com prazo. */}
+          <BillingCard />
+
           {subscription ? (
             <Card>
               <CardHeader>

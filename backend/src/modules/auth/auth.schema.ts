@@ -36,7 +36,18 @@ export const changePasswordSchema = z.object({
   newPassword: z.string().min(8, 'A nova senha deve ter no mínimo 8 caracteres').max(72),
 });
 
+export const forgotPasswordSchema = z.object({
+  email: z.string().email('E-mail inválido').toLowerCase().trim(),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(20, 'Link inválido'),
+  newPassword: z.string().min(8, 'A nova senha deve ter no mínimo 8 caracteres').max(72),
+});
+
 export type LoginDTO = z.infer<typeof loginSchema>;
 export type RegisterCompanyDTO = z.infer<typeof registerCompanySchema>;
 export type RefreshDTO = z.infer<typeof refreshSchema>;
 export type ChangePasswordDTO = z.infer<typeof changePasswordSchema>;
+export type ForgotPasswordDTO = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordDTO = z.infer<typeof resetPasswordSchema>;

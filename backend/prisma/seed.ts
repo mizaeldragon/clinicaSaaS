@@ -26,7 +26,7 @@ async function seedPlans() {
       name: 'Pro',
       slug: 'pro',
       description: 'A clínica completa: equipe, salas, financeiro, comissões e relatórios.',
-      price: 129.9,
+      price: 300,
       trialDays: 14,
       maxUsers: 8,
       maxProfessionals: 10,
@@ -51,7 +51,7 @@ async function seedPlans() {
       slug: 'premium',
       description:
         'Tudo do Pro mais o aluguel de espaços por turno ou diária, com link público para cada profissional.',
-      price: 219.9,
+      price: 450,
       trialDays: 14,
       maxUsers: null,
       maxProfessionals: null,
@@ -797,6 +797,18 @@ async function seedSharedSpace() {
         serviceId: byName(name).id,
       })),
     ],
+  });
+
+  // Cada catálogo na carteira de quem cobra por ele. O que a Ana pratica de
+  // preço no corte é negócio dela — a casa e a Bia não veem. Os serviços da
+  // Márcia ficam sem dono: são o catálogo da casa.
+  await prisma.service.updateMany({
+    where: { companyId, name: { in: ['Corte', 'Escova', 'Lavagem + finalização'] } },
+    data: { ownerProfessionalId: ana.id },
+  });
+  await prisma.service.updateMany({
+    where: { companyId, name: { in: ['Manicure', 'Pedicure'] } },
+    data: { ownerProfessionalId: bia.id },
   });
 
   // --------------------------------------------- contratos e reservas de turno

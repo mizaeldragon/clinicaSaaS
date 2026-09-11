@@ -23,6 +23,9 @@ import { subscriptionsRoutes } from '../modules/subscriptions/subscriptions.rout
 import { adminRoutes } from '../modules/admin/admin.routes';
 import { auditRoutes } from '../modules/audit/audit.routes';
 import { uploadsRoutes } from '../modules/uploads/uploads.routes';
+import { billingRoutes } from '../modules/billing/billing.routes';
+import { webhookRoutes } from '../modules/billing/webhook.routes';
+import { requireActiveSubscription } from '../shared/middlewares/subscription';
 
 export const routes = Router();
 
@@ -36,11 +39,28 @@ routes.use('/auth', authRoutes);
 // Página pública de agendamento — sem login, isolada pelo slug da empresa.
 routes.use('/public/:slug', publicRoutes);
 
+// Webhook do gateway de pagamento. Autenticado por token combinado, não por
+// sessão — quem chama é o Asaas, não uma pessoa.
+routes.use('/webhooks', webhookRoutes);
+
 // ------------------------------------------------------------- autenticado
 const secured = Router();
 secured.use(authenticate, tenantMiddleware);
 
+// ------------------------------------------------- sempre acessível, mesmo devendo
+// Uma empresa com trial vencido precisa conseguir entrar, ver o próprio
+// cadastro e — sobretudo — pagar. Trancar a tela de cobrança junto com o resto
+// seria exigir o pagamento e esconder onde pagar.
 secured.use('/company', companiesRoutes);
+secured.use('/billing', billingRoutes);
+secured.use('/subscription', subscriptionsRoutes);
+secured.use('/notifications', notificationsRoutes);
+
+// ------------------------------------------------------------ operação do dia
+// Daqui para baixo, assinatura em dia. A escrita é o que trava: a leitura
+// continua liberada para ninguém perder a agenda do dia por causa de um boleto.
+secured.use(requireActiveSubscription);
+
 secured.use('/onboarding', onboardingRoutes);
 secured.use('/users', usersRoutes);
 secured.use('/dashboard', dashboardRoutes);
@@ -56,8 +76,6 @@ secured.use('/rentals', rentalsRoutes);
 secured.use('/financial', financialRoutes);
 secured.use('/commissions', commissionsRoutes);
 secured.use('/reports', reportsRoutes);
-secured.use('/notifications', notificationsRoutes);
-secured.use('/subscription', subscriptionsRoutes);
 secured.use('/audit-logs', auditRoutes);
 secured.use('/uploads', uploadsRoutes);
 

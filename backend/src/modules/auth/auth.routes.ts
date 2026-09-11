@@ -8,9 +8,11 @@ import { authRateLimiter } from '../../shared/middlewares/rateLimit';
 import { asyncHandler } from '../../shared/utils/http';
 import {
   changePasswordSchema,
+  forgotPasswordSchema,
   loginSchema,
   refreshSchema,
   registerCompanySchema,
+  resetPasswordSchema,
 } from './auth.schema';
 
 export const authRoutes = Router();
@@ -40,6 +42,25 @@ authRoutes.post(
   authenticate,
   validate({ body: changePasswordSchema }),
   asyncHandler(authController.changePassword),
+);
+
+/**
+ * Esqueci a senha. Sob o limitador do login: a rota responde igual para conta
+ * que existe e que não existe, mas sem teto alguém a usaria para varrer
+ * endereços — e para disparar e-mail em cima de terceiros.
+ */
+authRoutes.post(
+  '/forgot-password',
+  authRateLimiter,
+  validate({ body: forgotPasswordSchema }),
+  asyncHandler(authController.forgotPassword),
+);
+
+authRoutes.post(
+  '/reset-password',
+  authRateLimiter,
+  validate({ body: resetPasswordSchema }),
+  asyncHandler(authController.resetPassword),
 );
 
 authRoutes.get('/me', authenticate, asyncHandler(authController.me));

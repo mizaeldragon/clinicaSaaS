@@ -726,8 +726,8 @@ function Plans() {
               Para a clínica, o salão ou o studio que atende as próprias clientes.
             </p>
             <p className="mt-7">
-              <span className="text-4xl font-semibold tracking-tight">R$ 129</span>
-              <span className="text-lg text-muted-foreground">,90/mês</span>
+              <span className="text-4xl font-semibold tracking-tight">R$ 300</span>
+              <span className="text-lg text-muted-foreground">/mês</span>
             </p>
             <Link
               to="/cadastro"
@@ -755,8 +755,8 @@ function Plans() {
                 Para quem aluga cadeira, mesa ou sala para outras profissionais.
               </p>
               <p className="mt-7">
-                <span className="text-4xl font-semibold tracking-tight">R$ 219</span>
-                <span className="text-lg text-muted-foreground">,90/mês</span>
+                <span className="text-4xl font-semibold tracking-tight">R$ 450</span>
+                <span className="text-lg text-muted-foreground">/mês</span>
               </p>
               <Link
                 to="/cadastro"

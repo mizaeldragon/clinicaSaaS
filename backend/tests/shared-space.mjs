@@ -269,6 +269,9 @@ const run = async () => {
   const customers = await api('/customers', { token: marcia.accessToken });
   const helena = customers.data.data.find((c) => c.name === 'Helena Prado');
   const services = await api('/services', { token: marcia.accessToken });
+  // O catálogo também tem dono: o corte é da Ana, a limpeza de pele é da casa.
+  const anaServices = await api('/services', { token: ana.accessToken });
+  const anaService = (name) => anaServices.data.data.find((s) => s.name === name).id;
   const marciaPro = professionals.data.data.find((p) => p.name === 'Márcia Vaz');
 
   const ownStart = new Date(monday);
@@ -331,7 +334,7 @@ const run = async () => {
       customerId: anaClient.id,
       professionalId: anaSlots.professional.id,
       startsAt: outsideShift.toISOString(),
-      services: [{ serviceId: services.data.data.find((s) => s.name === 'Corte').id, quantity: 1 }],
+      services: [{ serviceId: anaService('Corte'), quantity: 1 }],
     },
   });
   check(
@@ -354,10 +357,11 @@ const run = async () => {
   check(
     'locatária abre o financeiro e vê o caixa dela, não o do espaço',
     anaFinancial.status === 200 &&
+      marciaFinancial.status === 200 &&
       Number(anaFinancial.data.month.income) !== Number(marciaFinancial.data.month.income),
     JSON.stringify({
-      ana: anaFinancial.data?.month?.income,
-      marcia: marciaFinancial.data?.month?.income,
+      ana: anaFinancial.data?.month?.income ?? anaFinancial.data,
+      marcia: marciaFinancial.data?.month?.income ?? marciaFinancial.data,
     }),
   );
 
@@ -394,6 +398,40 @@ const run = async () => {
     JSON.stringify(anaCustomers.data.data.map((c) => c.name)),
   );
 
+  // O catálogo é parte do negócio: o preço que a Ana cobra pelo corte não é
+  // assunto da casa nem da concorrente de mesa ao lado.
+  const houseNames = services.data.data.map((s) => s.name);
+  const anaNames = anaServices.data.data.map((s) => s.name);
+  check(
+    'dona do espaço não vê o catálogo da locatária',
+    !houseNames.includes('Corte'),
+    JSON.stringify(houseNames),
+  );
+  check(
+    'mas continua vendo o catálogo da própria estética',
+    houseNames.includes('Limpeza de pele'),
+  );
+  check(
+    'locatária vê o próprio catálogo',
+    anaNames.includes('Corte') && anaNames.includes('Escova'),
+    JSON.stringify(anaNames),
+  );
+  check(
+    'e não vê o da casa nem o da outra locatária',
+    !anaNames.includes('Limpeza de pele') && !anaNames.includes('Manicure'),
+    JSON.stringify(anaNames),
+  );
+
+  // A página pública precisa enxergar tudo: é lá que a cliente escolhe o
+  // serviço, e ela não sabe de carteira nenhuma.
+  const vitrine = await api('/public/espaco-marcia-vaz');
+  const vitrineNames = (vitrine.data.services ?? []).map((s) => s.name);
+  check(
+    'o link público mostra o catálogo inteiro do espaço',
+    vitrineNames.includes('Corte') && vitrineNames.includes('Limpeza de pele'),
+    JSON.stringify(vitrineNames),
+  );
+
   const biaSession = await login('bia@marciavaz.com.br', 'marcia@12345');
   const biaAgenda = await api('/appointments?perPage=100', { token: biaSession.accessToken });
   check(
@@ -408,7 +446,11 @@ const run = async () => {
       customerId: helena.id,
       professionalId: anaSlots.professional.id,
       startsAt: new Date(tuesday.getTime() + 9 * 3600_000).toISOString(),
-      services: [{ serviceId: services.data.data.find((s) => s.name === 'Corte').id, quantity: 1 }],
+      // Serviço da casa de propósito: assim o catálogo resolve e a recusa só
+      // pode vir da parede de carteira, não de "serviço não encontrado".
+      services: [
+        { serviceId: services.data.data.find((x) => x.name === 'Limpeza de pele').id, quantity: 1 },
+      ],
     },
   });
   check(
@@ -473,10 +515,22 @@ const run = async () => {
       revenueOwner: 'PROFESSIONAL',
       publicBookingEnabled: true,
       specialties: ['Cabelo'],
-      serviceIds: [corte.id],
+      // Sem serviços: o catálogo da locatária é dela, e a dona do espaço não
+      // define o que a Carol cobra — nem poderia, já que não vê o da Ana.
     },
   });
   check('1) cadastra a profissional como locatária', nova.status === 201, JSON.stringify(nova.data));
+
+  const servicoAlheio = await api('/professionals', {
+    method: 'POST',
+    token: marcia.accessToken,
+    body: { name: 'Tentativa', revenueOwner: 'PROFESSIONAL', serviceIds: [corte.id] },
+  });
+  check(
+    '   e a dona não consegue pendurar nela um serviço de outra carteira',
+    servicoAlheio.status === 400,
+    JSON.stringify(servicoAlheio.data),
+  );
   check(
     '2) o link individual dela já nasce pronto',
     nova.data.publicSlug === 'carol-dias',
@@ -507,10 +561,39 @@ const run = async () => {
     JSON.stringify(carolClientes.data.data.map((c) => c.name)),
   );
 
+  const carolServicos = await api('/services', { token: carol.accessToken });
+  check(
+    '   e com o catálogo vazio — os preços da casa e da Ana não são dela',
+    carolServicos.data.data.length === 0,
+    JSON.stringify(carolServicos.data.data.map((x) => x.name)),
+  );
+
+  // 45 min de propósito: a Carol alugou o turno da noite (18h–22h) e o espaço
+  // fecha às 19h, então a janela real dela é de uma hora. Um serviço de duas
+  // horas não caberia — e o teste (f) mais abaixo depende de caber.
+  const carolCria = await api('/services', {
+    method: 'POST',
+    token: carol.accessToken,
+    body: { name: 'Hidratação', price: 120, durationMinutes: 45 },
+  });
+  check(
+    '6) ela monta o próprio catálogo',
+    carolCria.status === 201,
+    JSON.stringify(carolCria.data),
+  );
+  const marciaDepois = await api('/services', { token: marcia.accessToken });
+  check(
+    '   e o preço que ela pratica não aparece para a dona do espaço',
+    !marciaDepois.data.data.some((x) => x.name === 'Hidratação'),
+    JSON.stringify(marciaDepois.data.data.map((x) => x.name)),
+  );
+
   const carolPage = await api(`/public/${SLUG}/p/carol-dias`);
   check(
-    '6) o link público dela responde',
-    carolPage.status === 200 && carolPage.data.professional.name === 'Carol Dias',
+    '7) o link público dela responde, já com o serviço dela',
+    carolPage.status === 200 &&
+      carolPage.data.professional.name === 'Carol Dias' &&
+      (carolPage.data.services ?? []).some((x) => x.name === 'Hidratação'),
     String(carolPage.status),
   );
 
@@ -635,9 +718,10 @@ const run = async () => {
     JSON.stringify({ livres: again.data?.available, ocupados: again.data?.blocked }),
   );
 
-  // (f) A locatária do mês passa a ter agenda naqueles dias.
+  // (f) A locatária do mês passa a ter agenda naqueles dias — no serviço dela,
+  // que é o único que ela oferece.
   const carolAgenda = await api(
-    `/public/${SLUG}/availability?serviceId=${corte.id}&date=${nextMonday.toISOString()}&professionalId=${carolId}`,
+    `/public/${SLUG}/availability?serviceId=${carolCria.data.id}&date=${nextMonday.toISOString()}&professionalId=${carolId}`,
   );
   check(
     'f) quem alugou o mês aparece no link público naqueles dias',

@@ -105,8 +105,8 @@ São **dois planos**, e o que os separa é a locação:
 
 | Plano | Preço | Para quem | Aluguel de espaços |
 |---|---|---|---|
-| **Pro** | R$ 129,90 | a clínica que atende as próprias clientes — agenda, equipe, salas, financeiro, comissões e relatórios | **não** |
-| **Premium** | R$ 219,90 | o espaço compartilhado: tudo do Pro mais locação por turno ou diária e link público individual por profissional | **sim** |
+| **Pro** | R$ 300,00 | a clínica que atende as próprias clientes — agenda, equipe, salas, financeiro, comissões e relatórios | **não** |
+| **Premium** | R$ 450,00 | o espaço compartilhado: tudo do Pro mais locação por turno ou diária e link público individual por profissional | **sim** |
 
 É o plano que corta, não só o wizard: uma clínica no Pro **não vê "Aluguel"** no
 menu, e a API recusa `/rentals` com `MODULE_DISABLED` mesmo que alguém digite o
@@ -148,16 +148,80 @@ mesma empresa:
 |---|---|---|
 | Agenda | só os atendimentos dela | só os dela |
 | Clientes | só a carteira da estética | só a carteira dela |
+| Serviços e preços | só o catálogo da casa | só o catálogo dela |
 | Caixa | serviços dela + aluguéis recebidos | fora do sistema da dona |
 | Sobre quem aluga, vê | espaço, turno, dia e se pagou | — |
 
-A dona **não vê** a agenda, as clientes nem o faturamento de quem aluga — e uma
-locatária não vê os da outra. Na agenda da dona os turnos alugados aparecem como
+A dona **não vê** a agenda, as clientes, o catálogo nem o faturamento de quem
+aluga — e uma locatária não vê os da outra. O preço que cada uma pratica é
+negócio dela: numa casa onde todas disputam a mesma cliente, a tabela da
+vizinha não fica à vista. A locatária nova nasce com o catálogo vazio e monta o
+dela; a página pública, essa sim, mostra tudo — é lá que a cliente escolhe, e
+ela não sabe de carteira nenhuma. Na agenda da dona os turnos alugados aparecem como
 ocupação ("Salão · Manhã · Ana Ribeiro · pago"), nunca como atendimento.
 
 Como as salas são físicas e compartilhadas, o motor de conflitos continua
 enxergando tudo: uma agenda invisível segue ocupando o espaço, e a mensagem de
 conflito que volta é genérica, sem nome de profissional nem de cliente.
+
+---
+
+## Cobrança da mensalidade (Asaas)
+
+A mensalidade do SaaS é cobrada pelo **Asaas**, por PIX, boleto ou cartão. O
+desenho é de espelho, não de fonte: quem decide se uma cobrança foi paga é o
+Asaas, e o webhook traz essa decisão para cá. A cópia local existe para o painel
+mostrar histórico e segunda via sem depender da API deles a cada tela.
+
+```
+ASAAS_API_KEY=...          # sem ela a cobrança fica desligada
+ASAAS_ENV=sandbox          # ou production
+ASAAS_WEBHOOK_TOKEN=...    # obrigatório em produção
+BILLING_GRACE_DAYS=5
+```
+
+No painel do Asaas, cadastre o webhook apontando para
+`https://sua-api/api/v1/webhooks/asaas` com esse mesmo token. Ele chega no
+header `asaas-access-token`; sem conferir, qualquer um poderia postar
+"pagamento confirmado" e liberar o sistema de graça.
+
+### Quando o painel tranca
+
+A avaliação é **preguiçosa** — acontece na requisição, lendo as datas da
+assinatura. Não depende de job, de Redis nem de cron: numa instalação sem fila
+o trial vence do mesmo jeito.
+
+| Situação | O que acontece |
+|---|---|
+| Trial correndo | tudo liberado; a tela avisa quantos dias faltam |
+| Trial vencido | **escrita bloqueada** (402), leitura continua |
+| Vencida, dentro da tolerância | liberado, com aviso da data do bloqueio |
+| Vencida além da tolerância | escrita bloqueada |
+| **Sem `ASAAS_API_KEY`** | **nunca bloqueia** |
+
+Duas decisões que valem explicar. A primeira: **sem gateway não se tranca
+ninguém** — não haveria como pagar para destravar, e é o caso do
+desenvolvimento e de quem roda por conta própria. A segunda: o que trava é
+**escrever**; a agenda do dia continua abrindo, para ninguém deixar cliente na
+porta por causa de um boleto. E as rotas de `/billing`, `/company` e `/auth`
+ficam sempre de pé — trancar a tela de pagar seria exigir o pagamento e
+esconder onde pagar.
+
+Uma assinatura `ACTIVE` com período vencido também bloqueia: acontece quando o
+webhook não chegou, e a data manda mais que o rótulo — senão uma entrega falha
+viraria mês grátis.
+
+## Senha e e-mail
+
+- **Trocar a senha**: *Configurações › Minha conta*. As sessões dos outros
+  aparelhos caem junto.
+- **Esqueci minha senha**: link na tela de login. A resposta é a mesma para
+  e-mail com e sem conta — se variasse, a rota viraria um verificador de quem
+  tem cadastro aqui. O token vale 1 hora, serve uma vez só, e o banco guarda
+  apenas o hash dele.
+- **Envio**: SMTP via `SMTP_HOST`. Sem isso o e-mail é registrado no log — em
+  desenvolvimento o link de redefinição aparece no terminal. Em produção, SMTP
+  ausente sai como `error`, não como aviso.
 
 ---
 
@@ -168,27 +232,34 @@ cd backend && npm run test:e2e
 ```
 
 Reseta o banco, recria o seed e roda as duas suítes end-to-end contra a API
-(**141 verificações**):
+(**166 verificações**):
 
-**`test:smoke` (52)** — autenticação e rotação de refresh token, **isolamento entre
+**`test:smoke` (68)** — autenticação e rotação de refresh token, **isolamento entre
 empresas**, feature flags de módulos, prevenção de conflitos de agenda, finalização
 de atendimento gerando receita e comissão, dashboards, aluguéis, permissões por
 papel, painel do super admin e o **plano decidindo os módulos**: a clínica no Pro
 não recebe aluguel nem no menu, nem no dashboard, nem na API; o espaço no Premium
 recebe; e uma empresa nova nasce só com o básico, sem destravar aluguel nem
-quando responde que aluga — o wizard devolve o que ficou fora do plano.
+quando responde que aluga — o wizard devolve o que ficou fora do plano. Fecha
+com **senha e cobrança**: a troca de senha derruba a senha antiga, "esqueci
+minha senha" responde igual para e-mail com e sem conta, o link do e-mail
+redefine uma vez só, e a tela de cobrança traz os preços certos, recusa assinar
+sem gateway com erro claro em vez de 500 e **não tranca ninguém** quando não há
+como pagar.
 
-**`test:shared-space` (89)** — turnos e preços, reserva sem sobreposição, **página
+**`test:shared-space` (98)** — turnos e preços, reserva sem sobreposição, **página
 pública sem login**, "profissional do dia" saindo do aluguel, agendamento pelo link,
 **caixa separado** (receita da locatária não entra no da empresa), sala alugada
 protegendo a agenda, **link individual de cada profissional**, painel restrito da
 locatária e a **parede entre carteiras**:
-a dona não vê as clientes nem os agendamentos de quem aluga (nem pelo id direto),
-uma locatária não vê a outra, e ninguém escreve na agenda alheia — inclusive a
+a dona não vê as clientes, os agendamentos nem **o catálogo e os preços** de
+quem aluga (nem pelo id direto), uma locatária não vê a outra — mas o link
+público mostra o catálogo inteiro do espaço —, e ninguém escreve na agenda alheia — inclusive a
 guarda de exclusão, que conta histórico fora do recorte para nunca apagar de
 verdade uma profissional que tem agenda ou turnos. Fecha percorrendo o
 **cadastro de uma locatária nova do zero** (profissional → acesso vinculado →
-primeiro login → carteira vazia → link público no ar) e os **formatos reais de
+primeiro login → carteira e catálogo vazios → ela cria o próprio serviço →
+link público no ar com ele) e os **formatos reais de
 locação**: a semana toda, o mês inteiro em dias fixos, dois turnos no mesmo dia,
 período repetido sem duplicar e período invertido recusado. Fecha com o que a
 vida real cobra: **a cliente remarca e cancela sozinha** pelo link que recebeu,

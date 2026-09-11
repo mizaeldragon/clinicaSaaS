@@ -55,7 +55,15 @@ const CREATE_OPERATIONS = new Set(['create', 'createMany']);
  * (`ownerProfessionalId = null`) ou de uma locatária. A locadora enxerga apenas
  * a carteira da casa; cada locatária, apenas a sua.
  */
-const PORTFOLIO_MODELS = new Set<string>(['Customer', 'Appointment', 'FinancialTransaction']);
+const PORTFOLIO_MODELS = new Set<string>([
+  'Customer',
+  'Appointment',
+  'FinancialTransaction',
+  // O catálogo também: o preço que a locatária cobra é informação do negócio
+  // dela. A casa e as outras locatárias não precisam ver — e, numa casa onde
+  // todas disputam a mesma cliente, não deveriam.
+  'Service',
+]);
 
 function mergeWhere(where: unknown, companyId: string): Record<string, unknown> {
   const current = (where ?? {}) as Record<string, unknown>;
@@ -95,17 +103,41 @@ const STALE_PLAN_CODE = '0A000';
 /**
  * Repete uma consulta bruta quando o plano em cache ficou velho.
  *
- * O erro descarta o plano ao acontecer, então a segunda tentativa passa. Vale
- * só para o `$queryRaw`: as operações de modelo não sofrem porque o Prisma as
- * remonta a cada chamada, e o extension não intercepta consultas brutas.
+ * O cache é por conexão, e o pool tem várias — repetir na mesma chamada pode
+ * cair numa conexão ainda obsoleta, e foi o que acontecia: a primeira tentativa
+ * consertava uma conexão e a seguinte tropeçava na próxima. Em vez de tentar
+ * uma por uma, derrubamos o pool inteiro na primeira falha: as conexões novas
+ * nascem sem plano nenhum.
+ *
+ * Isto acontece uma vez depois de cada migração que muda tipos, e nunca mais.
+ * Sem isso, a primeira requisição após um deploy com migração devolve 500 para
+ * quem estiver online.
+ *
+ * Vale só para o `$queryRaw`: as operações de modelo não sofrem porque o Prisma
+ * as remonta a cada chamada, e o extension não intercepta consultas brutas.
  */
+const STALE_PLAN_ATTEMPTS = 6;
+
 export async function withStalePlanRetry<T>(run: () => Promise<T>): Promise<T> {
-  try {
-    return await run();
-  } catch (error) {
-    if (!isStalePlan(error)) throw error;
-    return run();
+  let last: unknown;
+
+  for (let attempt = 0; attempt < STALE_PLAN_ATTEMPTS; attempt += 1) {
+    try {
+      return await run();
+    } catch (error) {
+      if (!isStalePlan(error)) throw error;
+      last = error;
+
+      // Devolver as conexões não basta sozinho: esta consulta costuma ser uma
+      // das várias de um `Promise.all`, e o disconnect não fecha o que as
+      // irmãs ainda seguram. Por isso esperamos um pouco mais a cada rodada —
+      // é o tempo de elas terminarem e o pool renascer limpo.
+      await prisma.$disconnect().catch(() => undefined);
+      await new Promise((resolve) => setTimeout(resolve, 100 * (attempt + 1)));
+    }
   }
+
+  throw last;
 }
 
 function isStalePlan(error: unknown): boolean {

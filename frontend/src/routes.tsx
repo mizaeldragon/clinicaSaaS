@@ -5,6 +5,8 @@ import { ProtectedRoute, ModuleRoute, SuperAdminRoute } from '@/components/layou
 
 import { LoginPage } from '@/features/auth/LoginPage';
 import { RegisterPage } from '@/features/auth/RegisterPage';
+import { ForgotPasswordPage } from '@/features/auth/ForgotPasswordPage';
+import { ResetPasswordPage } from '@/features/auth/ResetPasswordPage';
 import { OnboardingPage } from '@/features/onboarding/OnboardingPage';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { AgendaPage } from '@/features/agenda/AgendaPage';
@@ -35,6 +37,9 @@ export function AppRoutes() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/cadastro" element={<RegisterPage />} />
+      <Route path="/esqueci-a-senha" element={<ForgotPasswordPage />} />
+      {/* O endereço que vai no e-mail: /redefinir-senha?token=... */}
+      <Route path="/redefinir-senha" element={<ResetPasswordPage />} />
 
       {/* Página pública de agendamento — sem login */}
       <Route path="/e/:slug" element={<PublicBookingPage />} />

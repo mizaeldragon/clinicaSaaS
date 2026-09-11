@@ -23,6 +23,7 @@ export interface CompanyContext {
   } | null;
   subscriptionStatus: string | null;
   trialEndsAt: Date | null;
+  currentPeriodEnd: Date | null;
 }
 
 const CACHE_TTL_MS = 30_000;
@@ -71,6 +72,7 @@ export async function getCompanyContext(companyId: string): Promise<CompanyConte
       : null,
     subscriptionStatus: company.subscription?.status ?? null,
     trialEndsAt: company.subscription?.trialEndsAt ?? null,
+    currentPeriodEnd: company.subscription?.currentPeriodEnd ?? null,
   };
 
   cache.set(companyId, { value, expiresAt: Date.now() + CACHE_TTL_MS });

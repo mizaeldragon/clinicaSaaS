@@ -112,6 +112,14 @@ export function LoginPage() {
               {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
             </button>
           </div>
+          <div className="flex justify-end">
+            <Link
+              to="/esqueci-a-senha"
+              className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+            >
+              Esqueci minha senha
+            </Link>
+          </div>
         </div>
 
         {needsCompany ? (

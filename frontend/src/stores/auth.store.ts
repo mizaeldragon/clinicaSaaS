@@ -14,6 +14,7 @@ interface AuthState {
   login: (email: string, password: string, companySlug?: string) => Promise<void>;
   register: (payload: RegisterPayload) => Promise<void>;
   logout: () => Promise<void>;
+  logoutAll: () => Promise<void>;
   refreshContext: () => Promise<void>;
   setSession: (data: AuthResponse) => void;
   hasModule: (module: ModuleKey) => boolean;
@@ -64,6 +65,16 @@ export const useAuthStore = create<AuthState>()(
         if (refreshToken) {
           await api.public.post('/auth/logout', { refreshToken }).catch(() => undefined);
         }
+        set({ accessToken: null, refreshToken: null, user: null, company: null });
+        resetBrandColor();
+      },
+
+      /**
+       * Derruba as sessões de todos os aparelhos, inclusive este. O servidor
+       * revoga os refresh tokens; aqui só resta limpar o estado local.
+       */
+      logoutAll: async () => {
+        await api.post('/auth/logout-all', {}).catch(() => undefined);
         set({ accessToken: null, refreshToken: null, user: null, company: null });
         resetBrandColor();
       },

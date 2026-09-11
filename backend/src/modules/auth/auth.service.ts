@@ -20,7 +20,18 @@ import { uniqueSlug } from '../../shared/utils/slug';
 import { env } from '../../config/env';
 import { CORE_MODULES, DEFAULT_BUSINESS_HOURS } from '../companies/company.constants';
 import { getCompanyContext, invalidateCompanyContext } from '../../shared/services/companyContext.service';
-import type { ChangePasswordDTO, LoginDTO, RegisterCompanyDTO } from './auth.schema';
+import { mailer } from '../../shared/services/mailer.service';
+import { logger } from '../../shared/utils/logger';
+import type {
+  ChangePasswordDTO,
+  ForgotPasswordDTO,
+  LoginDTO,
+  RegisterCompanyDTO,
+  ResetPasswordDTO,
+} from './auth.schema';
+
+/** 1 hora: tempo de ler o e-mail, curto o bastante para não virar chave. */
+const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000;
 
 interface SessionMeta {
   userAgent?: string | null;
@@ -64,6 +75,10 @@ function permissionsFor(
     );
     own.add(PERMISSIONS.appointmentsManage);
     own.add(PERMISSIONS.customersManage);
+    // Catálogo próprio: quem cobra da própria cliente define o que cobra. O
+    // recorte de carteira garante que ela só mexa no catálogo dela.
+    own.add(PERMISSIONS.servicesView);
+    own.add(PERMISSIONS.servicesManage);
     // Caixa próprio: o recorte de carteira garante que ela só alcance o dela.
     own.add(PERMISSIONS.financialView);
     own.add(PERMISSIONS.financialManage);
@@ -319,6 +334,94 @@ export const authService = {
         where: { userId, revokedAt: null },
         data: { revokedAt: new Date() },
       });
+    });
+  },
+
+  /**
+   * Pede o link de redefinição.
+   *
+   * Responde igual para e-mail que existe e para e-mail que não existe. Se
+   * variasse, esta rota viraria um verificador de contas: bastaria enumerar
+   * endereços e ver qual responde diferente.
+   *
+   * Um e-mail pode ter conta em mais de uma empresa (o login desempata pelo
+   * slug). Aqui mandamos um link por conta — cada um redefine a senha de uma.
+   */
+  async forgotPassword(dto: ForgotPasswordDTO): Promise<void> {
+    const users = await tenantContext.runAsSystem(() =>
+      prisma.user.findMany({
+        where: { email: dto.email, isActive: true },
+        include: { company: { select: { name: true } } },
+      }),
+    );
+
+    for (const user of users) {
+      // Reaproveita o gerador do refresh token (48 bytes aleatórios), mas com
+      // validade própria — uma hora, não trinta dias.
+      const { token, tokenHash } = generateRefreshToken();
+      const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MS);
+
+      await tenantContext.runAsSystem(async () => {
+        // Um pedido novo invalida os anteriores: dois links válidos ao mesmo
+        // tempo dobram a janela de quem interceptar o e-mail.
+        await prisma.passwordReset.updateMany({
+          where: { userId: user.id, usedAt: null },
+          data: { usedAt: new Date() },
+        });
+        await prisma.passwordReset.create({
+          data: { userId: user.id, tokenHash, expiresAt },
+        });
+      });
+
+      const link = `${env.APP_URL}/redefinir-senha?token=${token}`;
+      const onde = user.company ? ` em ${user.company.name}` : '';
+
+      await mailer.send({
+        to: user.email,
+        subject: 'Redefinir sua senha — Belezza',
+        text:
+          `Olá, ${user.name}.
+
+` +
+          `Recebemos um pedido para redefinir a senha da sua conta${onde}. ` +
+          `O link vale por 1 hora e só pode ser usado uma vez.
+
+` +
+          `Se não foi você quem pediu, ignore este e-mail — sua senha continua a mesma.`,
+        action: { label: 'Criar nova senha', url: link },
+      });
+    }
+
+    if (!users.length) {
+      logger.info({ email: dto.email }, 'Pedido de redefinição para e-mail sem conta');
+    }
+  },
+
+  /** Consome o token e troca a senha. Todas as sessões antigas caem junto. */
+  async resetPassword(dto: ResetPasswordDTO): Promise<void> {
+    await tenantContext.runAsSystem(async () => {
+      const reset = await prisma.passwordReset.findUnique({
+        where: { tokenHash: hashRefreshToken(dto.token) },
+        include: { user: true },
+      });
+
+      if (!reset || reset.usedAt || reset.expiresAt <= new Date()) {
+        throw new BadRequestError('Este link expirou ou já foi usado. Peça outro.');
+      }
+
+      await prisma.$transaction([
+        prisma.user.update({
+          where: { id: reset.userId },
+          data: { passwordHash: await hashPassword(dto.newPassword) },
+        }),
+        prisma.passwordReset.update({ where: { id: reset.id }, data: { usedAt: new Date() } }),
+        // Quem redefine a senha costuma estar reagindo a um acesso indevido.
+        // Derrubar as sessões abertas é parte do conserto.
+        prisma.refreshToken.updateMany({
+          where: { userId: reset.userId, revokedAt: null },
+          data: { revokedAt: new Date() },
+        }),
+      ]);
     });
   },
 

@@ -51,6 +51,18 @@ export const authController = {
     res.status(204).send();
   },
 
+  async forgotPassword(req: Request, res: Response) {
+    await authService.forgotPassword(req.body);
+    // 204 sempre — ver auth.service.forgotPassword: a resposta não pode
+    // revelar se o e-mail tem conta.
+    res.status(204).send();
+  },
+
+  async resetPassword(req: Request, res: Response) {
+    await authService.resetPassword(req.body);
+    res.status(204).send();
+  },
+
   async me(req: Request, res: Response) {
     if (!req.user) throw new UnauthorizedError();
     const context = await authService.context(req.user.id);

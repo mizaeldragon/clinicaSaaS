@@ -26,6 +26,7 @@ import type {
   Service,
   ServiceCategory,
 } from '@/types';
+import type { BillingOverview, BillingType } from '@/types';
 
 export const keys = {
   dashboard: ['dashboard'] as const,
@@ -1128,4 +1129,83 @@ export function useBookingMutations() {
       onError: handleError,
     }),
   };
+}
+
+// ===========================================================================
+//  Cobrança da mensalidade
+// ===========================================================================
+
+export function useBilling(enabled = true) {
+  return useQuery({
+    queryKey: ['billing'],
+    queryFn: () => api.get<BillingOverview>('/billing'),
+    enabled,
+  });
+}
+
+export function useBillingMutations() {
+  const qc = useQueryClient();
+  // A cobrança muda o que o painel libera, então o contexto da empresa
+  // precisa ser relido junto — senão a tela continua trancada depois de pagar.
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['billing'] });
+    qc.invalidateQueries({ queryKey: ['subscription'] });
+    qc.invalidateQueries({ queryKey: ['me'] });
+  };
+
+  return {
+    subscribe: useMutation({
+      mutationFn: (body: { planSlug?: string; billingType: BillingType }) =>
+        api.post<BillingOverview>('/billing/subscribe', body),
+      onSuccess: () => {
+        toast.success('Assinatura criada. A cobrança já está disponível abaixo.');
+        invalidate();
+      },
+      onError: handleError,
+    }),
+    sync: useMutation({
+      mutationFn: () => api.post<BillingOverview>('/billing/sync', {}),
+      onSuccess: () => {
+        toast.success('Cobranças atualizadas');
+        invalidate();
+      },
+      onError: handleError,
+    }),
+    cancel: useMutation({
+      mutationFn: () => api.post<BillingOverview>('/billing/cancel', {}),
+      onSuccess: () => {
+        toast.success('Assinatura cancelada');
+        invalidate();
+      },
+      onError: handleError,
+    }),
+  };
+}
+
+// ===========================================================================
+//  Senha
+// ===========================================================================
+
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: (body: { currentPassword: string; newPassword: string }) =>
+      api.post('/auth/change-password', body),
+    onSuccess: () => toast.success('Senha alterada. As outras sessões foram encerradas.'),
+    onError: handleError,
+  });
+}
+
+export function useForgotPassword() {
+  return useMutation({
+    mutationFn: (body: { email: string }) => api.post('/auth/forgot-password', body),
+    onError: handleError,
+  });
+}
+
+export function useResetPassword() {
+  return useMutation({
+    mutationFn: (body: { token: string; newPassword: string }) =>
+      api.post('/auth/reset-password', body),
+    onError: handleError,
+  });
 }

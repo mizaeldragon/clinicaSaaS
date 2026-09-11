@@ -1,4 +1,19 @@
+import 'dotenv/config';
+import crypto from 'node:crypto';
+import { PrismaClient } from '@prisma/client';
+
 const BASE = 'http://localhost:3333/api/v1';
+
+/**
+ * Acesso direto ao banco para montar cenários que a API não expõe de
+ * propósito: o token de redefinição só existe dentro do e-mail, e o
+ * vencimento do trial é uma data no passado que nenhuma rota deixa escrever.
+ */
+const db = new PrismaClient();
+
+/** O mesmo hash que o servidor guarda — é assim que o token do e-mail confere. */
+const hashToken = (token) =>
+  crypto.createHmac('sha256', process.env.REFRESH_TOKEN_SECRET).update(token).digest('hex');
 let pass = 0;
 let fail = 0;
 
@@ -403,6 +418,144 @@ const run = async () => {
     body: { refreshToken: bella.refreshToken },
   });
   check('refresh token antigo é revogado (rotação)', reused.status === 401);
+
+  console.log('\n=== 12. Senha ===');
+
+  const NOVA = 'marcia@99887';
+  const troca = await api('/auth/change-password', {
+    method: 'POST',
+    token: marcia.accessToken,
+    body: { currentPassword: 'marcia@12345', newPassword: NOVA },
+  });
+  check('troca a própria senha', troca.status === 204, String(troca.status));
+
+  const senhaVelha = await api('/auth/login', {
+    method: 'POST',
+    body: { email: 'marcia@marciavaz.com.br', password: 'marcia@12345' },
+  });
+  check('a senha antiga para de valer', senhaVelha.status === 401, String(senhaVelha.status));
+
+  const senhaNova = await api('/auth/login', {
+    method: 'POST',
+    body: { email: 'marcia@marciavaz.com.br', password: NOVA },
+  });
+  check('a nova senha entra', senhaNova.status === 200, String(senhaNova.status));
+
+  // Esqueci a senha: a resposta é a mesma para conta que existe e que não
+  // existe, senão a rota viraria um verificador de e-mails cadastrados.
+  const pedido = await api('/auth/forgot-password', {
+    method: 'POST',
+    body: { email: 'marcia@marciavaz.com.br' },
+  });
+  const pedidoFantasma = await api('/auth/forgot-password', {
+    method: 'POST',
+    body: { email: 'nao-existe-mesmo@exemplo.com' },
+  });
+  check(
+    'esqueci a senha responde igual para e-mail com e sem conta',
+    pedido.status === 204 && pedidoFantasma.status === 204,
+    JSON.stringify({ com: pedido.status, sem: pedidoFantasma.status }),
+  );
+
+  const reciboInvalido = await api('/auth/reset-password', {
+    method: 'POST',
+    body: { token: 'x'.repeat(96), newPassword: 'qualquer@123' },
+  });
+  check('token inventado não redefine nada', reciboInvalido.status === 400);
+
+  // O token só viaja dentro do e-mail, então aqui gravamos um que conhecemos —
+  // exatamente como o servidor teria gravado ao enviar a mensagem.
+  const marciaUser = await db.user.findFirstOrThrow({
+    where: { email: 'marcia@marciavaz.com.br' },
+  });
+  const tokenDoEmail = crypto.randomBytes(48).toString('hex');
+  await db.passwordReset.create({
+    data: {
+      userId: marciaUser.id,
+      tokenHash: hashToken(tokenDoEmail),
+      expiresAt: new Date(Date.now() + 3600_000),
+    },
+  });
+
+  const redefine = await api('/auth/reset-password', {
+    method: 'POST',
+    body: { token: tokenDoEmail, newPassword: 'marcia@12345' },
+  });
+  check('o link do e-mail redefine a senha', redefine.status === 204, JSON.stringify(redefine.data));
+
+  const reuso = await api('/auth/reset-password', {
+    method: 'POST',
+    body: { token: tokenDoEmail, newPassword: 'outra@12345' },
+  });
+  check('e o mesmo link não serve duas vezes', reuso.status === 400);
+
+  const voltou = await api('/auth/login', {
+    method: 'POST',
+    body: { email: 'marcia@marciavaz.com.br', password: 'marcia@12345' },
+  });
+  check('a senha redefinida vale no login', voltou.status === 200, String(voltou.status));
+
+  const marciaDeVolta = voltou.data;
+
+  console.log('\n=== 13. Cobrança da mensalidade ===');
+
+  const cobranca = await api('/billing', { token: marciaDeVolta.accessToken });
+  check(
+    'a tela de cobrança abre',
+    cobranca.status === 200 && cobranca.data.plan.slug === 'premium',
+    JSON.stringify(cobranca.data?.plan),
+  );
+  check(
+    'e diz que o gateway não está configurado nesta instalação',
+    cobranca.data.gateway.enabled === false,
+  );
+  check(
+    'o plano Premium custa R$ 450',
+    Number(cobranca.data.plan.price) === 450,
+    String(cobranca.data?.plan?.price),
+  );
+
+  const proPlan = (await api('/auth/plans')).data.find((p) => p.slug === 'pro');
+  check('e o Pro, R$ 300', Number(proPlan.price) === 300, String(proPlan?.price));
+
+  const assina = await api('/billing/subscribe', {
+    method: 'POST',
+    token: marciaDeVolta.accessToken,
+    body: { billingType: 'PIX' },
+  });
+  check(
+    'assinar sem gateway devolve erro claro, não 500',
+    assina.status === 503 && assina.data.error.code === 'BILLING_NOT_CONFIGURED',
+    JSON.stringify(assina.data),
+  );
+
+  const recepcaoBilling = await login('recepcao@clinicabella.com', 'bella@12345');
+  const cobrancaNegada = await api('/billing', { token: recepcaoBilling.accessToken });
+  check('recepcionista não vê a cobrança da empresa', cobrancaNegada.status === 403);
+
+  // Trial vencido numa instalação sem gateway: ninguém é trancado, porque não
+  // haveria como pagar para destravar.
+  await db.subscription.update({
+    where: { companyId: marciaDeVolta.company.id },
+    data: { trialEndsAt: new Date(Date.now() - 86_400_000), status: 'TRIALING' },
+  });
+
+  const aindaEscreve = await api('/customers', {
+    method: 'POST',
+    token: marciaDeVolta.accessToken,
+    body: { name: 'Teste Pós-Trial' },
+  });
+  check(
+    'trial vencido não tranca quando não há como pagar',
+    aindaEscreve.status === 201,
+    JSON.stringify(aindaEscreve.data),
+  );
+  check(
+    'e a tela de cobrança concorda que o acesso está liberado',
+    (await api('/billing', { token: marciaDeVolta.accessToken })).data.access.kind === 'ok',
+  );
+
+  await db.$disconnect();
 
   console.log(`\n──────────────────────────────\n  ${pass} passaram · ${fail} falharam\n`);
   process.exit(fail > 0 ? 1 : 0);

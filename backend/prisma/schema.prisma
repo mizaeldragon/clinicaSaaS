@@ -276,14 +276,80 @@ model Subscription {
   currentPeriodStart DateTime           @default(now())
   currentPeriodEnd   DateTime?
   canceledAt         DateTime?
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  plan    Plan    @relation(fields: [planId], references: [id])
+  /// Espelho da assinatura no Asaas. Nulo enquanto a empresa só experimenta.
+  asaasCustomerId     String?
+  asaasSubscriptionId String?      @unique
+  billingType         BillingType?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company  Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  plan     Plan                  @relation(fields: [planId], references: [id])
+  payments SubscriptionPayment[]
 
   @@index([status])
   @@map("subscriptions")
+}
+
+/// Como a empresa paga a mensalidade do SaaS.
+enum BillingType {
+  BOLETO
+  PIX
+  CREDIT_CARD
+}
+
+/// O ciclo de vida de uma cobrança no Asaas, espelhado pelo webhook.
+enum SubscriptionPaymentStatus {
+  PENDING
+  CONFIRMED
+  RECEIVED
+  OVERDUE
+  REFUNDED
+  CANCELED
+}
+
+/// Uma mensalidade. O Asaas é a fonte da verdade; esta tabela é o espelho que
+/// deixa o painel mostrar histórico e a segunda via sem depender da API deles.
+model SubscriptionPayment {
+  id             String                    @id @default(uuid())
+  subscriptionId String
+  companyId      String
+  asaasPaymentId String                    @unique
+  status         SubscriptionPaymentStatus @default(PENDING)
+  billingType    BillingType
+  value          Decimal                   @db.Decimal(10, 2)
+  dueDate        DateTime                  @db.Date
+  paidAt         DateTime?
+  /// Links que o Asaas devolve: fatura, boleto e o copia-e-cola do PIX.
+  invoiceUrl     String?
+  bankSlipUrl    String?
+  pixPayload     String?
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, dueDate])
+  @@index([status])
+  @@map("subscription_payments")
+}
+
+/// Pedido de redefinição de senha. Guardamos o hash do token — quem ler o banco
+/// não consegue redefinir a senha de ninguém.
+model PasswordReset {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_resets")
 }
 
 model CompanyModule {
@@ -349,11 +415,12 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  company       Company?       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  professional  Professional?
-  refreshTokens RefreshToken[]
-  auditLogs     AuditLog[]
-  notifications Notification[]
+  company        Company?        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  professional   Professional?
+  refreshTokens  RefreshToken[]
+  auditLogs      AuditLog[]
+  notifications  Notification[]
+  passwordResets PasswordReset[]
 
   @@unique([companyId, email])
   @@index([email])
@@ -396,8 +463,8 @@ model Customer {
   /// A locadora não enxerga a carteira de quem aluga o espaço dela.
   ownerProfessionalId String?
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   company           Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
   ownerProfessional Professional?          @relation("CustomerPortfolio", fields: [ownerProfessionalId], references: [id], onDelete: SetNull)
@@ -437,19 +504,20 @@ model Professional {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company        Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  user           User?                 @relation(fields: [userId], references: [id], onDelete: SetNull)
-  workingHours   WorkingHour[]
-  timeOffs       TimeOff[]
-  services       ProfessionalService[]
-  appointments   Appointment[]
-  commissions    Commission[]
-  rentals        Rental[]
-  rentalBookings RentalBooking[]
+  company           Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user              User?                  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  workingHours      WorkingHour[]
+  timeOffs          TimeOff[]
+  services          ProfessionalService[]
+  appointments      Appointment[]
+  commissions       Commission[]
+  rentals           Rental[]
+  rentalBookings    RentalBooking[]
   /// Carteira própria (quando locatária): clientes e atendimentos que são dela.
   ownedCustomers    Customer[]             @relation("CustomerPortfolio")
   ownedAppointments Appointment[]          @relation("AppointmentPortfolio")
   ownedTransactions FinancialTransaction[] @relation("FinancialPortfolio")
+  ownedServices     Service[]              @relation("ServicePortfolio")
 
   @@unique([companyId, publicSlug])
   @@index([companyId, isActive])
@@ -520,8 +588,13 @@ model Service {
   commissionValue    Decimal?        @db.Decimal(10, 2)
   resourceCategoryId String?
   isActive           Boolean         @default(true)
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
+
+  /// Carteira dona do serviço. Nulo = catálogo da casa; preenchido = da
+  /// locatária, e some do catálogo da casa e das outras locatárias.
+  ownerProfessionalId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   company             Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
   category            ServiceCategory?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
@@ -529,9 +602,11 @@ model Service {
   professionals       ProfessionalService[]
   appointmentServices AppointmentService[]
   commissions         Commission[]
+  ownerProfessional   Professional?         @relation("ServicePortfolio", fields: [ownerProfessionalId], references: [id], onDelete: SetNull)
 
   @@index([companyId, isActive])
   @@index([companyId, categoryId])
+  @@index([companyId, ownerProfessionalId])
   @@map("services")
 }
 
@@ -554,42 +629,42 @@ model ProfessionalService {
 }
 
 model Appointment {
-  id              String            @id @default(uuid())
-  companyId       String
-  customerId      String
-  professionalId  String?
-  roomId          String?
-  resourceId      String?
-  startsAt        DateTime
-  endsAt          DateTime
-  durationMinutes Int
-  status          AppointmentStatus @default(SCHEDULED)
-  totalPrice      Decimal           @default(0) @db.Decimal(10, 2)
-  notes           String?
-  canceledReason  String?
-  canceledAt      DateTime?
-  completedAt     DateTime?
+  id                  String            @id @default(uuid())
+  companyId           String
+  customerId          String
+  professionalId      String?
+  roomId              String?
+  resourceId          String?
+  startsAt            DateTime
+  endsAt              DateTime
+  durationMinutes     Int
+  status              AppointmentStatus @default(SCHEDULED)
+  totalPrice          Decimal           @default(0) @db.Decimal(10, 2)
+  notes               String?
+  canceledReason      String?
+  canceledAt          DateTime?
+  completedAt         DateTime?
   /// INTERNAL quando criado no painel, PUBLIC quando veio da página de agendamento.
-  source          AppointmentSource @default(INTERNAL)
+  source              AppointmentSource @default(INTERNAL)
   /// Chave secreta do link que a cliente recebe para consultar, remarcar ou
   /// cancelar o próprio horário sem ter conta no sistema.
-  publicToken     String?           @unique
+  publicToken         String?           @unique
   /// Carteira: null = atendimento da casa; preenchido = atendimento de uma
   /// locatária (não entra no caixa nem na agenda da locadora).
   ownerProfessionalId String?
-  createdById     String?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  createdById         String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
 
-  company           Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  customer          Customer      @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  professional      Professional? @relation(fields: [professionalId], references: [id], onDelete: SetNull)
-  ownerProfessional Professional? @relation("AppointmentPortfolio", fields: [ownerProfessionalId], references: [id], onDelete: SetNull)
-  room         Resource?              @relation("AppointmentRoom", fields: [roomId], references: [id], onDelete: SetNull)
-  resource     Resource?              @relation("AppointmentResource", fields: [resourceId], references: [id], onDelete: SetNull)
-  services     AppointmentService[]
-  transactions FinancialTransaction[]
-  commissions  Commission[]
+  company           Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer          Customer               @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  professional      Professional?          @relation(fields: [professionalId], references: [id], onDelete: SetNull)
+  ownerProfessional Professional?          @relation("AppointmentPortfolio", fields: [ownerProfessionalId], references: [id], onDelete: SetNull)
+  room              Resource?              @relation("AppointmentRoom", fields: [roomId], references: [id], onDelete: SetNull)
+  resource          Resource?              @relation("AppointmentResource", fields: [resourceId], references: [id], onDelete: SetNull)
+  services          AppointmentService[]
+  transactions      FinancialTransaction[]
+  commissions       Commission[]
 
   @@index([companyId, startsAt])
   @@index([companyId, professionalId, startsAt])
@@ -821,37 +896,37 @@ model ExpenseCategory {
 }
 
 model FinancialTransaction {
-  id              String            @id @default(uuid())
-  companyId       String
-  type            TransactionType
-  origin          TransactionOrigin @default(MANUAL)
-  description     String
-  amount          Decimal           @db.Decimal(10, 2)
-  paidAmount      Decimal           @default(0) @db.Decimal(10, 2)
-  paymentMethod   PaymentMethod?
-  paymentStatus   PaymentStatus     @default(PENDING)
-  dueDate         DateTime?
-  paidAt          DateTime?
-  competenceDate  DateTime          @default(now())
-  categoryId      String?
-  customerId      String?
-  appointmentId   String?
-  rentalPaymentId String?
-  rentalBookingId String?
+  id                  String            @id @default(uuid())
+  companyId           String
+  type                TransactionType
+  origin              TransactionOrigin @default(MANUAL)
+  description         String
+  amount              Decimal           @db.Decimal(10, 2)
+  paidAmount          Decimal           @default(0) @db.Decimal(10, 2)
+  paymentMethod       PaymentMethod?
+  paymentStatus       PaymentStatus     @default(PENDING)
+  dueDate             DateTime?
+  paidAt              DateTime?
+  competenceDate      DateTime          @default(now())
+  categoryId          String?
+  customerId          String?
+  appointmentId       String?
+  rentalPaymentId     String?
+  rentalBookingId     String?
   /// Carteira: null = caixa da casa; preenchido = caixa daquela locatária.
   ownerProfessionalId String?
-  notes           String?
-  createdById     String?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  notes               String?
+  createdById         String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
 
-  company       Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  category      ExpenseCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  customer      Customer?        @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  appointment   Appointment?     @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
-  rentalPayment RentalPayment?   @relation(fields: [rentalPaymentId], references: [id], onDelete: SetNull)
-  rentalBooking RentalBooking?   @relation(fields: [rentalBookingId], references: [id], onDelete: SetNull)
-  ownerProfessional Professional? @relation("FinancialPortfolio", fields: [ownerProfessionalId], references: [id], onDelete: SetNull)
+  company           Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  category          ExpenseCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  customer          Customer?        @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  appointment       Appointment?     @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  rentalPayment     RentalPayment?   @relation(fields: [rentalPaymentId], references: [id], onDelete: SetNull)
+  rentalBooking     RentalBooking?   @relation(fields: [rentalBookingId], references: [id], onDelete: SetNull)
+  ownerProfessional Professional?    @relation("FinancialPortfolio", fields: [ownerProfessionalId], references: [id], onDelete: SetNull)
 
   @@index([companyId, ownerProfessionalId, competenceDate])
   @@index([companyId, type, competenceDate])
