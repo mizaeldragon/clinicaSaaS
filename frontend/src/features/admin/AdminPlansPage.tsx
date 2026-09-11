@@ -18,20 +18,8 @@ import {
 import { useAdminMutations, useAdminPlans } from '@/api/queries';
 import { currency } from '@/lib/format';
 import { slugifyLocal } from './slugify';
+import { ALL_MODULES, MODULE_HINTS, MODULE_LABELS, moduleLabel } from '@/lib/modules';
 import type { ModuleKey } from '@/types';
-
-const ALL_MODULES: ModuleKey[] = [
-  'appointments',
-  'customers',
-  'services',
-  'professionals',
-  'financial',
-  'commissions',
-  'resources',
-  'rentals',
-  'reports',
-  'notifications',
-];
 
 const EMPTY = {
   name: '',
@@ -180,7 +168,7 @@ export function AdminPlansPage() {
                       key={module}
                       className="rounded-md bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground"
                     >
-                      {module}
+                      {moduleLabel(module)}
                     </span>
                   ))}
                 </div>
@@ -311,9 +299,10 @@ export function AdminPlansPage() {
                 {ALL_MODULES.map((module) => (
                   <label
                     key={module}
-                    className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                    className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
                   >
                     <Checkbox
+                      className="mt-0.5"
                       checked={modules.includes(module)}
                       onCheckedChange={(checked) =>
                         setModules((prev) =>
@@ -321,7 +310,12 @@ export function AdminPlansPage() {
                         )
                       }
                     />
-                    {module}
+                    <span className="min-w-0">
+                      <span className="block font-medium">{MODULE_LABELS[module]}</span>
+                      <span className="block text-xs text-muted-foreground">
+                        {MODULE_HINTS[module]}
+                      </span>
+                    </span>
                   </label>
                 ))}
               </div>

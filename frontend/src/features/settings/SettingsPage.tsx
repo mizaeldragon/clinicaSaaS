@@ -47,6 +47,7 @@ import { useAuthStore } from '@/stores/auth.store';
 import { toast } from 'sonner';
 import { applyBrandColor } from '@/lib/utils';
 import { ImageUpload } from '@/components/ImageUpload';
+import { moduleLabel } from '@/lib/modules';
 import { HolidaysCard } from './HolidaysCard';
 import { BillingCard } from './BillingCard';
 import { ChangePasswordCard, SessionsCard } from './ChangePasswordCard';
@@ -668,7 +669,7 @@ export function SettingsPage() {
                       {plan.modules.map((module) => (
                         <li key={module} className="flex items-center gap-2">
                           <Check className="size-4 text-primary" />
-                          {module}
+                          {moduleLabel(module)}
                         </li>
                       ))}
                     </ul>

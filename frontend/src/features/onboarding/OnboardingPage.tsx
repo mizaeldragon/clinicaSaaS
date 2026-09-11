@@ -12,6 +12,7 @@ import { Switch } from '@/components/ui/primitives';
 import { MODULE_ICONS } from '@/config/navigation';
 import { cn } from '@/lib/utils';
 import { handleError } from '@/api/queries';
+import { MODULE_LABELS } from '@/lib/modules';
 import type { ModuleKey } from '@/types';
 
 interface Options {
@@ -19,19 +20,6 @@ interface Options {
   services: { key: string; label: string; category: string }[];
   rentalResources: { key: string; label: string }[];
 }
-
-const MODULE_LABELS: Record<ModuleKey, string> = {
-  appointments: 'Agenda',
-  customers: 'Clientes',
-  professionals: 'Profissionais',
-  services: 'Serviços',
-  financial: 'Financeiro',
-  commissions: 'Comissões',
-  resources: 'Salas e Recursos',
-  rentals: 'Aluguel de Espaços',
-  reports: 'Relatórios',
-  notifications: 'Notificações',
-};
 
 const CORE: ModuleKey[] = ['appointments', 'customers', 'services'];
 
