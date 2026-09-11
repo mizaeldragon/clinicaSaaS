@@ -1,5 +1,5 @@
 import { PaymentStatus, Prisma, TransactionOrigin, TransactionType } from '@prisma/client';
-import { prisma, TxClient, withStalePlanRetry } from '../../shared/database/prisma';
+import { prisma, TxClient } from '../../shared/database/prisma';
 import { BadRequestError, NotFoundError } from '../../shared/errors/AppError';
 import { getPagination, paginated } from '../../shared/utils/http';
 import { endOfDay, endOfMonth, startOfDay, startOfMonth } from '../../shared/utils/datetime';
@@ -266,19 +266,15 @@ export const financialService = {
         where: { type: 'EXPENSE', competenceDate: { gte: from, lte: to } },
         _sum: { amount: true },
       }),
-      // A consulta bruta não passa pelo extension: empresa e carteira entram
-      // à mão, senão a locatária veria a série diária do caixa da casa.
-      withStalePlanRetry(
-        async () => prisma.$queryRaw<{ day: Date; type: string; total: Prisma.Decimal }[]>`
-          SELECT date_trunc('day', "competenceDate") AS day, "type", SUM("amount") AS total
-          FROM "financial_transactions"
-          WHERE "companyId" = ${await currentCompanyId()}
-            AND "ownerProfessionalId" IS NOT DISTINCT FROM ${currentPortfolioOwner()}
-            AND "competenceDate" BETWEEN ${from} AND ${to}
-          GROUP BY 1, 2
-          ORDER BY 1 ASC
-        `,
-      ),
+      // A série diária é agrupada aqui, não no banco. Um mês de lançamentos
+      // cabe folgado na memória, e passando pelo Prisma normal a empresa e a
+      // carteira entram sozinhas — na consulta bruta os dois filtros eram
+      // escritos à mão, e esquecer um vazaria o caixa da casa para a locatária.
+      prisma.financialTransaction.findMany({
+        where: { competenceDate: { gte: from, lte: to } },
+        select: { competenceDate: true, type: true, amount: true },
+        orderBy: { competenceDate: 'asc' },
+      }),
     ]);
 
     const categories = await prisma.expenseCategory.findMany();
@@ -315,14 +311,35 @@ export const financialService = {
         name: c.categoryId ? (categoryName.get(c.categoryId) ?? 'Sem categoria') : 'Sem categoria',
         total: num(c._sum.amount),
       })),
-      dailySeries: dailySeries.map((d) => ({
-        day: d.day,
-        type: d.type,
-        total: num(d.total),
-      })),
+      dailySeries: groupByDay(dailySeries),
     };
   },
 };
+
+/**
+ * Soma os lançamentos por dia e tipo, no formato que o gráfico espera.
+ * O dia é truncado em horário local — a série é lida por quem trabalha no
+ * salão, não em UTC.
+ */
+function groupByDay(
+  rows: { competenceDate: Date; type: string; amount: Prisma.Decimal }[],
+): { day: Date; type: string; total: number }[] {
+  const buckets = new Map<string, { day: Date; type: string; total: number }>();
+
+  for (const row of rows) {
+    const day = new Date(
+      row.competenceDate.getFullYear(),
+      row.competenceDate.getMonth(),
+      row.competenceDate.getDate(),
+    );
+    const key = `${day.getTime()}|${row.type}`;
+    const bucket = buckets.get(key) ?? { day, type: row.type, total: 0 };
+    bucket.total += num(row.amount);
+    buckets.set(key, bucket);
+  }
+
+  return [...buckets.values()].sort((a, b) => a.day.getTime() - b.day.getTime());
+}
 
 export const expenseCategoriesService = {
   async list() {
@@ -342,10 +359,3 @@ export const expenseCategoriesService = {
   },
 };
 
-/** O $queryRaw não passa pelo extension: a empresa é injetada manualmente. */
-async function currentCompanyId(): Promise<string> {
-  const { tenantContext } = await import('../../shared/database/tenantContext');
-  const companyId = tenantContext.companyId;
-  if (!companyId) throw new BadRequestError('Contexto de empresa ausente');
-  return companyId;
-}

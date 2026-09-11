@@ -307,6 +307,10 @@ frontend/src/
    `data: { companyId }` em toda escrita das entidades de domínio; sem contexto de
    empresa, a operação é bloqueada em vez de vazar dados.
 
+Não há `$queryRaw` no projeto, e é de propósito: consulta bruta não passa pela
+extension, então empresa e carteira teriam de ser escritas à mão em cada uma —
+esquecer um dos dois filtros vazaria dados entre negócios.
+
 Feature flags (`CompanyModule`) são validados no servidor via `requireModule(...)`.
 O frontend esconde o menu, mas quem decide o acesso é a API.
 
