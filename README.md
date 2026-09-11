@@ -7,6 +7,7 @@ Cada empresa ativa **apenas os módulos de que precisa** — do studio de manicu
 profissional até a clínica com salas, equipe, recepção e aluguel de espaços.
 
 - Arquitetura completa: [docs/ARQUITETURA.md](docs/ARQUITETURA.md)
+- Subir para produção: [docs/DEPLOY.md](docs/DEPLOY.md) — Railway (API + banco) e Vercel (painel)
 
 ---
 

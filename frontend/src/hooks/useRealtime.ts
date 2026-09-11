@@ -7,6 +7,28 @@ import { useAuthStore } from '@/stores/auth.store';
 let socket: Socket | null = null;
 
 /**
+ * Onde o WebSocket se conecta.
+ *
+ * Em desenvolvimento o painel e a API saem da mesma origem, porque o Vite faz
+ * proxy — daí `window.location.origin` bastar. Em produção eles moram em
+ * domínios diferentes (o painel na Vercel, a API no Railway), e apontar para a
+ * própria origem faria o socket bater na Vercel, que não tem WebSocket nenhum.
+ *
+ * Então a origem sai da mesma variável que já configura o REST: de
+ * `https://api.exemplo.com.br/api/v1` fica `https://api.exemplo.com.br`.
+ */
+function socketOrigin(): string {
+  const apiUrl = import.meta.env.VITE_API_URL;
+  if (!apiUrl) return window.location.origin;
+
+  try {
+    return new URL(apiUrl, window.location.origin).origin;
+  } catch {
+    return window.location.origin;
+  }
+}
+
+/**
  * Conecta ao WebSocket e mantém as telas sincronizadas em tempo real:
  * um agendamento criado na recepção aparece na agenda do profissional.
  */
@@ -17,7 +39,7 @@ export function useRealtime() {
   useEffect(() => {
     if (!accessToken) return;
 
-    socket = io(window.location.origin, {
+    socket = io(socketOrigin(), {
       auth: { token: accessToken },
       // Começa por polling e faz upgrade: evita falha quando há proxy no meio.
       transports: ['polling', 'websocket'],

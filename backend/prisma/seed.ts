@@ -1010,7 +1010,24 @@ async function seedSharedSpace() {
 }
 
 
+/**
+ * `npm run seed` popula tudo — é o banco de demonstração, com três empresas e
+ * contas de senha conhecida.
+ *
+ * `npm run seed:plans` cria **apenas os planos**, que é o que a produção
+ * precisa: sem eles o cadastro recusa a primeira empresa ("Nenhum plano
+ * disponível para assinatura"), e não há tela para criá-los antes de existir um
+ * super admin. As contas de demonstração jamais devem ir para produção — elas
+ * são públicas neste repositório.
+ */
 async function main() {
+  if (process.argv.includes('--plans')) {
+    console.log('\n🌱 Criando os planos (modo produção)...\n');
+    await seedPlans();
+    console.log('\n✅ Planos prontos. Nenhuma conta de demonstração foi criada.\n');
+    return;
+  }
+
   console.log('\n🌱 Populando o banco...\n');
   await seedPlans();
   await seedSuperAdmin();
