@@ -15,7 +15,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 224 30% 12%;
 
-    /* Cor principal — sobrescrita em runtime pela cor da empresa */
+    /* Cor principal: sobrescrita em runtime pela cor da empresa */
     --primary: 262 83% 58%;
     --primary-foreground: 0 0% 100%;
 
