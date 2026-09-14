@@ -4,15 +4,19 @@ import { CalendarDays, Link2, Sparkles, Wallet } from 'lucide-react';
 /**
  * Moldura das telas de entrada: login, cadastro, esqueci a senha e redefinir.
  *
- * Segue a mesma linguagem da landing — areia, marinho e vinho — porque quem
- * clica em "Entrar" na vitrine não pode cair noutro produto. Antes daqui a
- * landing era clara e o login, roxo escuro: a troca de identidade no meio do
- * caminho faz a pessoa duvidar de que está no lugar certo, e é justamente onde
- * ela vai digitar a senha.
+ * Segue a mesma linguagem da landing — areia, blush e vinho — porque quem
+ * clica em "Entrar" na vitrine não pode cair noutro produto. Antes daqui o
+ * login era escuro: a troca de identidade no meio do caminho faz a pessoa
+ * duvidar de que está no lugar certo, e é justamente onde ela vai digitar a
+ * senha.
  *
- * A coluna escura repete o bloco de recursos da landing. Sem foto de propósito:
- * a landing carrega as dela de um banco de imagens externo, e aqui uma imagem
- * que não chega deixaria a tela de login parecendo quebrada.
+ * A coluna da esquerda usa o blush da landing, não o marinho do bloco de
+ * recursos: aquele bloco é uma pausa escura no meio de uma página clara, e
+ * sozinho numa tela de login virava a cor principal do produto — com o brilho
+ * rosa por cima, dava roxo. Aqui as duas colunas são claras, como a landing.
+ *
+ * Sem foto de propósito: a landing carrega as dela de um banco de imagens
+ * externo, e aqui uma imagem que não chega deixaria o login parecendo quebrado.
  */
 
 const HIGHLIGHTS = [
@@ -55,15 +59,9 @@ const THEME = {
   '--ring': '347 61% 54%',
 } as CSSProperties;
 
-function Logo({ tone = 'dark' }: { tone?: 'dark' | 'light' }) {
+function Logo() {
   return (
-    <span
-      className={
-        tone === 'dark'
-          ? 'grid size-9 place-items-center rounded-full bg-[#1d2340] text-white'
-          : 'grid size-9 place-items-center rounded-full bg-white/10 text-white backdrop-blur'
-      }
-    >
+    <span className="grid size-9 place-items-center rounded-full bg-[#1d2340] text-white">
       <Sparkles className="size-[17px]" strokeWidth={2.2} />
     </span>
   );
@@ -85,17 +83,22 @@ export function AuthShell({
       style={THEME}
       className="grid min-h-screen bg-[#fffaf8] text-[#1d2340] selection:bg-[#f8ced7] lg:grid-cols-[1fr_1.05fr]"
     >
-      {/* ------------------------------------------------------ coluna escura */}
-      <aside className="relative hidden overflow-hidden bg-[#1d2340] p-12 text-white lg:flex lg:flex-col lg:justify-between">
-        {/* Um brilho vinho bem discreto, só para o marinho não ficar chapado. */}
+      {/* ------------------------------------------------------ coluna blush */}
+      <aside className="relative hidden overflow-hidden border-r border-[#1d2340]/[0.07] bg-[#f6eee9] p-12 text-[#1d2340] lg:flex lg:flex-col lg:justify-between">
+        {/* Dois halos quentes, bem diluídos, para o bege não ficar chapado. */}
         <div
           aria-hidden
-          className="pointer-events-none absolute -right-24 -top-24 size-[420px] rounded-full opacity-25 blur-3xl"
-          style={{ background: 'radial-gradient(circle, #d24362, transparent 65%)' }}
+          className="pointer-events-none absolute -right-28 -top-28 size-[460px] rounded-full opacity-60 blur-3xl"
+          style={{ background: 'radial-gradient(circle, #f2d8d1, transparent 70%)' }}
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -bottom-32 -left-24 size-[420px] rounded-full opacity-50 blur-3xl"
+          style={{ background: 'radial-gradient(circle, #fbe7eb, transparent 70%)' }}
         />
 
         <a href="/" className="relative flex items-center gap-2.5" aria-label="Belezza, início">
-          <Logo tone="light" />
+          <Logo />
           <span className="text-lg font-bold tracking-[-0.04em]">Belezza</span>
         </a>
 
@@ -104,7 +107,7 @@ export function AuthShell({
             <h2 className="text-[2.6rem] font-bold leading-[1.03] tracking-[-0.055em]">
               Seu tempo fica com as clientes.
             </h2>
-            <p className="text-lg leading-relaxed text-white/62">
+            <p className="text-lg leading-relaxed text-[#1d2340]/65">
               A agenda, o caixa e os espaços ficam com o Belezza.
             </p>
           </div>
@@ -112,19 +115,19 @@ export function AuthShell({
           <ul className="space-y-5">
             {HIGHLIGHTS.map((item) => (
               <li key={item.title} className="flex gap-4">
-                <span className="grid size-10 shrink-0 place-items-center rounded-full bg-white/[0.09] text-[#ff9bb1]">
+                <span className="grid size-10 shrink-0 place-items-center rounded-full bg-white text-[#d24362] shadow-sm">
                   <item.icon className="size-[18px]" />
                 </span>
                 <div>
                   <p className="font-bold">{item.title}</p>
-                  <p className="text-sm leading-relaxed text-white/55">{item.text}</p>
+                  <p className="text-sm leading-relaxed text-[#1d2340]/60">{item.text}</p>
                 </div>
               </li>
             ))}
           </ul>
         </div>
 
-        <p className="relative text-xs font-medium text-white/40">
+        <p className="relative text-xs font-medium text-[#1d2340]/45">
           © {new Date().getFullYear()} Belezza · Gestão para espaços de beleza
         </p>
       </aside>
@@ -132,7 +135,7 @@ export function AuthShell({
       {/* ------------------------------------------------------- coluna do form */}
       <div className="flex items-center justify-center px-5 py-12 sm:px-10">
         <div className="w-full max-w-[420px] space-y-8">
-          {/* No celular a coluna escura some, então a marca reaparece aqui. */}
+          {/* No celular a coluna da esquerda some, então a marca reaparece aqui. */}
           <a href="/" className="flex items-center gap-2.5 lg:hidden" aria-label="Belezza, início">
             <Logo />
             <span className="text-lg font-bold tracking-[-0.04em]">Belezza</span>
