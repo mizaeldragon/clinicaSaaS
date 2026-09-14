@@ -3,8 +3,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { ProtectedRoute, ModuleRoute, SuperAdminRoute } from '@/components/layout/guards';
 
-import { LoginPage } from '@/features/auth/LoginPage';
-import { RegisterPage } from '@/features/auth/RegisterPage';
+import { AuthSwitch } from '@/features/auth/AuthSwitch';
 import { ForgotPasswordPage } from '@/features/auth/ForgotPasswordPage';
 import { ResetPasswordPage } from '@/features/auth/ResetPasswordPage';
 import { OnboardingPage } from '@/features/onboarding/OnboardingPage';
@@ -35,8 +34,11 @@ export function AppRoutes() {
     <Routes>
       {/* Vitrine do produto. Quem já está logado cai direto no painel. */}
       <Route path="/" element={<LandingPage />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/cadastro" element={<RegisterPage />} />
+      {/* Uma tela só, com o interruptor entre Entrar e Criar conta. Os dois
+          endereços continuam existindo para o botão voltar e para os links da
+          landing; é o caminho que decide qual metade abre. */}
+      <Route path="/login" element={<AuthSwitch />} />
+      <Route path="/cadastro" element={<AuthSwitch />} />
       <Route path="/esqueci-a-senha" element={<ForgotPasswordPage />} />
       {/* O endereço que vai no e-mail: /redefinir-senha?token=... */}
       <Route path="/redefinir-senha" element={<ResetPasswordPage />} />
