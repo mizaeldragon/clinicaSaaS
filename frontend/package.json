@@ -33,7 +33,7 @@
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.54.0",
     "react-router-dom": "^6.28.0",
-    "recharts": "^2.14.1",
+    "recharts": "^3.10.1",
     "socket.io-client": "^4.8.1",
     "sonner": "^1.7.1",
     "tailwind-merge": "^2.5.5",
