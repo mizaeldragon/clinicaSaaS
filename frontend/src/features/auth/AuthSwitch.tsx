@@ -167,7 +167,7 @@ export function AuthSwitch() {
         {mode === 'login' ? (
           <LoginForm onTwoFactorRequired={setChallenge} onSignedIn={concluir} />
         ) : (
-          <RegisterForm onCreated={() => navigate('/onboarding', { replace: true })} />
+          <RegisterForm onCreated={() => navigate('/app', { replace: true })} />
         )}
       </div>
     </AuthShell>

@@ -109,10 +109,16 @@ São **dois planos**, e o que os separa é a locação:
 | **Pro** | R$ 300,00 | a clínica que atende as próprias clientes — agenda, equipe, salas, financeiro, comissões e relatórios | **não** |
 | **Premium** | R$ 450,00 | o espaço compartilhado: tudo do Pro mais locação por turno ou diária e link público individual por profissional | **sim** |
 
-É o plano que corta, não só o wizard: uma clínica no Pro **não vê "Aluguel"** no
-menu, e a API recusa `/rentals` com `MODULE_DISABLED` mesmo que alguém digite o
-endereço na barra. No onboarding, um módulo fora do plano aparece como
-*"Disponível no plano Premium"* — desligado, com o caminho do upgrade à vista.
+O plano corta já no cadastro. Quem escolhe o Premium entra com **Aluguel ligado
+desde o primeiro acesso**; quem escolhe o Pro, sem ele — e a API recusa
+`/rentals` com `MODULE_DISABLED` mesmo que alguém digite o endereço na barra.
+Não há questionário no meio: a escolha foi feita na contratação, e é a única
+coisa que separa os dois preços.
+
+O wizard continua existindo em `/onboarding` para quem quiser popular catálogo e
+estrutura de uma vez, mas deixou de barrar a entrada. Lá, um módulo fora do
+plano aparece como *"Disponível no plano Premium"* — desligado, com o caminho
+do upgrade à vista.
 
 O *Studio Nails Lu* assina o mesmo **Pro** da clínica, mas ligou só quatro
 módulos no onboarding — é a diferença entre o que o plano **permite** e o que a
@@ -388,9 +394,9 @@ cd backend && npm run test:e2e
 ```
 
 Reseta o banco, recria o seed e roda as duas suítes end-to-end contra a API
-(**199 verificações**):
+(**202 verificações**):
 
-**`test:smoke` (101)** — autenticação e rotação de refresh token, **isolamento entre
+**`test:smoke` (104)** — autenticação e rotação de refresh token, **isolamento entre
 empresas**, feature flags de módulos, prevenção de conflitos de agenda, finalização
 de atendimento gerando receita e comissão, dashboards, aluguéis, permissões por
 papel, painel do super admin e o **plano decidindo os módulos**: a clínica no Pro

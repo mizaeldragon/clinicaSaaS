@@ -316,9 +316,9 @@ const run = async () => {
   });
   check('módulo essencial não pode ser desativado', disableCore.status === 400);
 
-  // Uma clínica que não aluga espaço não deve ver "Aluguel" em lugar nenhum.
-  // É o cadastro que decide: a empresa nasce só com o básico e o wizard liga o
-  // resto conforme as respostas.
+  // O plano decide os módulos no cadastro, e decide sozinho: quem assina o Pro
+  // entra sem Aluguel, quem assina o Premium entra com ele. Nenhum wizard no
+  // meio — a escolha já foi feita na contratação.
   const nova = await api('/auth/register', {
     method: 'POST',
     body: {
@@ -333,10 +333,36 @@ const run = async () => {
   });
   check('nova empresa é criada', nova.status === 201, JSON.stringify(nova.data?.error));
   check(
-    'nasce só com o básico — agenda, clientes e serviços',
-    ['appointments', 'customers', 'services'].every((m) => nova.data.company.modules.includes(m)) &&
-      !nova.data.company.modules.includes('rentals'),
+    'no Pro, ela já nasce com tudo do plano — e sem Aluguel',
+    nova.data.company.modules.length === 9 && !nova.data.company.modules.includes('rentals'),
     JSON.stringify(nova.data.company?.modules),
+  );
+  check(
+    'e sem wizard pendente: não há o que perguntar depois da contratação',
+    nova.data.company.onboardingCompleted === true,
+  );
+
+  // A mesma porta, o outro plano: é aqui que os dois preços se justificam.
+  const novaPremium = await api('/auth/register', {
+    method: 'POST',
+    body: {
+      company: { name: `Espaço Com Aluguel ${Date.now()}`, type: 'BEAUTY_COWORKING' },
+      admin: {
+        name: 'Dona do Espaço',
+        email: `espaco${Date.now()}@teste.com`,
+        password: 'jabuticaba-nervosa-71',
+      },
+      planSlug: 'premium',
+    },
+  });
+  check(
+    'no Premium, nasce com Aluguel ligado desde o primeiro acesso',
+    novaPremium.status === 201 && novaPremium.data.company.modules.includes('rentals'),
+    JSON.stringify(novaPremium.data.company?.modules ?? novaPremium.data),
+  );
+  check(
+    'e a API já aceita /rentals sem passar por wizard nenhum',
+    (await api('/rentals', { token: novaPremium.data.accessToken })).status === 200,
   );
 
   const semAluguel = await api('/onboarding/complete', {

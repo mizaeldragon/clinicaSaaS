@@ -5,7 +5,7 @@ import { EmptyState } from '@/components/ui/feedback';
 import type { ModuleKey } from '@/types';
 
 export function ProtectedRoute() {
-  const { accessToken, user, company } = useAuthStore();
+  const { accessToken, user } = useAuthStore();
   const location = useLocation();
 
   if (!accessToken || !user) {
@@ -17,15 +17,10 @@ export function ProtectedRoute() {
     return <Navigate to="/admin" replace />;
   }
 
-  // Empresa recém-criada precisa concluir o onboarding.
-  if (
-    company &&
-    !company.onboardingCompleted &&
-    location.pathname !== '/onboarding' &&
-    user.role === 'COMPANY_ADMIN'
-  ) {
-    return <Navigate to="/onboarding" replace />;
-  }
+  // O wizard deixou de ser obrigatório: o plano escolhido no cadastro já liga
+  // os módulos que a empresa contratou, e não sobra o que perguntar antes de
+  // deixar alguém entrar. Ele continua em /onboarding para quem quiser popular
+  // catálogo e estrutura de uma vez.
 
   return <Outlet />;
 }

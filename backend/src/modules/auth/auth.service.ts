@@ -21,7 +21,7 @@ import { twoFactorService } from './twoFactor.service';
 import { PERMISSIONS, resolvePermissions } from '../../shared/middlewares/rbac';
 import { uniqueSlug } from '../../shared/utils/slug';
 import { env } from '../../config/env';
-import { CORE_MODULES, DEFAULT_BUSINESS_HOURS } from '../companies/company.constants';
+import { DEFAULT_BUSINESS_HOURS } from '../companies/company.constants';
 import { getCompanyContext, invalidateCompanyContext } from '../../shared/services/companyContext.service';
 import { mailer } from '../../shared/services/mailer.service';
 import {
@@ -340,8 +340,15 @@ export const authService = {
       await assertPasswordNotBreached(dto.admin.password);
       const passwordHash = await hashPassword(dto.admin.password);
 
-      // Módulos iniciais: básicos limitados ao que o plano oferece.
-      const initialModules = CORE_MODULES.filter((m) => plan.modules.includes(m));
+      // O plano decide os módulos, e decide agora.
+      //
+      // Quem assina o Premium entra com Aluguel ligado; quem assina o Pro, sem
+      // ele. Antes daqui toda empresa nascia com os mesmos três módulos básicos
+      // e um questionário para responder depois — a diferença entre os planos,
+      // que é a única coisa que separa os dois preços, só aparecia no fim do
+      // wizard. Não há o que perguntar sobre uma escolha que já foi feita na
+      // contratação.
+      const initialModules = plan.modules;
 
       const company = await prisma.company.create({
         data: {
@@ -351,6 +358,10 @@ export const authService = {
           phone: dto.company.phone,
           document: dto.company.document,
           status: CompanyStatus.TRIALING,
+          // Nada ficou pendente de configurar: o plano já entregou o que
+          // entrega. O wizard continua existindo para quem quiser popular
+          // catálogo e estrutura, mas deixa de barrar a entrada.
+          onboardingCompleted: true,
           subscription: {
             create: {
               planId: plan.id,

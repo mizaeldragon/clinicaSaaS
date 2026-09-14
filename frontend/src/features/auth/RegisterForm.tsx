@@ -52,7 +52,7 @@ export function RegisterForm({ onCreated }: { onCreated: () => void }) {
         },
         planSlug,
       });
-      toast.success('Empresa criada! Vamos configurar seus módulos.');
+      toast.success('Empresa criada! Seu plano já está ativo.');
       onCreated();
     } catch (error) {
       if (error instanceof ApiError) toast.error(error.message);
