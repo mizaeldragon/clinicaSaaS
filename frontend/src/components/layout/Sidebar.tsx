@@ -53,7 +53,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             <Sparkles className="size-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold">Belezza</p>
+            <p className="truncate text-sm font-semibold">CliniStudio</p>
             <p className="truncate text-[11px] text-sidebar-muted">Gestão de beleza</p>
           </div>
           <Button

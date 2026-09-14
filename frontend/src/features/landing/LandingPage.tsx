@@ -66,7 +66,7 @@ function Header() {
   return (
     <header className="sticky top-0 z-50 border-b border-[#1d2340]/10 bg-[#fffaf8]/90 backdrop-blur-xl">
       <div className="mx-auto flex h-[70px] max-w-7xl items-center gap-5 px-5 sm:px-8">
-        <a href="#topo" className="flex items-center gap-2.5" aria-label="Belezza, início"><Logo /><span className="text-lg font-bold tracking-[-0.04em]">Belezza</span></a>
+        <a href="#topo" className="flex items-center gap-2.5" aria-label="CliniStudio, início"><Logo /><span className="text-lg font-bold tracking-[-0.04em]">CliniStudio</span></a>
         <nav className="ml-7 hidden items-center gap-7 lg:flex" aria-label="Navegação principal">
           {NAV.map((item) => <a key={item.href} href={item.href} className="text-sm font-medium text-[#1d2340]/70 transition hover:text-[#1d2340]">{item.label}</a>)}
         </nav>
@@ -87,7 +87,7 @@ function Hero() {
       <div className="mx-auto grid max-w-7xl items-center gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:gap-16">
         <div className="max-w-xl">
           <Eyebrow>Gestão feita para beleza</Eyebrow>
-          <h1 className="text-[3.1rem] font-bold leading-[0.98] tracking-[-0.065em] sm:text-6xl lg:text-[4.35rem]">Seu tempo fica com as clientes. A organização fica com o Belezza.</h1>
+          <h1 className="text-[3.1rem] font-bold leading-[0.98] tracking-[-0.065em] sm:text-6xl lg:text-[4.35rem]">Seu tempo fica com as clientes. A organização fica com o CliniStudio.</h1>
           <p className="mt-6 max-w-lg text-lg leading-relaxed text-[#1d2340]/68">Agenda, clientes, caixa e espaços em um só lugar para seu negócio crescer sem virar uma bagunça.</p>
           <div className="mt-8 flex flex-wrap items-center gap-3"><Link to="/cadastro" className="group inline-flex items-center gap-2 rounded-full bg-[#d24362] px-6 py-3.5 text-sm font-bold text-white transition hover:bg-[#b9314e] active:translate-y-px">Começar grátis <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" /></Link><a href="#como-funciona" className="rounded-full border border-[#1d2340]/15 px-6 py-3.5 text-sm font-bold transition hover:border-[#1d2340]/35 hover:bg-white">Ver como funciona</a></div>
           <p className="mt-5 text-sm font-medium text-[#1d2340]/48">14 dias gratuitos. Sem cartão de crédito.</p>
@@ -114,7 +114,7 @@ function HowItWorks() {
     ['Atenda com contexto', 'Histórico e preferências da cliente sempre à mão.', Users],
     ['Feche o dia segura', 'Receitas, despesas, comissões e aluguéis organizados.', Wallet],
   ];
-  return <section id="como-funciona" className="px-5 py-24 sm:px-8 lg:py-32"><div className="mx-auto max-w-7xl"><div className="max-w-2xl"><h2 className="text-4xl font-bold leading-[1.04] tracking-[-0.055em] sm:text-5xl">A gestão do espaço não precisa tomar o seu dia.</h2><p className="mt-5 text-lg leading-relaxed text-[#1d2340]/62">O Belezza reúne o que hoje fica espalhado entre conversas, cadernos e planilhas.</p></div><div className="mt-14 grid gap-10 md:grid-cols-3 md:gap-6">{steps.map(([title, description, Icon], index) => <article key={title as string} className="border-t-2 border-[#1d2340] pt-5"><span className="text-sm font-bold text-[#d24362]">0{index + 1}</span><div className="mt-8 grid size-11 place-items-center rounded-2xl bg-[#f7ece8] text-[#d24362]"><Icon className="size-5" /></div><h3 className="mt-5 text-xl font-bold tracking-[-0.03em]">{title as string}</h3><p className="mt-2 max-w-xs text-sm leading-relaxed text-[#1d2340]/61">{description as string}</p></article>)}</div></div></section>;
+  return <section id="como-funciona" className="px-5 py-24 sm:px-8 lg:py-32"><div className="mx-auto max-w-7xl"><div className="max-w-2xl"><h2 className="text-4xl font-bold leading-[1.04] tracking-[-0.055em] sm:text-5xl">A gestão do espaço não precisa tomar o seu dia.</h2><p className="mt-5 text-lg leading-relaxed text-[#1d2340]/62">O CliniStudio reúne o que hoje fica espalhado entre conversas, cadernos e planilhas.</p></div><div className="mt-14 grid gap-10 md:grid-cols-3 md:gap-6">{steps.map(([title, description, Icon], index) => <article key={title as string} className="border-t-2 border-[#1d2340] pt-5"><span className="text-sm font-bold text-[#d24362]">0{index + 1}</span><div className="mt-8 grid size-11 place-items-center rounded-2xl bg-[#f7ece8] text-[#d24362]"><Icon className="size-5" /></div><h3 className="mt-5 text-xl font-bold tracking-[-0.03em]">{title as string}</h3><p className="mt-2 max-w-xs text-sm leading-relaxed text-[#1d2340]/61">{description as string}</p></article>)}</div></div></section>;
 }
 
 function Features() {
@@ -154,9 +154,9 @@ function Faq() {
 }
 
 function FinalCta() {
-  return <section className="px-5 pb-20 sm:px-8 lg:pb-28"><div className="mx-auto max-w-7xl rounded-[2rem] bg-[#d24362] px-6 py-14 text-center text-white sm:px-12 lg:py-20"><h2 className="mx-auto max-w-2xl text-4xl font-bold leading-[1.04] tracking-[-0.055em] sm:text-5xl">Menos tempo organizando. Mais tempo fazendo seu espaço acontecer.</h2><p className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-white/78">Crie sua conta e teste a gestão do Belezza sem compromisso.</p><Link to="/cadastro" className="mt-8 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3.5 text-sm font-bold text-[#1d2340] transition hover:bg-[#fff4f6] active:translate-y-px">Começar grátis <ArrowRight className="size-4" /></Link></div></section>;
+  return <section className="px-5 pb-20 sm:px-8 lg:pb-28"><div className="mx-auto max-w-7xl rounded-[2rem] bg-[#d24362] px-6 py-14 text-center text-white sm:px-12 lg:py-20"><h2 className="mx-auto max-w-2xl text-4xl font-bold leading-[1.04] tracking-[-0.055em] sm:text-5xl">Menos tempo organizando. Mais tempo fazendo seu espaço acontecer.</h2><p className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-white/78">Crie sua conta e teste a gestão do CliniStudio sem compromisso.</p><Link to="/cadastro" className="mt-8 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3.5 text-sm font-bold text-[#1d2340] transition hover:bg-[#fff4f6] active:translate-y-px">Começar grátis <ArrowRight className="size-4" /></Link></div></section>;
 }
 
 function Footer() {
-  return <footer className="border-t border-[#1d2340]/10 px-5 py-9 sm:px-8"><div className="mx-auto flex max-w-7xl flex-col gap-5 text-sm sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-2.5"><Logo /><span className="font-bold">Belezza</span></div><p className="font-medium text-[#1d2340]/45">© {new Date().getFullYear()} Belezza. Gestão para espaços de beleza.</p><div className="flex gap-5 font-semibold"><Link to="/login" className="text-[#1d2340]/65 hover:text-[#1d2340]">Entrar</Link><Link to="/cadastro" className="text-[#1d2340]/65 hover:text-[#1d2340]">Criar conta</Link></div></div></footer>;
+  return <footer className="border-t border-[#1d2340]/10 px-5 py-9 sm:px-8"><div className="mx-auto flex max-w-7xl flex-col gap-5 text-sm sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-2.5"><Logo /><span className="font-bold">CliniStudio</span></div><p className="font-medium text-[#1d2340]/45">© {new Date().getFullYear()} CliniStudio. Gestão para espaços de beleza.</p><div className="flex gap-5 font-semibold"><Link to="/login" className="text-[#1d2340]/65 hover:text-[#1d2340]">Entrar</Link><Link to="/cadastro" className="text-[#1d2340]/65 hover:text-[#1d2340]">Criar conta</Link></div></div></footer>;
 }

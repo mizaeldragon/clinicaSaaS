@@ -1,4 +1,4 @@
-# Belezza — SaaS multiempresa para beleza, estética e clínicas
+# CliniStudio — SaaS multiempresa para beleza, estética e clínicas
 
 Plataforma SaaS **multi-tenant e modular** para gestão de salões, studios, barbearias,
 clínicas de estética e espaços compartilhados de beleza.
@@ -32,14 +32,14 @@ Pré-requisitos: **Node.js 20+** e um **PostgreSQL 14+** rodando na máquina
 .\scripts\setup-local.ps1
 ```
 
-O script pede a senha do usuário `postgres`, cria o banco `belezza` se ele
+O script pede a senha do usuário `postgres`, cria o banco `clinistudio` se ele
 ainda não existir, grava a `DATABASE_URL` no `backend/.env` (com a senha
 codificada, para um `@` ou `#` não quebrar a URL), aplica as migrations e roda
 o seed. Pode ser rodado de novo à vontade — se o banco já existe, ele passa
 adiante. Aceita `-Database`, `-Port` e `-SkipSeed`.
 
 Na mão, se preferir: crie o banco (`psql -U postgres -h localhost -c "CREATE
-DATABASE belezza"`, ou no DBeaver com o direito na conexão → *Create* →
+DATABASE clinistudio"`, ou no DBeaver com o direito na conexão → *Create* →
 *Database*), copie `.env.example` para `.env`, troque `SUA_SENHA` na
 `DATABASE_URL` e rode `npx prisma migrate deploy && npm run seed`.
 

@@ -18,7 +18,7 @@ export function AdminLayout() {
             <ShieldCheck className="size-5" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-white">Belezza SaaS</p>
+            <p className="text-sm font-semibold text-white">CliniStudio SaaS</p>
             <p className="text-[11px] text-slate-400">Painel da plataforma</p>
           </div>
         </div>
@@ -68,7 +68,7 @@ export function AdminLayout() {
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-border/70 bg-background/85 px-4 backdrop-blur-md lg:px-8">
           <div className="flex items-center gap-2 lg:hidden">
             <ShieldCheck className="size-5 text-primary" />
-            <span className="font-semibold">Belezza SaaS</span>
+            <span className="font-semibold">CliniStudio SaaS</span>
           </div>
           <nav className="flex gap-1 lg:hidden">
             {ADMIN_NAV.map((item) => (

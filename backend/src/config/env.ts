@@ -91,7 +91,7 @@ const envSchema = z.object({
     .transform((v) => v === 'true'),
   SMTP_USER: z.string().optional(),
   SMTP_PASSWORD: z.string().optional(),
-  MAIL_FROM: z.string().default('Belezza <nao-responda@belezza.app>'),
+  MAIL_FROM: z.string().default('CliniStudio <nao-responda@clinistudio.app>'),
 });
 
 const parsed = envSchema.safeParse(process.env);

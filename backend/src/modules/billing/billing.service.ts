@@ -283,7 +283,7 @@ export const billingService = {
 
     const customerId = await ensureAsaasCustomer(subscription);
     const value = Number(subscription.plan.price);
-    const description = `Belezza — plano ${subscription.plan.name}`;
+    const description = `CliniStudio — plano ${subscription.plan.name}`;
 
     if (subscription.asaasSubscriptionId) {
       await asaas.updateSubscription(subscription.asaasSubscriptionId, {
@@ -449,7 +449,7 @@ async function notifyCompany(
   if (SETTLED.has(status)) {
     await mailer.send({
       to: company.email,
-      subject: 'Pagamento confirmado — Belezza',
+      subject: 'Pagamento confirmado — CliniStudio',
       text: `Recebemos o pagamento de ${valor}. Sua assinatura está em dia e o sistema segue liberado.\n\nObrigado!`,
       action: { label: 'Abrir o painel', url: `${env.APP_URL}/app` },
     });
@@ -458,7 +458,7 @@ async function notifyCompany(
 
   await mailer.send({
     to: company.email,
-    subject: 'Mensalidade em aberto — Belezza',
+    subject: 'Mensalidade em aberto — CliniStudio',
     text:
       `A mensalidade de ${valor} venceu e ainda não foi identificada.\n\n` +
       `Você tem ${env.BILLING_GRACE_DAYS} dias para regularizar antes que o acesso seja bloqueado. ` +

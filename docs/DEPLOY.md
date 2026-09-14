@@ -157,7 +157,7 @@ SMTP_PORT=587
 SMTP_SECURE=false
 SMTP_USER=...
 SMTP_PASSWORD=...
-MAIL_FROM=Belezza <nao-responda@seu-dominio.com.br>
+MAIL_FROM=CliniStudio <nao-responda@seu-dominio.com.br>
 ```
 
 Em produção, SMTP ausente é registrado como **erro** no log, não como aviso.

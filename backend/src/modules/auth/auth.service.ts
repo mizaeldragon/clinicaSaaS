@@ -202,7 +202,7 @@ async function warnAboutNewDevice(
 
     await mailer.send({
       to: user.email,
-      subject: 'Novo acesso à sua conta — Belezza',
+      subject: 'Novo acesso à sua conta — CliniStudio',
       text:
         `Olá, ${user.name}.
 
@@ -531,7 +531,7 @@ export const authService = {
 
       await mailer.send({
         to: user.email,
-        subject: 'Redefinir sua senha — Belezza',
+        subject: 'Redefinir sua senha — CliniStudio',
         text:
           `Olá, ${user.name}.
 

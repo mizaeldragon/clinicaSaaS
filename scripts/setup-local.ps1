@@ -6,10 +6,10 @@
     hora e não fica no histórico do terminal.
 
     Uso:  .\scripts\setup-local.ps1
-          .\scripts\setup-local.ps1 -Database belezza -Port 5432 -SkipSeed
+          .\scripts\setup-local.ps1 -Database clinistudio -Port 5432 -SkipSeed
 #>
 param(
-  [string] $Database = 'belezza',
+  [string] $Database = 'clinistudio',
   [string] $DbUser   = 'postgres',
   [string] $DbHost   = 'localhost',
   [int]    $Port      = 5432,

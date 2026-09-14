@@ -8,7 +8,7 @@
     Uso:
       .\scripts\backup-db.ps1                       # banco local
       .\scripts\backup-db.ps1 -Url "postgresql://..." -Keep 30
-      .\scripts\backup-db.ps1 -Destino "D:\backups\belezza"
+      .\scripts\backup-db.ps1 -Destino "D:\backups\clinistudio"
 
     Restaurar:
       pg_restore --clean --if-exists -d "<URL>" arquivo.dump
@@ -56,7 +56,7 @@ New-Item -ItemType Directory -Force -Path $Destino | Out-Null
 $Destino = (Resolve-Path $Destino).Path
 
 $carimbo = Get-Date -Format 'yyyy-MM-dd_HHmmss'
-$arquivo = Join-Path $Destino "belezza_$carimbo.dump"
+$arquivo = Join-Path $Destino "clinistudio_$carimbo.dump"
 
 Write-Host "Gerando $arquivo ..." -ForegroundColor Cyan
 
@@ -68,7 +68,7 @@ $mb = [math]::Round((Get-Item $arquivo).Length / 1MB, 2)
 Write-Host "[ok] backup gerado ($mb MB)" -ForegroundColor Green
 
 # --------------------------------------------------------------- rotação
-$antigos = Get-ChildItem $Destino -Filter 'belezza_*.dump' |
+$antigos = Get-ChildItem $Destino -Filter 'clinistudio_*.dump' |
   Sort-Object LastWriteTime -Descending |
   Select-Object -Skip $Keep
 
@@ -77,5 +77,5 @@ foreach ($velho in $antigos) {
   Write-Host "[--] removido $($velho.Name)" -ForegroundColor DarkGray
 }
 
-$total = (Get-ChildItem $Destino -Filter 'belezza_*.dump').Count
+$total = (Get-ChildItem $Destino -Filter 'clinistudio_*.dump').Count
 Write-Host "[ok] $total backups guardados em $Destino" -ForegroundColor Green

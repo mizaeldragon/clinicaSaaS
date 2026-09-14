@@ -97,9 +97,9 @@ export function AuthShell({
           style={{ background: 'radial-gradient(circle, #fbe7eb, transparent 70%)' }}
         />
 
-        <a href="/" className="relative flex items-center gap-2.5" aria-label="Belezza, início">
+        <a href="/" className="relative flex items-center gap-2.5" aria-label="CliniStudio, início">
           <Logo />
-          <span className="text-lg font-bold tracking-[-0.04em]">Belezza</span>
+          <span className="text-lg font-bold tracking-[-0.04em]">CliniStudio</span>
         </a>
 
         <div className="relative max-w-md space-y-9">
@@ -108,7 +108,7 @@ export function AuthShell({
               Seu tempo fica com as clientes.
             </h2>
             <p className="text-lg leading-relaxed text-[#1d2340]/65">
-              A agenda, o caixa e os espaços ficam com o Belezza.
+              A agenda, o caixa e os espaços ficam com o CliniStudio.
             </p>
           </div>
 
@@ -128,7 +128,7 @@ export function AuthShell({
         </div>
 
         <p className="relative text-xs font-medium text-[#1d2340]/45">
-          © {new Date().getFullYear()} Belezza · Gestão para espaços de beleza
+          © {new Date().getFullYear()} CliniStudio · Gestão para espaços de beleza
         </p>
       </aside>
 
@@ -136,9 +136,9 @@ export function AuthShell({
       <div className="flex items-center justify-center px-5 py-12 sm:px-10">
         <div className="w-full max-w-[420px] space-y-8">
           {/* No celular a coluna da esquerda some, então a marca reaparece aqui. */}
-          <a href="/" className="flex items-center gap-2.5 lg:hidden" aria-label="Belezza, início">
+          <a href="/" className="flex items-center gap-2.5 lg:hidden" aria-label="CliniStudio, início">
             <Logo />
-            <span className="text-lg font-bold tracking-[-0.04em]">Belezza</span>
+            <span className="text-lg font-bold tracking-[-0.04em]">CliniStudio</span>
           </a>
 
           <div className="space-y-2">

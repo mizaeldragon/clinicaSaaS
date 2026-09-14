@@ -22,8 +22,8 @@ export interface AccessTokenPayload {
  * para outro fim não vale como sessão aqui.
  */
 const ALGORITHM = 'HS256' as const;
-const ISSUER = 'belezza';
-const AUDIENCE = 'belezza-app';
+const ISSUER = 'clinistudio';
+const AUDIENCE = 'clinistudio-app';
 
 export function signAccessToken(payload: AccessTokenPayload): string {
   const options: SignOptions = {
@@ -57,7 +57,7 @@ export function verifyAccessToken(token: string): AccessTokenPayload {
  *
  * Cinco minutos: o tempo de abrir o aplicativo e digitar seis dígitos.
  */
-const CHALLENGE_AUDIENCE = 'belezza-2fa';
+const CHALLENGE_AUDIENCE = 'clinistudio-2fa';
 
 export function signTwoFactorChallenge(userId: string): string {
   return jwt.sign({ sub: userId }, env.JWT_SECRET, {

@@ -613,7 +613,7 @@ const run = async () => {
   const outroEmissor = jwt.sign(
     { sub: claims.sub, companyId: claims.companyId, role: claims.role, permissions: claims.permissions },
     process.env.JWT_SECRET,
-    { algorithm: 'HS256', expiresIn: '15m', issuer: 'outro-sistema', audience: 'belezza-app' },
+    { algorithm: 'HS256', expiresIn: '15m', issuer: 'outro-sistema', audience: 'clinistudio-app' },
   );
   check(
     'token do nosso segredo mas de outro emissor é recusado',

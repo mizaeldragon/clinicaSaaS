@@ -90,7 +90,7 @@ export const twoFactorService = {
       secret,
       // O nome da conta aparece dentro do aplicativo; o e-mail evita confusão
       // para quem administra mais de uma empresa.
-      otpauthUrl: generateURI({ secret, label: user.email, issuer: 'Belezza' }),
+      otpauthUrl: generateURI({ secret, label: user.email, issuer: 'CliniStudio' }),
     };
   },
 

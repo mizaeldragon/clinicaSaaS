@@ -85,7 +85,7 @@ async function call<T>(
         access_token: env.ASAAS_API_KEY,
         'Content-Type': 'application/json',
         // O Asaas pede identificação da integração; ajuda o suporte deles.
-        'User-Agent': 'Belezza/1.0',
+        'User-Agent': 'CliniStudio/1.0',
       },
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: controller.signal,

@@ -117,7 +117,7 @@ export const useAuthStore = create<AuthState>()(
       },
     }),
     {
-      name: 'belezza.auth',
+      name: 'clinistudio.auth',
       partialize: (state) => ({
         accessToken: state.accessToken,
         refreshToken: state.refreshToken,

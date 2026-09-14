@@ -50,7 +50,7 @@ export async function checkBreachedPassword(password: string): Promise<BreachChe
 
   try {
     const response = await fetch(`${ENDPOINT}${prefix}`, {
-      headers: { 'Add-Padding': 'true', 'User-Agent': 'Belezza' },
+      headers: { 'Add-Padding': 'true', 'User-Agent': 'CliniStudio' },
       signal: controller.signal,
     });
     if (!response.ok) return { breached: false, count: 0, checked: false };

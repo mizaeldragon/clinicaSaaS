@@ -65,7 +65,7 @@ function render(input: MailInput): string {
   const button = input.action
     ? `<p style="margin:28px 0 8px">
          <a href="${escapeHtml(input.action.url)}"
-            style="background:#7C3AED;color:#fff;text-decoration:none;border-radius:8px;
+            style="background:#d24362;color:#fff;text-decoration:none;border-radius:8px;
                    padding:12px 22px;display:inline-block;font-weight:600">
            ${escapeHtml(input.action.label)}
          </a>
@@ -83,13 +83,13 @@ function render(input: MailInput): string {
       <table role="presentation" width="560" cellpadding="0" cellspacing="0"
              style="max-width:560px;background:#fff;border-radius:14px;padding:32px">
         <tr><td>
-          <p style="margin:0 0 24px;font-weight:700;font-size:18px;color:#7C3AED">Belezza</p>
+          <p style="margin:0 0 24px;font-weight:700;font-size:18px;color:#d24362">CliniStudio</p>
           ${paragraphs}
           ${button}
         </td></tr>
       </table>
       <p style="margin:20px 0 0;font-size:12px;color:#94A3B8">
-        Você recebeu este e-mail porque tem uma conta no Belezza.
+        Você recebeu este e-mail porque tem uma conta no CliniStudio.
       </p>
     </td></tr>
   </table>
