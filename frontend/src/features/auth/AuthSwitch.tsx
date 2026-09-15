@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/primitives';
 import { useAuthStore } from '@/stores/auth.store';
 import { ApiError } from '@/lib/api';
+import { safeInternalPath } from '@/lib/safePath';
 import { cn } from '@/lib/utils';
 
 /**
@@ -60,8 +61,8 @@ export function AuthSwitch() {
 
   function concluir() {
     const role = useAuthStore.getState().user?.role;
-    const from = (location.state as { from?: string } | null)?.from;
-    navigate(role === 'SUPER_ADMIN' ? '/admin' : (from ?? '/app'), { replace: true });
+    const from = safeInternalPath((location.state as { from?: unknown } | null)?.from);
+    navigate(role === 'SUPER_ADMIN' ? '/admin' : from, { replace: true });
   }
 
   async function handleTwoFactor(event: React.FormEvent) {

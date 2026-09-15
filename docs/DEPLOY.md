@@ -200,8 +200,13 @@ adicione um Redis no Railway, ponha `REDIS_ENABLED=true`,
   agendado. Nenhuma outra defesa recupera dado apagado.
 - **Cloudflare na frente**, se DDoS preocupar. Os limites por IP da API seguram
   um atacante; uma botnet, não.
-- **Dependabot ligado** no GitHub: *Settings › Code security*. O arquivo de
-  configuração já está no repositório.
+- **Alertas de segurança do GitHub ligados**: *Settings › Code security* →
+  *Dependabot alerts*. Só avisa; não abre PR. As **atualizações automáticas**
+  ficam desligadas de propósito — atualização de rotina vira ruído, e quem
+  decide a hora de mexer numa biblioteca é você.
+- **Conferir vulnerabilidades de vez em quando**, ou quando um alerta chegar:
+  `npm audit --omit=dev` nas duas pastas. Só `--omit=dev` interessa — falha em
+  ferramenta de desenvolvimento não vai para o ar.
 - **Senha da Márcia**: ela vai escolher no cadastro. O sistema recusa senha que
   já vazou, mas vale pedir que ligue a verificação em duas etapas em
   *Configurações › Minha conta* — é o que protege a conta mesmo que a senha
