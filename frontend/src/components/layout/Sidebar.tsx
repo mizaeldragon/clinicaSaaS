@@ -1,10 +1,11 @@
 import { NavLink } from 'react-router-dom';
-import { Sparkles, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth.store';
 import { NAV_ITEMS, type NavItem } from '@/config/navigation';
 import { isNavItemVisible } from '@/lib/nav';
 import { Button } from '@/components/ui/button';
+import { BrandMarkTile } from '@/components/brand';
 
 const GROUP_LABELS: Record<NavItem['group'], string> = {
   operação: 'Operação',
@@ -49,9 +50,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
       >
         {/* Marca do produto. A identidade da empresa fica no topo, à direita. */}
         <div className="flex h-16 items-center gap-3 px-5">
-          <div className="flex size-9 items-center justify-center rounded-xl bg-sidebar-accent text-white shadow-lg">
-            <Sparkles className="size-5" />
-          </div>
+          <BrandMarkTile />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold">CliniStudio</p>
             <p className="truncate text-[11px] text-sidebar-muted">Gestão de beleza</p>

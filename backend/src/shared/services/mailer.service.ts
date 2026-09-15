@@ -83,7 +83,14 @@ function render(input: MailInput): string {
       <table role="presentation" width="560" cellpadding="0" cellspacing="0"
              style="max-width:560px;background:#fff;border-radius:14px;padding:32px">
         <tr><td>
-          <p style="margin:0 0 24px;font-weight:700;font-size:18px;color:#d24362">CliniStudio</p>
+          <!-- A maioria dos programas de e-mail não baixa imagem sem a pessoa
+               mandar. O texto alternativo é o que ela lê nesse caso, e vai
+               estilizado para continuar parecendo o cabeçalho da marca em vez
+               de um defeito. -->
+          <img src="${escapeHtml(env.APP_URL)}/logo-clinistudio.png"
+               alt="CliniStudio" width="194" height="48"
+               style="display:block;border:0;margin:0 0 24px;height:48px;width:auto;
+                      font-weight:700;font-size:18px;color:#d24362" />
           ${paragraphs}
           ${button}
         </td></tr>

@@ -9,11 +9,11 @@ import {
   Link2,
   Menu,
   Receipt,
-  Sparkles,
   Users,
   Wallet,
   X,
 } from 'lucide-react';
+import { BrandLogo } from '@/components/brand';
 import { useAuthStore } from '@/stores/auth.store';
 import { cn } from '@/lib/utils';
 
@@ -28,14 +28,6 @@ const PHOTOS = {
   hero: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=1600&q=85',
   team: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=1400&q=85',
 };
-
-function Logo() {
-  return (
-    <span className="grid size-9 place-items-center rounded-full bg-[#1d2340] text-white">
-      <Sparkles className="size-[17px]" strokeWidth={2.2} />
-    </span>
-  );
-}
 
 function Eyebrow({ children }: { children: React.ReactNode }) {
   return <p className="mb-4 text-xs font-bold uppercase tracking-[0.16em] text-[#d24362]">{children}</p>;
@@ -66,7 +58,7 @@ function Header() {
   return (
     <header className="sticky top-0 z-50 border-b border-[#1d2340]/10 bg-[#fffaf8]/90 backdrop-blur-xl">
       <div className="mx-auto flex h-[70px] max-w-7xl items-center gap-5 px-5 sm:px-8">
-        <a href="#topo" className="flex items-center gap-2.5" aria-label="CliniStudio, início"><Logo /><span className="text-lg font-bold tracking-[-0.04em]">CliniStudio</span></a>
+        <a href="#topo" className="flex items-center" aria-label="CliniStudio, início"><BrandLogo className="h-9" /></a>
         <nav className="ml-7 hidden items-center gap-7 lg:flex" aria-label="Navegação principal">
           {NAV.map((item) => <a key={item.href} href={item.href} className="text-sm font-medium text-[#1d2340]/70 transition hover:text-[#1d2340]">{item.label}</a>)}
         </nav>
@@ -158,5 +150,5 @@ function FinalCta() {
 }
 
 function Footer() {
-  return <footer className="border-t border-[#1d2340]/10 px-5 py-9 sm:px-8"><div className="mx-auto flex max-w-7xl flex-col gap-5 text-sm sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-2.5"><Logo /><span className="font-bold">CliniStudio</span></div><p className="font-medium text-[#1d2340]/45">© {new Date().getFullYear()} CliniStudio. Gestão para espaços de beleza.</p><div className="flex gap-5 font-semibold"><Link to="/login" className="text-[#1d2340]/65 hover:text-[#1d2340]">Entrar</Link><Link to="/cadastro" className="text-[#1d2340]/65 hover:text-[#1d2340]">Criar conta</Link></div></div></footer>;
+  return <footer className="border-t border-[#1d2340]/10 px-5 py-9 sm:px-8"><div className="mx-auto flex max-w-7xl flex-col gap-5 text-sm sm:flex-row sm:items-center sm:justify-between"><BrandLogo className="h-8" /><p className="font-medium text-[#1d2340]/45">© {new Date().getFullYear()} CliniStudio. Gestão para espaços de beleza.</p><div className="flex gap-5 font-semibold"><Link to="/login" className="text-[#1d2340]/65 hover:text-[#1d2340]">Entrar</Link><Link to="/cadastro" className="text-[#1d2340]/65 hover:text-[#1d2340]">Criar conta</Link></div></div></footer>;
 }

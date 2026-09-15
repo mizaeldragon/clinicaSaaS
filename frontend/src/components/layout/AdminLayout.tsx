@@ -1,10 +1,11 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LogOut, ShieldCheck } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import { ADMIN_NAV } from '@/config/navigation';
 import { useAuthStore } from '@/stores/auth.store';
 import { Button } from '@/components/ui/button';
 import { UserAvatar } from '@/components/ui/primitives';
 import { cn } from '@/lib/utils';
+import { BrandMark, BrandMarkTile } from '@/components/brand';
 
 export function AdminLayout() {
   const navigate = useNavigate();
@@ -14,9 +15,7 @@ export function AdminLayout() {
     <div className="min-h-screen bg-background">
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-[250px] flex-col bg-slate-950 text-slate-200 lg:flex">
         <div className="flex h-16 items-center gap-3 px-5">
-          <div className="flex size-9 items-center justify-center rounded-xl bg-primary text-white">
-            <ShieldCheck className="size-5" />
-          </div>
+          <BrandMarkTile />
           <div>
             <p className="text-sm font-semibold text-white">CliniStudio SaaS</p>
             <p className="text-[11px] text-slate-400">Painel da plataforma</p>
@@ -67,7 +66,7 @@ export function AdminLayout() {
       <div className="lg:pl-[250px]">
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-border/70 bg-background/85 px-4 backdrop-blur-md lg:px-8">
           <div className="flex items-center gap-2 lg:hidden">
-            <ShieldCheck className="size-5 text-primary" />
+            <BrandMark className="size-6" />
             <span className="font-semibold">CliniStudio SaaS</span>
           </div>
           <nav className="flex gap-1 lg:hidden">

@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { CalendarDays, Link2, Sparkles, Wallet } from 'lucide-react';
+import { CalendarDays, Link2, Wallet } from 'lucide-react';
+import { BrandLogo } from '@/components/brand';
 
 /**
  * Moldura das telas de entrada: login, cadastro, esqueci a senha e redefinir.
@@ -59,14 +60,6 @@ const THEME = {
   '--ring': '347 61% 54%',
 } as CSSProperties;
 
-function Logo() {
-  return (
-    <span className="grid size-9 place-items-center rounded-full bg-[#1d2340] text-white">
-      <Sparkles className="size-[17px]" strokeWidth={2.2} />
-    </span>
-  );
-}
-
 export function AuthShell({
   title,
   subtitle,
@@ -97,9 +90,8 @@ export function AuthShell({
           style={{ background: 'radial-gradient(circle, #fbe7eb, transparent 70%)' }}
         />
 
-        <a href="/" className="relative flex items-center gap-2.5" aria-label="CliniStudio, início">
-          <Logo />
-          <span className="text-lg font-bold tracking-[-0.04em]">CliniStudio</span>
+        <a href="/" className="relative flex items-center" aria-label="CliniStudio, início">
+          <BrandLogo className="h-9" />
         </a>
 
         <div className="relative max-w-md space-y-9">
@@ -136,9 +128,8 @@ export function AuthShell({
       <div className="flex items-center justify-center px-5 py-12 sm:px-10">
         <div className="w-full max-w-[420px] space-y-8">
           {/* No celular a coluna da esquerda some, então a marca reaparece aqui. */}
-          <a href="/" className="flex items-center gap-2.5 lg:hidden" aria-label="CliniStudio, início">
-            <Logo />
-            <span className="text-lg font-bold tracking-[-0.04em]">CliniStudio</span>
+          <a href="/" className="flex items-center lg:hidden" aria-label="CliniStudio, início">
+            <BrandLogo className="h-9" />
           </a>
 
           <div className="space-y-2">
