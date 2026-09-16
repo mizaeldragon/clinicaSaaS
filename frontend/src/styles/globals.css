@@ -15,9 +15,16 @@
     --popover: 0 0% 100%;
     --popover-foreground: 224 30% 12%;
 
-    /* Cor principal: sobrescrita em runtime pela cor da empresa */
+    /*
+     * Cor principal: sobrescrita em runtime pela cor da empresa.
+     *
+     * As duas seguintes são calculadas a partir dela, nunca escolhidas:
+     * `foreground` é o que se escreve POR CIMA da cor, e `ink` é a própria cor
+     * escurecida até poder ser lida COMO texto sobre branco.
+     */
     --primary: 262 83% 58%;
     --primary-foreground: 0 0% 100%;
+    --primary-ink: 262 72% 46%;
 
     --secondary: 240 12% 96%;
     --secondary-foreground: 224 25% 20%;

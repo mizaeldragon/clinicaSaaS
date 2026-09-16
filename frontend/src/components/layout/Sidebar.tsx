@@ -86,7 +86,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                       cn(
                         'group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all',
                         isActive
-                          ? 'bg-sidebar-accent/10 text-sidebar-accent'
+                          ? 'bg-primary/10 text-primary-ink'
                           : 'text-sidebar-foreground/70 hover:bg-foreground/[0.04] hover:text-sidebar-foreground',
                       )
                     }
@@ -108,8 +108,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             </p>
             <NavLink
               to="/app/configuracoes?tab=plano"
-              className="mt-2 inline-flex text-[11px] font-semibold text-sidebar-accent hover:underline"
-              style={{ color: 'hsl(var(--sidebar-accent))' }}
+              className="mt-2 inline-flex text-[11px] font-semibold text-primary-ink hover:underline"
             >
               Ver planos →
             </NavLink>

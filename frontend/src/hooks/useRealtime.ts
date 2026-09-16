@@ -3,6 +3,13 @@ import { io, type Socket } from 'socket.io-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/stores/auth.store';
+import { avisoLigado, ouvirPrimeiroGesto, tocarAviso } from '@/lib/aviso-sonoro';
+
+/** O que interessa do agendamento que chegou pelo socket. */
+interface AgendamentoRecebido {
+  source?: string;
+  createdById?: string | null;
+}
 
 let socket: Socket | null = null;
 
@@ -34,7 +41,13 @@ function socketOrigin(): string {
  */
 export function useRealtime() {
   const accessToken = useAuthStore((s) => s.accessToken);
+  const meuId = useAuthStore((s) => s.user?.id);
   const queryClient = useQueryClient();
+
+  // Deixa o áudio pronto antes de precisar dele: o navegador só libera som
+  // depois de um gesto, e o gesto quase sempre acontece muito antes do
+  // primeiro agendamento chegar.
+  useEffect(() => ouvirPrimeiroGesto(), []);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -51,7 +64,15 @@ export function useRealtime() {
       queryClient.invalidateQueries({ queryKey: ['availability'] });
     };
 
-    socket.on('appointment.created', invalidateAgenda);
+    socket.on('appointment.created', (agendamento: AgendamentoRecebido) => {
+      invalidateAgenda();
+
+      // Quem marcou não precisa ser avisado do que acabou de fazer — o aviso
+      // existe para quem está de costas para a tela. Agendamento do site vem
+      // sem autor, então sempre toca.
+      const fuiEu = Boolean(agendamento?.createdById) && agendamento.createdById === meuId;
+      if (!fuiEu && avisoLigado()) void tocarAviso();
+    });
     socket.on('appointment.updated', invalidateAgenda);
     socket.on('appointment.deleted', invalidateAgenda);
 
@@ -80,5 +101,5 @@ export function useRealtime() {
       socket?.disconnect();
       socket = null;
     };
-  }, [accessToken, queryClient]);
+  }, [accessToken, queryClient, meuId]);
 }

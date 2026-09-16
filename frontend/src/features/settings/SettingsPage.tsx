@@ -290,7 +290,12 @@ export function SettingsPage() {
                   <Input
                     className="max-w-[140px]"
                     value={form.primaryColor}
-                    onChange={(e) => setForm((f) => ({ ...f, primaryColor: e.target.value }))}
+                    onChange={(e) => {
+                      setForm((f) => ({ ...f, primaryColor: e.target.value }));
+                      // Quem digita o código da cor vê o mesmo que quem usa o
+                      // seletor. Hexadecimal pela metade é ignorado lá dentro.
+                      applyBrandColor(e.target.value);
+                    }}
                   />
                   <span className="text-xs text-muted-foreground">
                     A cor é aplicada em todo o painel (base para white-label).

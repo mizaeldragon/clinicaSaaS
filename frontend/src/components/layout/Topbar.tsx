@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, ChevronDown, LogOut, Menu, Settings } from 'lucide-react';
+import { Bell, ChevronDown, LogOut, Menu, Settings, Volume2, VolumeX } from 'lucide-react';
+import { toast } from 'sonner';
 import { useAuthStore } from '@/stores/auth.store';
 import { useNotificationMutations, useNotifications } from '@/api/queries';
 import { Button } from '@/components/ui/button';
@@ -14,6 +16,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger, UserAvatar } from '@/components/ui/primitives';
 import { USER_ROLE } from '@/config/labels';
 import { fromNow } from '@/lib/format';
+import { avisoLigado, definirAviso, tocarAviso } from '@/lib/aviso-sonoro';
 import { cn } from '@/lib/utils';
 
 export function Topbar({ onOpenMenu }: { onOpenMenu: () => void }) {
@@ -23,6 +26,25 @@ export function Topbar({ onOpenMenu }: { onOpenMenu: () => void }) {
   const { markAsRead, markAllAsRead } = useNotificationMutations();
 
   const unread = notifications?.unread ?? 0;
+  const [somLigado, setSomLigado] = useState(avisoLigado);
+
+  async function alternarSom() {
+    const ligando = !somLigado;
+    setSomLigado(ligando);
+    definirAviso(ligando);
+
+    // O clique que liga é o gesto que o navegador exige para liberar áudio.
+    // Tocar agora confirma pelo ouvido que o aviso vai funcionar de verdade —
+    // e denuncia na hora se o som do aparelho estiver mudo.
+    if (ligando) {
+      const tocou = await tocarAviso();
+      if (!tocou) {
+        toast('Não consegui tocar o som', {
+          description: 'O navegador ou o som do aparelho está bloqueando o áudio.',
+        });
+      }
+    }
+  }
 
   return (
     // Sem linha embaixo e na cor do quadro, não do cartão: o que separa o
@@ -34,6 +56,21 @@ export function Topbar({ onOpenMenu }: { onOpenMenu: () => void }) {
       </Button>
 
       <div className="min-w-0 flex-1" />
+
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={alternarSom}
+        aria-pressed={somLigado}
+        aria-label={somLigado ? 'Desligar aviso sonoro' : 'Ligar aviso sonoro'}
+        title={
+          somLigado
+            ? 'Aviso sonoro ligado — toca quando chega agendamento'
+            : 'Aviso sonoro desligado'
+        }
+      >
+        {somLigado ? <Volume2 /> : <VolumeX className="text-muted-foreground" />}
+      </Button>
 
       <Popover>
         <PopoverTrigger asChild>
