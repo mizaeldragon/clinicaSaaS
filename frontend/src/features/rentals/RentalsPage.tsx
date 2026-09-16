@@ -12,6 +12,7 @@ import {
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input, Textarea } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/field';
 import { PageHeader, Pagination, StatCard, TBody, TD, TH, THead, TR, Table } from '@/components/ui/data';
 import { EmptyState, Skeleton } from '@/components/ui/feedback';
 import { Label, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/primitives';
@@ -383,10 +384,10 @@ export function RentalsPage() {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="renterPhone">Telefone</Label>
-                <Input
+                <PhoneInput
                   id="renterPhone"
                   value={form.renterPhone}
-                  onChange={(e) => setForm((f) => ({ ...f, renterPhone: e.target.value }))}
+                  onChange={(v) => setForm((f) => ({ ...f, renterPhone: v }))}
                 />
               </div>
             </div>

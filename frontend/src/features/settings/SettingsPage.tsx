@@ -4,6 +4,7 @@ import { Check, Copy, ExternalLink, Plus, Save, ShieldCheck, Trash2, UserPlus } 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input, Textarea } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/field';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader, TBody, TD, TH, THead, TR, Table } from '@/components/ui/data';
 import { EmptyState, PageLoader } from '@/components/ui/feedback';
@@ -227,16 +228,16 @@ export function SettingsPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label>Telefone</Label>
-                  <Input
+                  <PhoneInput
                     value={form.phone}
-                    onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                    onChange={(v) => setForm((f) => ({ ...f, phone: v }))}
                   />
                 </div>
                 <div className="space-y-1.5">
                   <Label>WhatsApp</Label>
-                  <Input
+                  <PhoneInput
                     value={form.whatsapp}
-                    onChange={(e) => setForm((f) => ({ ...f, whatsapp: e.target.value }))}
+                    onChange={(v) => setForm((f) => ({ ...f, whatsapp: v }))}
                   />
                 </div>
               </div>

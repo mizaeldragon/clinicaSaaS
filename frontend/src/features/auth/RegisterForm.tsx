@@ -4,6 +4,7 @@ import { Building2, Mail, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PasswordInput, PhoneInput } from '@/components/ui/field';
 import { Label } from '@/components/ui/primitives';
 import {
   Select,
@@ -43,6 +44,7 @@ export function RegisterForm({ onCreated }: { onCreated: () => void }) {
     adminName: '',
     email: '',
     password: '',
+    confirmacao: '',
     phone: '',
   });
   const [loading, setLoading] = useState(false);
@@ -57,8 +59,18 @@ export function RegisterForm({ onCreated }: { onCreated: () => void }) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  // Só reclama depois que a pessoa comecou a repetir: acusar diferenca no
+  // primeiro caractere digitado seria acusar o óbvio.
+  const naoConfere = form.confirmacao.length > 0 && form.confirmacao !== form.password;
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
+
+    if (form.password !== form.confirmacao) {
+      toast.error('As duas senhas estão diferentes.');
+      return;
+    }
+
     setLoading(true);
     try {
       await register({
@@ -126,12 +138,7 @@ export function RegisterForm({ onCreated }: { onCreated: () => void }) {
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="phone">Telefone</Label>
-          <Input
-            id="phone"
-            placeholder="(11) 99999-0000"
-            value={form.phone}
-            onChange={(e) => set('phone', e.target.value)}
-          />
+          <PhoneInput id="phone" value={form.phone} onChange={(v) => set('phone', v)} />
         </div>
       </div>
 
@@ -147,17 +154,35 @@ export function RegisterForm({ onCreated }: { onCreated: () => void }) {
         />
       </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="register-password">Senha</Label>
-        <Input
-          id="register-password"
-          type="password"
-          required
-          minLength={8}
-          placeholder="Mínimo de 8 caracteres"
-          value={form.password}
-          onChange={(e) => set('password', e.target.value)}
-        />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label htmlFor="register-password">Senha</Label>
+          <PasswordInput
+            id="register-password"
+            autoComplete="new-password"
+            required
+            minLength={8}
+            placeholder="Mínimo de 8 caracteres"
+            value={form.password}
+            onChange={(e) => set('password', e.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="register-confirmacao">Confirmar senha</Label>
+          <PasswordInput
+            id="register-confirmacao"
+            autoComplete="new-password"
+            required
+            placeholder="Repita a senha"
+            value={form.confirmacao}
+            onChange={(e) => set('confirmacao', e.target.value)}
+            aria-invalid={naoConfere}
+            className={naoConfere ? 'border-destructive focus-visible:border-destructive' : undefined}
+          />
+          {naoConfere ? (
+            <p className="text-xs font-medium text-destructive">As duas senhas estão diferentes.</p>
+          ) : null}
+        </div>
       </div>
 
       {plan ? (

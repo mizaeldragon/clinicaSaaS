@@ -80,6 +80,28 @@ export function weekdayName(weekday: number, short = false): string {
   return short ? shortNames[weekday] : names[weekday];
 }
 
+/**
+ * Máscara de telefone enquanto a pessoa digita.
+ *
+ * Diferente de `phoneMask`, que só formata número completo para exibir: esta
+ * formata a cada tecla, ainda pela metade. Trabalha sempre a partir dos dígitos,
+ * nunca do texto já formatado — assim apagar com backspace funciona sem deixar
+ * parênteses órfãos para trás.
+ *
+ * Os dois formatos do Brasil: fixo com 8 dígitos e celular com 9. Qual é só se
+ * sabe no 11º dígito, então até lá vale o de fixo e o traço anda um lugar
+ * quando o último chega.
+ */
+export function phoneTyping(value: string): string {
+  const d = value.replace(/\D/g, '').slice(0, 11);
+
+  if (d.length === 0) return '';
+  if (d.length <= 2) return `(${d}`;
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+}
+
 export function phoneMask(value?: string | null): string {
   if (!value) return '—';
   const digits = value.replace(/\D/g, '');

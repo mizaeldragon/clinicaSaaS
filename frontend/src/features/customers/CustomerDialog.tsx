@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input, Textarea } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/field';
 import { Label } from '@/components/ui/primitives';
 import { useCustomerMutations } from '@/api/queries';
 import type { Customer } from '@/types';
@@ -101,21 +102,11 @@ export function CustomerDialog({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="phone">Telefone</Label>
-              <Input
-                id="phone"
-                placeholder="(11) 99999-0000"
-                value={form.phone}
-                onChange={(e) => set('phone', e.target.value)}
-              />
+              <PhoneInput id="phone" value={form.phone} onChange={(v) => set('phone', v)} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="whatsapp">WhatsApp</Label>
-              <Input
-                id="whatsapp"
-                placeholder="(11) 99999-0000"
-                value={form.whatsapp}
-                onChange={(e) => set('whatsapp', e.target.value)}
-              />
+              <PhoneInput id="whatsapp" value={form.whatsapp} onChange={(v) => set('whatsapp', v)} />
             </div>
           </div>
 

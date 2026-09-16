@@ -140,11 +140,15 @@ export function AuthSwitch() {
           {/* A pastilha desliza entre as metades em vez de piscar de um lado
               para o outro: o movimento é o que faz o controle parecer um
               interruptor, e não dois botões. */}
+          {/* `left-1` para casar com o p-1 do trilho: sem ele a pastilha
+              nascia colada na borda esquerda e, empurrada, colava na direita.
+              Com a margem certa dos dois lados, o deslocamento é exatamente a
+              largura dela. */}
           <span
             aria-hidden
             className={cn(
-              'absolute inset-y-1 w-[calc(50%-0.25rem)] rounded-full bg-white shadow-sm transition-transform duration-300 ease-out',
-              mode === 'register' && 'translate-x-[calc(100%+0.5rem)]',
+              'absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-full bg-white shadow-sm transition-transform duration-300 ease-out',
+              mode === 'register' && 'translate-x-full',
             )}
           />
           {TABS.map((tab) => (

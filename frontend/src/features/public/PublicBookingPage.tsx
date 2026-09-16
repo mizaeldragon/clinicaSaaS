@@ -23,6 +23,7 @@ import {
 } from '@/api/public';
 import { Button } from '@/components/ui/button';
 import { Input, Textarea } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/field';
 import { Label, UserAvatar } from '@/components/ui/primitives';
 import { PageLoader, Spinner } from '@/components/ui/feedback';
 import { ApiError } from '@/lib/api';
@@ -441,14 +442,12 @@ export function PublicBookingPage() {
 
                   <div className="space-y-1.5">
                     <Label htmlFor="phone">WhatsApp *</Label>
-                    <Input
+                    <PhoneInput
                       id="phone"
                       required
-                      inputMode="tel"
-                      placeholder="(11) 99999-0000"
                       icon={<Phone />}
                       value={form.phone}
-                      onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                      onChange={(v) => setForm((f) => ({ ...f, phone: v }))}
                     />
                   </div>
 

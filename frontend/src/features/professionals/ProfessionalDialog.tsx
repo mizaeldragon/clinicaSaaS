@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input, Textarea } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/field';
 import { Badge } from '@/components/ui/badge';
 import { ImageUpload } from '@/components/ImageUpload';
 import { Checkbox, Label, Switch } from '@/components/ui/primitives';
@@ -134,7 +135,7 @@ export function ProfessionalDialog({
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="phone">Telefone</Label>
-              <Input id="phone" value={form.phone} onChange={(e) => set('phone', e.target.value)} />
+              <PhoneInput id="phone" value={form.phone} onChange={(v) => set('phone', v)} />
             </div>
           </div>
 
