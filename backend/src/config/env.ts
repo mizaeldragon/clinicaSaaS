@@ -45,7 +45,7 @@ const envSchema = z.object({
 
   LOG_LEVEL: z.string().default('info'),
 
-  DEFAULT_TRIAL_DAYS: z.coerce.number().default(14),
+  DEFAULT_TRIAL_DAYS: z.coerce.number().default(5),
 
   TIMEZONE: z.string().default('America/Sao_Paulo'),
 

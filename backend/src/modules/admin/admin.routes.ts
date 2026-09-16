@@ -115,7 +115,7 @@ const planSchema = z.object({
   description: z.string().max(500).nullable().optional(),
   price: z.coerce.number().min(0),
   billingInterval: z.nativeEnum(BillingInterval).default(BillingInterval.MONTHLY),
-  trialDays: z.coerce.number().int().min(0).max(365).default(14),
+  trialDays: z.coerce.number().int().min(0).max(365).default(5),
   maxUsers: z.coerce.number().int().min(1).nullable().optional(),
   maxProfessionals: z.coerce.number().int().min(1).nullable().optional(),
   maxAppointmentsMonth: z.coerce.number().int().min(1).nullable().optional(),

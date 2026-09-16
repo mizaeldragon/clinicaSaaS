@@ -27,7 +27,7 @@ async function seedPlans() {
       slug: 'pro',
       description: 'A clínica completa: equipe, salas, financeiro, comissões e relatórios.',
       price: 300,
-      trialDays: 14,
+      trialDays: 5,
       maxUsers: 8,
       maxProfessionals: 10,
       maxAppointmentsMonth: 2000,
@@ -52,7 +52,7 @@ async function seedPlans() {
       description:
         'Tudo do Pro mais o aluguel de espaços por turno ou diária, com link público para cada profissional.',
       price: 450,
-      trialDays: 14,
+      trialDays: 5,
       maxUsers: null,
       maxProfessionals: null,
       maxAppointmentsMonth: null,

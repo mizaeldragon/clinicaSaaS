@@ -26,7 +26,7 @@ const EMPTY = {
   slug: '',
   description: '',
   price: '',
-  trialDays: '14',
+  trialDays: '5',
   maxUsers: '',
   maxProfessionals: '',
   maxAppointmentsMonth: '',

@@ -193,7 +193,7 @@ model Plan {
   description          String?
   price                Decimal         @db.Decimal(10, 2)
   billingInterval      BillingInterval @default(MONTHLY)
-  trialDays            Int             @default(14)
+  trialDays            Int             @default(5)
   maxUsers             Int?
   maxProfessionals     Int?
   maxAppointmentsMonth Int?

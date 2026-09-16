@@ -39,7 +39,7 @@ const COPY: Record<Mode, { title: string; subtitle: string }> = {
   },
   register: {
     title: 'Criar sua empresa',
-    subtitle: 'Teste grátis por 14 dias, sem cartão de crédito',
+    subtitle: 'Teste grátis por 5 dias, sem cartão de crédito',
   },
 };
 

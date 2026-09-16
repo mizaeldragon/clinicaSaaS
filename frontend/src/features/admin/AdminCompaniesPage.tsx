@@ -45,7 +45,7 @@ export function AdminCompaniesPage() {
     adminName: '',
     adminEmail: '',
     adminPassword: '',
-    trialDays: '14',
+    trialDays: '5',
   });
 
   const debounced = useDebouncedValue(search, 350);
@@ -159,10 +159,10 @@ export function AdminCompaniesPage() {
                           ))}
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
-                            onSelect={() => mutations.extendTrial.mutate({ id: company.id, days: 14 })}
+                            onSelect={() => mutations.extendTrial.mutate({ id: company.id, days: 5 })}
                           >
                             <CalendarPlus />
-                            Estender teste (14 dias)
+                            Estender teste (5 dias)
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           {company.status !== 'SUSPENDED' ? (
@@ -225,7 +225,7 @@ export function AdminCompaniesPage() {
                     adminName: '',
                     adminEmail: '',
                     adminPassword: '',
-                    trialDays: '14',
+                    trialDays: '5',
                   });
                 })
                 .catch(() => undefined);

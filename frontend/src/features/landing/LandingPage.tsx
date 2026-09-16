@@ -82,7 +82,7 @@ function Hero() {
           <h1 className="text-[3.1rem] font-bold leading-[0.98] tracking-[-0.065em] sm:text-6xl lg:text-[4.35rem]">Seu tempo fica com as clientes. A organização fica com o CliniStudio.</h1>
           <p className="mt-6 max-w-lg text-lg leading-relaxed text-[#1d2340]/68">Agenda, clientes, caixa e espaços em um só lugar para seu negócio crescer sem virar uma bagunça.</p>
           <div className="mt-8 flex flex-wrap items-center gap-3"><a href="#planos" className="group inline-flex items-center gap-2 rounded-full bg-[#d24362] px-6 py-3.5 text-sm font-bold text-white transition hover:bg-[#b9314e] active:translate-y-px">Começar grátis <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" /></a><a href="#como-funciona" className="rounded-full border border-[#1d2340]/15 px-6 py-3.5 text-sm font-bold transition hover:border-[#1d2340]/35 hover:bg-white">Ver como funciona</a></div>
-          <p className="mt-5 text-sm font-medium text-[#1d2340]/48">14 dias gratuitos. Sem cartão de crédito.</p>
+          <p className="mt-5 text-sm font-medium text-[#1d2340]/48">5 dias gratuitos. Sem cartão de crédito.</p>
         </div>
         <div className="relative min-h-[390px] sm:min-h-[480px]">
           <div className="absolute inset-y-0 left-4 right-0 overflow-hidden rounded-[2rem] bg-[#f2d8d1] sm:left-10"><img src={PHOTOS.hero} alt="Profissional em um salão de beleza" className="size-full object-cover object-center" /></div>
@@ -126,7 +126,7 @@ function OnlineBooking() {
 function Plans() {
   const pro = ['Agenda, clientes e serviços', 'Financeiro, comissão e relatórios', 'Link público de agendamento'];
   const premium = ['Tudo do Pro', 'Aluguel por turno, diária ou mês', 'Contratos, cobrança e logins separados'];
-  return <section id="planos" className="border-y border-[#1d2340]/10 bg-[#f6eee9] px-5 py-24 sm:px-8 lg:py-32"><div className="mx-auto max-w-7xl"><div className="max-w-xl"><Eyebrow>Planos</Eyebrow><h2 className="text-4xl font-bold leading-[1.04] tracking-[-0.055em] sm:text-5xl">Comece pelo que o seu espaço precisa.</h2></div><div className="mt-12 grid gap-4 lg:grid-cols-2"><Plan slug="pro" name="Pro" description="Para quem atende no próprio espaço." price="300" features={pro} /><Plan slug="premium" name="Premium" description="Para quem atende e também aluga espaço." price="450" features={premium} popular /></div><p className="mt-7 text-sm font-medium text-[#1d2340]/54">Teste por 14 dias. Cancele quando quiser.</p></div></section>;
+  return <section id="planos" className="border-y border-[#1d2340]/10 bg-[#f6eee9] px-5 py-24 sm:px-8 lg:py-32"><div className="mx-auto max-w-7xl"><div className="max-w-xl"><Eyebrow>Planos</Eyebrow><h2 className="text-4xl font-bold leading-[1.04] tracking-[-0.055em] sm:text-5xl">Comece pelo que o seu espaço precisa.</h2></div><div className="mt-12 grid gap-4 lg:grid-cols-2"><Plan slug="pro" name="Pro" description="Para quem atende no próprio espaço." price="300" features={pro} /><Plan slug="premium" name="Premium" description="Para quem atende e também aluga espaço." price="450" features={premium} popular /></div><p className="mt-7 text-sm font-medium text-[#1d2340]/54">Teste por 5 dias. Cancele quando quiser.</p></div></section>;
 }
 
 function Plan({ slug, name, description, price, features, popular = false }: { slug: string; name: string; description: string; price: string; features: string[]; popular?: boolean }) {
