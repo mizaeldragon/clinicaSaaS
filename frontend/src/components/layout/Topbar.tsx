@@ -25,7 +25,10 @@ export function Topbar({ onOpenMenu }: { onOpenMenu: () => void }) {
   const unread = notifications?.unread ?? 0;
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border/70 bg-background/85 px-4 backdrop-blur-md lg:px-6">
+    // Sem linha embaixo e na cor do quadro, não do cartão: o que separa o
+    // cabeçalho do conteúdo agora é o cartão flutuante, não um traço. Opaco de
+    // propósito — o conteúdo desliza por baixo dele ao rolar.
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 bg-shell px-4 lg:px-6">
       <Button variant="ghost" size="icon" className="lg:hidden" onClick={onOpenMenu} aria-label="Abrir menu">
         <Menu />
       </Button>

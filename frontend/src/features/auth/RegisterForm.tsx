@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Building2, Check, Mail, User } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Building2, Mail, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,13 +16,26 @@ import { useAuthStore } from '@/stores/auth.store';
 import { usePublicPlans } from './usePublicPlans';
 import { COMPANY_TYPE } from '@/config/labels';
 import { currency } from '@/lib/format';
-import { cn } from '@/lib/utils';
 import { ApiError } from '@/lib/api';
 
-/** A metade "Criar conta" do cartão de autenticação. */
+/**
+ * A metade "Criar conta" do cartão de autenticação.
+ *
+ * O plano não se escolhe aqui. Quem decide entre Pro e Premium está comparando
+ * o que cada um entrega, e essa comparação é a seção de planos da landing —
+ * com as duas listas lado a lado. Repetir a escolha no fim do formulário, em
+ * duas linhas de resumo, era pedir a mesma decisão de novo no pior momento
+ * para tomá-la.
+ *
+ * O plano chega pela URL (`/cadastro?plano=premium`), posto lá pelo botão do
+ * cartão na landing. Aqui ele só aparece confirmado, com um caminho de volta
+ * para a comparação. Sem parâmetro — quem veio pelo alternador do login, por
+ * exemplo — vale o primeiro plano da lista, e o aviso diz qual é.
+ */
 export function RegisterForm({ onCreated }: { onCreated: () => void }) {
   const register = useAuthStore((state) => state.register);
   const { data: plans } = usePublicPlans();
+  const [searchParams] = useSearchParams();
 
   const [form, setForm] = useState({
     companyName: '',
@@ -31,8 +45,13 @@ export function RegisterForm({ onCreated }: { onCreated: () => void }) {
     password: '',
     phone: '',
   });
-  const [planSlug, setPlanSlug] = useState<string>('pro');
   const [loading, setLoading] = useState(false);
+
+  // Só aceita slug que exista de verdade: a URL é de quem chega, e um valor
+  // inventado faria o cadastro falhar lá no fim, depois de tudo preenchido.
+  const escolhido = searchParams.get('plano');
+  const plan = plans?.find((item) => item.slug === escolhido) ?? plans?.[0];
+  const planSlug = plan?.slug ?? 'pro';
 
   function set<K extends keyof typeof form>(key: K, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -141,36 +160,28 @@ export function RegisterForm({ onCreated }: { onCreated: () => void }) {
         />
       </div>
 
-      {plans?.length ? (
-        <div className="space-y-2">
-          <Label>Plano inicial</Label>
-          <div className="grid gap-2">
-            {plans.map((plan) => (
-              <button
-                key={plan.slug}
-                type="button"
-                onClick={() => setPlanSlug(plan.slug)}
-                className={cn(
-                  'flex items-center justify-between rounded-xl border p-3 text-left transition-all',
-                  planSlug === plan.slug
-                    ? 'border-primary bg-primary/5 ring-1 ring-primary'
-                    : 'border-border hover:border-primary/40',
-                )}
-              >
-                <div>
-                  <p className="flex items-center gap-2 text-sm font-medium">
-                    {plan.name}
-                    {planSlug === plan.slug ? <Check className="size-4 text-primary" /> : null}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{plan.description}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-semibold">{currency(plan.price)}</p>
-                  <p className="text-[11px] text-muted-foreground">{plan.trialDays} dias grátis</p>
-                </div>
-              </button>
-            ))}
+      {plan ? (
+        <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/60 px-3.5 py-3">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Plano escolhido
+            </p>
+            <p className="mt-0.5 truncate text-sm font-semibold">
+              {plan.name}
+              <span className="font-normal text-muted-foreground">
+                {' '}· {currency(plan.price)}/mês · {plan.trialDays} dias grátis
+              </span>
+            </p>
           </div>
+          {/* <a> e não <Link> de propósito: o React Router troca a rota sem
+              recarregar e não rola até a âncora, então o "#planos" seria
+              ignorado e a pessoa cairia no topo da landing. */}
+          <a
+            href="/#planos"
+            className="shrink-0 text-xs font-semibold text-primary hover:underline"
+          >
+            Trocar
+          </a>
         </div>
       ) : null}
 

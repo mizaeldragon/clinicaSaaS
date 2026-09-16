@@ -277,7 +277,7 @@ export function PublicBookingPage() {
                               setServiceId(item.id);
                               setStep('date');
                             }}
-                            className="flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-card p-4 text-left transition-all hover:border-primary hover:shadow-card"
+                            className="flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-card p-4 text-left transition-all hover:border-primary hover:shadow-panel"
                           >
                             <div className="min-w-0">
                               <p className="font-medium">{item.name}</p>

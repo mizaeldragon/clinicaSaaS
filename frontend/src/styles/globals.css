@@ -41,11 +41,22 @@
     --input: 240 10% 90%;
     --ring: 262 83% 58%;
 
-    --sidebar: 250 30% 14%;
-    --sidebar-foreground: 250 20% 92%;
-    --sidebar-muted: 250 12% 62%;
+    /*
+     * O quadro do painel.
+     *
+     * Precisa ser um tom mais fundo que os cartões: é esse degrau que faz o
+     * conteúdo parecer flutuar. Puxa para o quente porque é a família da
+     * landing — areia e blush —, não um cinza neutro que brigaria com ela.
+     */
+    --shell: 26 30% 96%;
+
+    /* Menu lateral claro: a marca é marinho e vinho, e sobre branco ela
+       aparece inteira, sem precisar de pastilha por baixo. */
+    --sidebar: 0 0% 100%;
+    --sidebar-foreground: 224 30% 12%;
+    --sidebar-muted: 224 12% 46%;
     --sidebar-accent: 262 83% 58%;
-    --sidebar-border: 250 20% 22%;
+    --sidebar-border: 240 10% 90%;
 
     --radius: 0.75rem;
   }
@@ -72,7 +83,11 @@
     --border: 240 10% 20%;
     --input: 240 10% 20%;
 
-    --sidebar: 240 18% 10%;
+    --shell: 240 16% 7%;
+
+    --sidebar: 240 14% 11%;
+    --sidebar-foreground: 240 15% 96%;
+    --sidebar-muted: 240 10% 62%;
     --sidebar-border: 240 12% 18%;
   }
 
@@ -127,7 +142,7 @@
   }
 
   .glass-card {
-    @apply rounded-xl border border-border/70 bg-card shadow-card;
+    @apply rounded-xl border border-border/70 bg-card shadow-panel;
   }
 }
 

@@ -15,6 +15,7 @@ export default {
         ring: 'hsl(var(--ring))',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
+        shell: 'hsl(var(--shell))',
         primary: {
           DEFAULT: 'hsl(var(--primary))',
           foreground: 'hsl(var(--primary-foreground))',
@@ -69,7 +70,11 @@ export default {
       },
       boxShadow: {
         soft: '0 1px 2px 0 rgb(16 24 40 / 0.04), 0 1px 3px 0 rgb(16 24 40 / 0.06)',
-        card: '0 1px 3px rgb(16 24 40 / 0.06), 0 8px 24px -12px rgb(16 24 40 / 0.12)',
+        // Nao chamar de 'card': existe uma COR com esse nome logo acima, e o
+        // Tailwind gera `shadow-<cor>` para cada uma. As duas regras saem com o
+        // mesmo nome de classe, a de cor vence, e `shadow-card` virava "sombra
+        // branca" — invisivel sobre fundo claro.
+        panel: '0 1px 3px rgb(16 24 40 / 0.06), 0 8px 24px -12px rgb(16 24 40 / 0.12)',
         pop: '0 10px 40px -12px rgb(16 24 40 / 0.22)',
       },
       keyframes: {

@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/auth.store';
 import { NAV_ITEMS, type NavItem } from '@/config/navigation';
 import { isNavItemVisible } from '@/lib/nav';
 import { Button } from '@/components/ui/button';
-import { BrandMarkTile } from '@/components/brand';
+import { BrandLogo } from '@/components/brand';
 
 const GROUP_LABELS: Record<NavItem['group'], string> = {
   operação: 'Operação',
@@ -50,15 +50,15 @@ export function Sidebar({ open, onClose }: SidebarProps) {
       >
         {/* Marca do produto. A identidade da empresa fica no topo, à direita. */}
         <div className="flex h-16 items-center gap-3 px-5">
-          <BrandMarkTile />
+          {/* Num contêiner flex, o flex-1 tem que ficar na caixa: aplicado na
+              própria imagem ele esticaria o logotipo. */}
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold">CliniStudio</p>
-            <p className="truncate text-[11px] text-sidebar-muted">Gestão de beleza</p>
+            <BrandLogo className="h-7" />
           </div>
           <Button
             variant="ghost"
             size="icon-sm"
-            className="text-sidebar-muted hover:bg-white/10 hover:text-white lg:hidden"
+            className="text-sidebar-muted hover:bg-foreground/[0.06] lg:hidden"
             onClick={onClose}
             aria-label="Fechar menu"
           >
@@ -86,8 +86,8 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                       cn(
                         'group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all',
                         isActive
-                          ? 'bg-sidebar-accent text-white shadow-lg'
-                          : 'text-sidebar-foreground/75 hover:bg-white/8 hover:text-white',
+                          ? 'bg-sidebar-accent/10 text-sidebar-accent'
+                          : 'text-sidebar-foreground/70 hover:bg-foreground/[0.04] hover:text-sidebar-foreground',
                       )
                     }
                   >
@@ -101,8 +101,8 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         </nav>
 
         {company?.subscriptionStatus === 'TRIALING' && company.trialEndsAt ? (
-          <div className="mx-3 mb-4 rounded-xl border border-sidebar-border bg-white/5 p-3">
-            <p className="text-xs font-medium text-white">Período de teste</p>
+          <div className="mx-3 mb-4 rounded-xl border border-sidebar-border bg-shell p-3">
+            <p className="text-xs font-semibold text-sidebar-foreground">Período de teste</p>
             <p className="mt-0.5 text-[11px] text-sidebar-muted">
               Termina em {new Date(company.trialEndsAt).toLocaleDateString('pt-BR')}
             </p>

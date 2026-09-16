@@ -33,17 +33,30 @@ export function AppLayout() {
   ).slice(0, 5);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-shell">
       <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
 
       <div className="lg:pl-[270px]">
         <Topbar onOpenMenu={() => setMenuOpen(true)} />
-        <main className="mx-auto w-full max-w-[1400px] px-4 pb-24 pt-6 lg:px-8 lg:pb-10">
-          <Outlet />
+
+        {/*
+          O conteúdo mora num cartão que flutua sobre o quadro.
+
+          É ele que separa o miolo do menu e do cabeçalho agora — antes eram
+          duas linhas de 1px. A folga em volta e a sombra fazem o mesmo
+          trabalho sem cortar a tela em retângulos.
+
+          Os cartões de dentro continuam visíveis porque têm borda própria; do
+          contrário sumiriam, branco sobre branco.
+        */}
+        <main className="px-3 pb-24 lg:px-5 lg:pb-6">
+          <div className="mx-auto w-full max-w-[1400px] rounded-2xl bg-card p-4 shadow-panel sm:p-6 lg:p-7">
+            <Outlet />
+          </div>
         </main>
       </div>
 
-      <nav className="safe-bottom fixed inset-x-0 bottom-0 z-30 flex border-t border-border/70 bg-background/95 backdrop-blur-md lg:hidden">
+      <nav className="safe-bottom fixed inset-x-0 bottom-0 z-30 flex bg-card/95 shadow-[0_-1px_3px_rgb(16_24_40/0.06)] backdrop-blur-md lg:hidden">
         {mobileItems.map((item) => (
           <NavLink
             key={item.to}
