@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
+import { BrandLogo } from '@/components/brand';
 import { useAuthStore } from '@/stores/auth.store';
 import './landing.css';
 
@@ -83,7 +84,7 @@ const PLANOS = [
     nome: 'Starter',
     selo: 'Para começar',
     desc: 'Para quem atende sozinha e quer sair do caderno e da planilha.',
-    preco: '169,90',
+    preco: '199,99',
     precoMenor: true,
     itens: [
       'Agenda, clientes e serviços',
@@ -139,27 +140,40 @@ const DUVIDAS = [
   ],
 ];
 
-function Marca() {
-  return (
-    <>
-      Clini<span className="lp-marca-it">Studio</span>
-    </>
-  );
+/**
+ * Fica colado no topo e só vira barra quando a página sai do lugar.
+ *
+ * Parado no início, sem fundo e sem fio embaixo, ele some dentro do creme e o
+ * hero começa na borda da tela. Depois de rolar, precisa se destacar do que
+ * passa por baixo — e aí vira uma barra solta, com fundo e sombra.
+ */
+function useRolou(limite = 24) {
+  const [rolou, setRolou] = useState(false);
+
+  useEffect(() => {
+    const aoRolar = () => setRolou(window.scrollY > limite);
+    aoRolar();
+    window.addEventListener('scroll', aoRolar, { passive: true });
+    return () => window.removeEventListener('scroll', aoRolar);
+  }, [limite]);
+
+  return rolou;
 }
 
 export function LandingPage() {
   const token = useAuthStore((state) => state.accessToken);
   const [aberta, setAberta] = useState<number>(0);
+  const rolou = useRolou();
 
   if (token) return <Navigate to="/app" replace />;
 
   return (
     <div className="lp">
       {/* ------------------------------------------------------- barra topo */}
-      <div className="lp-topo" id="top">
+      <div className={rolou ? 'lp-topo lp-topo--flutuante' : 'lp-topo'} id="top">
         <div className="lp-wrap lp-pad lp-topo-linha">
-          <a href="#top" className="lp-marca">
-            <Marca />
+          <a href="#top" className="lp-marca" aria-label="CliniStudio, início">
+            <BrandLogo className="lp-logo" />
           </a>
 
           <nav className="lp-nav" aria-label="Navegação principal">
@@ -419,8 +433,8 @@ export function LandingPage() {
       </div>
 
       {/* --------------------------------------------------------- dúvidas */}
-      <div className="lp-pad lp-duvidas" id="duvidas">
-        <div className="lp-wrap lp-duvidas-grid">
+      <div className="lp-duvidas" id="duvidas">
+        <div className="lp-wrap lp-pad lp-duvidas-grid">
           <h2 className="lp-h2">
             Perguntas antes de <span className="lp-it">começar.</span>
           </h2>
@@ -451,7 +465,10 @@ export function LandingPage() {
       </div>
 
       {/* ------------------------------------------------------------- CTA */}
-      <div className="lp-cta">
+      {/* Dentro de `lp-wrap`/`lp-pad` como o resto: antes tinha largura própria
+          de 1060px e ficava mais estreito que a seção logo acima. */}
+      <div className="lp-wrap lp-pad lp-cta-caixa">
+        <div className="lp-cta">
         <img
           src="/landing/cta.jpg"
           alt="CliniStudio no notebook e no celular"
@@ -471,25 +488,54 @@ export function LandingPage() {
             <a href="#planos" className="lp-btn lp-btn-branco">
               Começar grátis <span aria-hidden>→</span>
             </a>
+            </div>
           </div>
         </div>
       </div>
 
       {/* ---------------------------------------------------------- rodapé */}
-      <div className="lp-pad lp-rodape">
-        <div className="lp-wrap lp-rodape-linha">
-          <span className="lp-marca">
-            <Marca />
-          </span>
-          <span className="lp-rodape-copy">
-            © {new Date().getFullYear()} CliniStudio · Gestão para espaços de beleza
-          </span>
-          <div className="lp-rodape-links">
-            <Link to="/login">Entrar</Link>
-            <a href="#planos">Criar conta</a>
+      <footer className="lp-rodape">
+        <div className="lp-wrap lp-pad">
+          <div className="lp-rodape-grid">
+            <div className="lp-rodape-marca">
+              <BrandLogo className="lp-logo" />
+              <p>
+                Agenda, clientes, caixa e aluguel de espaços num lugar só — para salões,
+                clínicas de estética, barbearias e espaços compartilhados de beleza.
+              </p>
+            </div>
+
+            <div className="lp-rodape-coluna">
+              <h3>Produto</h3>
+              <a href="#metodo">Método</a>
+              <a href="#sistema">Sistema</a>
+              <a href="#planos">Planos</a>
+              <a href="#duvidas">Dúvidas</a>
+            </div>
+
+            <div className="lp-rodape-coluna">
+              <h3>Conta</h3>
+              <Link to="/login">Entrar</Link>
+              <a href="#planos">Criar conta</a>
+              <Link to="/esqueci-a-senha">Esqueci a senha</Link>
+            </div>
+
+            <div className="lp-rodape-coluna">
+              <h3>Legal</h3>
+              <Link to="/termos">Termos de uso</Link>
+              <Link to="/privacidade">Política de privacidade</Link>
+              <a href="mailto:contato@clinistudio.app">Falar com a gente</a>
+            </div>
+          </div>
+
+          <div className="lp-rodape-fim">
+            <span className="lp-rodape-copy">
+              © {new Date().getFullYear()} CliniStudio · Gestão para espaços de beleza
+            </span>
+            <span className="lp-rodape-copy">Feito no Brasil · dados hospedados no Brasil</span>
           </div>
         </div>
-      </div>
+      </footer>
     </div>
   );
 }

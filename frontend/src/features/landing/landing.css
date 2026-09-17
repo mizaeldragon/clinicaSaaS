@@ -28,7 +28,17 @@
   font-family: 'Hanken Grotesk', system-ui, sans-serif;
   background: var(--creme);
   color: var(--tinta);
-  overflow-x: hidden;
+
+  /*
+   * `clip`, e não `hidden`.
+   *
+   * `overflow-x: hidden` faz do elemento um contêiner de rolagem, e um
+   * contêiner de rolagem quebra o `position: sticky` de tudo que está dentro:
+   * a barra de topo passava a rolar junto com a página em vez de grudar.
+   * `clip` corta o que vaza sem criar rolagem — a rede de segurança continua,
+   * a barra volta a funcionar.
+   */
+  overflow-x: clip;
 }
 
 .lp * {
@@ -180,14 +190,16 @@
   transition: background 0.25s ease, color 0.25s ease, border-color 0.25s ease;
 }
 
+/* Degradê diagonal do rosa da marca para o vinho: dá volume ao botão sem
+   inventar cor nenhuma fora da paleta. */
 .lp .lp-btn-cheio {
-  background: var(--rosa);
+  background-image: linear-gradient(135deg, #f0577a 0%, #e13a5c 46%, #b82746 100%);
   color: #fff;
   box-shadow: 0 18px 34px -18px rgba(225, 58, 92, 0.8);
 }
 
 .lp .lp-btn-cheio:hover {
-  background: var(--tinta);
+  background-image: linear-gradient(135deg, #1b2044 0%, #2b3260 100%);
   color: #fff;
 }
 
@@ -216,13 +228,21 @@
 
 /* ------------------------------------------------------------ barra topo */
 
+/*
+ * Parada no topo, a barra não existe: sem fundo, sem fio, sem sombra. Ela some
+ * dentro do creme e o hero começa na borda da tela.
+ *
+ * Depois que a página rola, o conteúdo passa por baixo dela e aí ela precisa se
+ * separar do que passa — vira uma barra solta, com fundo, desfoque e sombra.
+ * A transição é do fundo e da sombra, não da altura: mexer na altura empurraria
+ * a página inteira a cada rolagem.
+ */
 .lp-topo {
   position: sticky;
   top: 0;
   z-index: 60;
-  background: rgba(255, 249, 245, 0.82);
-  backdrop-filter: blur(14px);
-  border-bottom: 1px solid rgba(27, 32, 68, 0.12);
+  padding-top: 0;
+  transition: padding-top 0.3s ease;
 }
 
 .lp-topo-linha {
@@ -230,8 +250,46 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 16px 32px;
+  position: relative;
   padding-top: 16px;
   padding-bottom: 16px;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transition: background 0.3s ease, box-shadow 0.3s ease, border-radius 0.3s ease,
+    padding 0.3s ease;
+}
+
+.lp-topo--flutuante {
+  padding-top: 12px;
+}
+
+.lp-topo--flutuante .lp-topo-linha {
+  background: rgba(255, 249, 245, 0.86);
+  backdrop-filter: blur(14px);
+  border-radius: 22px;
+  box-shadow: 0 14px 34px -22px rgba(27, 32, 68, 0.55);
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+/* Nas páginas de texto a barra já nasce assentada: não há hero para ela sumir
+   por cima. */
+.lp-topo--solto {
+  border-bottom: 1px solid rgba(27, 32, 68, 0.12);
+}
+
+.lp .lp-logo {
+  height: 40px;
+  width: auto;
+  display: block;
+}
+
+/* Na barra flutuante ela encolhe um tico, para a pílula não ficar alta demais
+   por cima do conteúdo. */
+.lp-topo--flutuante .lp-logo {
+  height: 34px;
+  transition: height 0.3s ease;
 }
 
 .lp .lp-marca {
@@ -250,10 +308,21 @@
   color: var(--rosa);
 }
 
+/*
+ * O menu fica no centro da barra, não no centro da sobra.
+ *
+ * `margin: 0 auto` divide o espaço livre igualmente — e como as ações da
+ * direita são bem mais largas que a marca, isso deixava o menu quase cem pixels
+ * à esquerda do meio de verdade. Tirado do fluxo e ancorado em 50%, ele fica
+ * centrado independente do que cresce nas pontas.
+ */
 .lp-nav {
-  margin-left: auto;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 12px 28px;
 }
 
@@ -273,13 +342,32 @@
 }
 
 .lp-acoes {
+  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 22px;
 }
 
-.lp-acoes a.lp-entrar {
-  color: var(--tinta);
+/*
+ * "Entrar" deixa de ser texto solto e vira botão.
+ *
+ * Fica na mesma família do principal, mas em contorno e fundo lavado: os dois
+ * lado a lado com o mesmo peso brigariam, e quem chega para conhecer o produto
+ * precisa ver "Começar grátis" primeiro.
+ */
+.lp .lp-acoes a.lp-entrar {
+  color: var(--rosa-escuro);
+  border: 1px solid rgba(225, 58, 92, 0.32);
+  background-image: linear-gradient(135deg, rgba(225, 58, 92, 0.1), rgba(225, 58, 92, 0.02));
+  padding: 12px 22px;
+  border-radius: 100px;
+  transition: background-image 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+}
+
+.lp .lp-acoes a.lp-entrar:hover {
+  color: var(--rosa-escuro);
+  border-color: rgba(225, 58, 92, 0.6);
+  background-image: linear-gradient(135deg, rgba(225, 58, 92, 0.2), rgba(225, 58, 92, 0.07));
 }
 
 .lp .lp-btn-topo {
@@ -287,16 +375,18 @@
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: #fff;
-  background: var(--rosa);
+  background-image: linear-gradient(135deg, #f0577a 0%, #e13a5c 46%, #b82746 100%);
   padding: 13px 24px;
   border-radius: 100px;
   font-weight: 600;
-  transition: background 0.25s ease;
+  box-shadow: 0 12px 24px -14px rgba(225, 58, 92, 0.85);
+  transition: background-image 0.25s ease, box-shadow 0.25s ease;
 }
 
 .lp .lp-btn-topo:hover {
-  background: var(--tinta);
+  background-image: linear-gradient(135deg, #1b2044 0%, #2b3260 100%);
   color: #fff;
+  box-shadow: 0 12px 24px -14px rgba(27, 32, 68, 0.6);
 }
 
 /* ----------------------------------------------------------------- hero */
@@ -1091,10 +1181,14 @@
 
 /* ------------------------------------------------------------------ CTA */
 
+/* A caixa dá a mesma moldura das seções de cima; o banner ocupa tudo que ela
+   oferece, em vez de ter uma largura própria e mais estreita. */
+.lp-cta-caixa {
+  padding-bottom: 40px;
+}
+
 .lp-cta {
-  max-width: 1060px;
-  margin: 0 auto 40px;
-  width: calc(100% - clamp(48px, 8vw, 80px));
+  width: 100%;
   border-radius: 32px;
   overflow: hidden;
   position: relative;
@@ -1171,23 +1265,101 @@
 /* --------------------------------------------------------------- rodapé */
 
 .lp-rodape {
-  padding-top: 44px;
-  padding-bottom: 56px;
+  padding-top: 64px;
+  padding-bottom: 40px;
   background: var(--creme);
+  border-top: 1px solid rgba(27, 32, 68, 0.12);
 }
 
-.lp-rodape-linha {
+/*
+ * Grade explícita, não `auto-fit`.
+ *
+ * Com `auto-fit`, num aparelho estreito a primeira coluna tomava a linha
+ * inteira e sobrava espaço para exatamente duas das trêss listas — uma descia
+ * sozinha e as outras ficavam espremidas lado a lado. Aqui é uma coluna no
+ * celular e quatro a partir do momento em que cabem.
+ */
+.lp-rodape-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 32px;
+  padding-bottom: 36px;
+}
+
+@media (min-width: 760px) {
+  .lp-rodape-grid {
+    grid-template-columns: 1.6fr repeat(3, 1fr);
+    gap: 36px 40px;
+    padding-bottom: 40px;
+  }
+}
+
+.lp-rodape-marca {
+  max-width: 360px;
+}
+
+.lp-rodape-marca p {
+  margin: 18px 0 0;
+  font-size: 13.5px;
+  font-weight: 300;
+  line-height: 1.7;
+  color: var(--cinza-texto);
+}
+
+.lp-rodape-coluna {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.lp-rodape-coluna h3 {
+  margin: 0 0 4px;
+  font-size: 10px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--rosa-etiqueta);
+  font-weight: 600;
+}
+
+.lp-rodape-coluna a {
+  font-size: 13.5px;
+  font-weight: 400;
+  color: var(--cinza-texto);
+  transition: color 0.2s ease;
+}
+
+.lp-rodape-coluna a:hover {
+  color: var(--tinta);
+}
+
+.lp-rodape-fim {
   display: flex;
   flex-wrap: wrap;
-  gap: 24px;
+  gap: 10px 24px;
   align-items: center;
   justify-content: space-between;
+  padding-top: 26px;
+  border-top: 1px solid rgba(27, 32, 68, 0.1);
 }
 
 .lp-rodape-copy {
   font-size: 12px;
   color: var(--cinza-2);
   font-weight: 300;
+}
+
+/* O rodapé curto das páginas de texto. */
+.lp-rodape-simples {
+  margin-top: 40px;
+}
+
+.lp-rodape-linha {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .lp-rodape-links {
@@ -1205,6 +1377,88 @@
 
 .lp-rodape-links a:hover {
   color: var(--tinta);
+}
+
+/* ---------------------------------------------- termos e privacidade */
+
+.lp-legal {
+  padding-top: 64px;
+  padding-bottom: 20px;
+  max-width: 820px;
+}
+
+.lp-legal-titulo {
+  margin-bottom: 18px;
+}
+
+.lp-legal-resumo {
+  font-size: 16px;
+  font-weight: 300;
+  line-height: 1.7;
+  color: var(--cinza-texto);
+  margin: 0 0 12px;
+  text-wrap: pretty;
+}
+
+.lp-legal-secao {
+  padding-top: 34px;
+}
+
+.lp-legal-secao h2 {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 24px;
+  letter-spacing: -0.01em;
+  margin: 0 0 14px;
+  padding-top: 26px;
+  border-top: 1px solid rgba(27, 32, 68, 0.14);
+}
+
+.lp-legal-num {
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  color: var(--rosa);
+  font-family: 'Hanken Grotesk', system-ui, sans-serif;
+}
+
+.lp-legal-secao p {
+  font-size: 15px;
+  font-weight: 300;
+  line-height: 1.75;
+  color: var(--cinza-texto);
+  margin: 0 0 14px;
+  text-wrap: pretty;
+}
+
+.lp-legal-secao ul {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lp-legal-secao li {
+  font-size: 15px;
+  font-weight: 300;
+  line-height: 1.6;
+  color: var(--cinza-texto);
+}
+
+.lp-legal-secao li::marker {
+  color: var(--rosa);
+}
+
+.lp-legal-contato {
+  margin: 44px 0 0;
+  padding-top: 26px;
+  border-top: 1px solid rgba(27, 32, 68, 0.14);
+  font-size: 14.5px;
+  font-weight: 300;
+  color: var(--cinza-texto);
 }
 
 /*
@@ -1246,8 +1500,11 @@
   }
 }
 
-/* A barra de topo é larga demais para caber numa linha no celular. */
-@media (max-width: 900px) {
+/*
+ * Abaixo disso o menu central encostaria na marca ou nas ações — e, por estar
+ * fora do fluxo, passaria por cima em vez de empurrar. Some antes disso.
+ */
+@media (max-width: 1080px) {
   .lp-nav {
     display: none;
   }

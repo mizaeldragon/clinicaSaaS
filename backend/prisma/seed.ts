@@ -33,7 +33,7 @@ async function seedPlans() {
       slug: 'starter',
       description:
         'Para quem atende sozinha: agenda, clientes, serviços, caixa e link de agendamento.',
-      price: 169.9,
+      price: 199.99,
       trialDays: 5,
       maxUsers: 1,
       maxProfessionals: 1,

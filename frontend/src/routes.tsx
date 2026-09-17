@@ -28,6 +28,7 @@ import { NotFoundPage } from '@/features/misc/NotFoundPage';
 import { PublicBookingPage } from '@/features/public/PublicBookingPage';
 import { PublicAppointmentPage } from '@/features/public/PublicAppointmentPage';
 import { LandingPage } from '@/features/landing/LandingPage';
+import { PrivacidadePage, TermosPage } from '@/features/landing/LegalPage';
 
 export function AppRoutes() {
   return (
@@ -40,6 +41,11 @@ export function AppRoutes() {
       <Route path="/login" element={<AuthSwitch />} />
       <Route path="/cadastro" element={<AuthSwitch />} />
       <Route path="/esqueci-a-senha" element={<ForgotPasswordPage />} />
+
+      {/* Documentos do rodapé. Abertos, sem login: quem está decidindo se
+          assina precisa ler antes de criar conta. */}
+      <Route path="/termos" element={<TermosPage />} />
+      <Route path="/privacidade" element={<PrivacidadePage />} />
       {/* O endereço que vai no e-mail: /redefinir-senha?token=... */}
       <Route path="/redefinir-senha" element={<ResetPasswordPage />} />
 
