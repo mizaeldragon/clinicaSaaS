@@ -18,6 +18,7 @@ import { publicRoutes } from '../modules/public/public.routes';
 import { financialRoutes } from '../modules/financial/financial.routes';
 import { commissionsRoutes } from '../modules/commissions/commissions.routes';
 import { reportsRoutes } from '../modules/reports/reports.routes';
+import { insightsRoutes } from '../modules/insights/insights.routes';
 import { notificationsRoutes } from '../modules/notifications/notifications.routes';
 import { subscriptionsRoutes } from '../modules/subscriptions/subscriptions.routes';
 import { adminRoutes } from '../modules/admin/admin.routes';
@@ -76,6 +77,8 @@ secured.use('/rentals', rentalsRoutes);
 secured.use('/financial', financialRoutes);
 secured.use('/commissions', commissionsRoutes);
 secured.use('/reports', reportsRoutes);
+// Leituras do proprio historico: risco de falta, encaixe e resumo do mes.
+secured.use('/insights', insightsRoutes);
 secured.use('/audit-logs', auditRoutes);
 secured.use('/uploads', uploadsRoutes);
 

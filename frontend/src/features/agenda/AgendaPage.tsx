@@ -28,6 +28,7 @@ import { AppointmentDialog } from './AppointmentDialog';
 import { AppointmentDetail } from './AppointmentDetail';
 import { RentedShiftsBand } from './RentedShiftsBand';
 import { StatusLegend } from './StatusLegend';
+import { EncaixesCard } from '@/features/insights/EncaixesCard';
 import type { Appointment } from '@/types';
 
 type View = 'day' | 'week' | 'month';
@@ -39,6 +40,10 @@ export function AgendaPage() {
 
   const [view, setView] = useState<View>('week');
   const [reference, setReference] = useState(new Date());
+
+  // `format` local, e não `toISOString`: o ISO converte para UTC e antes das
+  // 21h no Brasil isso devolve o dia anterior.
+  const diaDeReferência = format(reference, 'yyyy-MM-dd');
   const [professionalId, setProfessionalId] = useState('');
   const [serviceId, setServiceId] = useState('');
   const [roomId, setRoomId] = useState('');
@@ -207,6 +212,10 @@ export function AgendaPage() {
       ) : null}
 
       <RentedShiftsBand days={days} from={range.from} to={range.to} />
+
+      {/* Os vaos do dia de referencia. Em modo semana a data e o dia em que a
+          pessoa esta ancorada, que e o mais proximo do que ela esta olhando. */}
+      {hasModule('reports') ? <EncaixesCard data={diaDeReferência} /> : null}
 
       {isLoading ? (
         <Skeleton className="h-[560px] rounded-xl" />

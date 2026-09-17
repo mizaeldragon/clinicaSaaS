@@ -17,6 +17,7 @@ import { PageHeader, StatCard, TBody, TD, TH, THead, TR, Table } from '@/compone
 import { EmptyState, Skeleton } from '@/components/ui/feedback';
 import { Label, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/primitives';
 import { useReport } from '@/api/queries';
+import { ResumoDoMesCard } from '@/features/insights/ResumoDoMesCard';
 import { APPOINTMENT_STATUS } from '@/config/labels';
 import { compactCurrency, currency, percent, weekdayName } from '@/lib/format';
 import type { AppointmentStatus } from '@/types';
@@ -94,6 +95,10 @@ export function ReportsPage() {
           </div>
         }
       />
+
+      {/* Antes das tabelas: quem abre relatorios quer a conclusao, e so depois
+          conferir de onde ela veio. */}
+      <ResumoDoMesCard />
 
       {appointments.isLoading ? (
         <Skeleton className="h-28 rounded-xl" />

@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { useDashboard } from '@/api/queries';
 import { useAuthStore } from '@/stores/auth.store';
+import { RiscoDeFaltaCard } from '@/features/insights/RiscoDeFaltaCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatCard } from '@/components/ui/data';
 import { Button } from '@/components/ui/button';
@@ -159,6 +160,10 @@ export function DashboardPage() {
           />
         </div>
       ) : null}
+
+      {/* Antes do gráfico de propósito: e a unica coisa desta tela em que da
+          para agir hoje, ligando para confirmar. */}
+      {hasModule('reports') ? <RiscoDeFaltaCard /> : null}
 
       <div className="grid gap-4 lg:grid-cols-3">
         {/* ------------------------------------------------------- Gráfico */}

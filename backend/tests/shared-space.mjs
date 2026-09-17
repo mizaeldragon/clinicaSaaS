@@ -2,7 +2,8 @@
  * Cenário do espaço compartilhado: aluguel por turno alimentando a agenda
  * pública. Roda contra a API em execução, depois de `npm run seed`.
  */
-const BASE = 'http://localhost:3333/api/v1';
+// A porta vem do ambiente quando a 3333 estiver ocupada por outro projeto.
+const BASE = process.env.API_URL ?? 'http://localhost:3333/api/v1';
 const SLUG = 'espaco-marcia-vaz';
 
 let pass = 0;

@@ -53,6 +53,7 @@ export const keys = {
   commissions: (params?: unknown) => ['commissions', params] as const,
   commissionSummary: (month: string) => ['commission-summary', month] as const,
   reports: (name: string, params?: unknown) => ['reports', name, params] as const,
+  insights: (name: string, params?: unknown) => ['insights', name, params] as const,
   notifications: (params?: unknown) => ['notifications', params] as const,
   company: ['company'] as const,
   companyModules: ['company-modules'] as const,
@@ -1245,3 +1246,73 @@ export function useTwoFactorMutations() {
     }),
   };
 }
+
+/* ----------------------------------------------------- Leituras do histórico */
+
+export interface MotivoDoRisco {
+  texto: string;
+  direcao: 'cima' | 'baixo';
+}
+
+export interface AtendimentoEmRisco {
+  appointmentId: string;
+  startsAt: string;
+  customer: { id: string; name: string; phone: string | null };
+  professional: { id: string; name: string } | null;
+  servico: string | null;
+  valor: number;
+  risco: number;
+  faixa: 'baixo' | 'medio' | 'alto';
+  motivos: MotivoDoRisco[];
+  historico: { total: number; faltas: number };
+}
+
+export interface ResumoDeRisco {
+  dias: number;
+  taxaDaEmpresa: number;
+  taxaEmTexto: string;
+  baseadoEm: number;
+  total: number;
+  emRisco: number;
+  valorEmRisco: number;
+  principais: AtendimentoEmRisco[];
+}
+
+export const useRiscoDeFalta = (dias = 7) =>
+  useApiQuery<ResumoDeRisco>(keys.insights('no-show', dias), '/insights/no-show/resumo', { dias });
+
+export interface Encaixe {
+  professional: { id: string; name: string };
+  comecaEm: string;
+  terminaEm: string;
+  minutos: number;
+  candidatas: {
+    appointmentId: string;
+    customer: { id: string; name: string; phone: string | null };
+    servico: string | null;
+    duracao: number;
+    marcadaPara: string;
+    adiantaEmDias: number;
+    valor: number;
+    motivos: string[];
+  }[];
+}
+
+export const useEncaixes = (data: string) =>
+  useApiQuery<Encaixe[]>(keys.insights('encaixes', data), '/insights/encaixes', { data });
+
+export interface ResumoDoMes {
+  mes: string;
+  rotulo: string;
+  receita: number;
+  despesa: number;
+  resultado: number;
+  atendimentos: number;
+  faltas: number;
+  anterior: { receita: number; atendimentos: number; variacao: number | null } | null;
+  destaques: { texto: string; tom: 'bom' | 'ruim' | 'neutro' }[];
+  temDados: boolean;
+}
+
+export const useResumoDoMes = (mes: string) =>
+  useApiQuery<ResumoDoMes>(keys.insights('resumo', mes), '/insights/resumo-do-mes', { mes });

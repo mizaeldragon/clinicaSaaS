@@ -4,7 +4,8 @@ import jwt from 'jsonwebtoken';
 import { generateSync } from 'otplib';
 import { PrismaClient } from '@prisma/client';
 
-const BASE = 'http://localhost:3333/api/v1';
+// A porta vem do ambiente quando a 3333 estiver ocupada por outro projeto.
+const BASE = process.env.API_URL ?? 'http://localhost:3333/api/v1';
 
 /**
  * Acesso direto ao banco para montar cenários que a API não expõe de
