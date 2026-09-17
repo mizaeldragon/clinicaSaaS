@@ -1,4 +1,6 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+/* Inter no painel; Newsreader e Hanken Grotesk na vitrine. Num pedido só —
+   e o navegador só baixa a fonte que a página aberta realmente usa. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Newsreader:ital,wght@0,400;1,400&family=Hanken+Grotesk:wght@300;400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
