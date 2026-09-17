@@ -21,6 +21,36 @@ const ALL_MODULES: ModuleKey[] = [
 async function seedPlans() {
   const plans: Prisma.PlanUncheckedCreateInput[] = [
     {
+      // Quem trabalha sozinha: manicure, designer de sobrancelha, esteticista
+      // autônoma. Tem agenda, clientes, serviços, caixa e o link público — o
+      // que falta é só o que existe por causa de equipe.
+      //
+      // `professionals` entra mesmo com limite de 1: o cadastro não cria um
+      // profissional sozinho, e o agendamento público exige escolher uma. Sem
+      // esse módulo ela nunca apareceria no próprio link, que é justamente o
+      // que mais vende o plano.
+      name: 'Starter',
+      slug: 'starter',
+      description:
+        'Para quem atende sozinha: agenda, clientes, serviços, caixa e link de agendamento.',
+      price: 169.9,
+      trialDays: 5,
+      maxUsers: 1,
+      maxProfessionals: 1,
+      // Sem teto de atendimento: travar a agenda no fim do mês é travar o
+      // faturamento de quem menos pode perder cliente.
+      maxAppointmentsMonth: null,
+      modules: [
+        'appointments',
+        'customers',
+        'services',
+        'professionals',
+        'financial',
+        'notifications',
+      ],
+      sortOrder: 0,
+    },
+    {
       // A clínica que atende as próprias clientes: equipe, salas, caixa e
       // comissões. Não aluga espaço — e por isso nunca vê "Aluguel" no menu.
       name: 'Pro',
@@ -473,7 +503,10 @@ async function seedSmallStudio() {
   const existing = await prisma.company.findUnique({ where: { slug } });
   if (existing) return;
 
-  const plan = await prisma.plan.findUniqueOrThrow({ where: { slug: 'pro' } });
+  // Starter, e não Pro: a Lu trabalha sozinha. Enquanto assinava o Pro, esta
+  // conta era um estado que nenhum cadastro real conseguia produzir — tinha os
+  // módulos do Pro desligados na mão, e hoje o plano entrega os seus no ato.
+  const plan = await prisma.plan.findUniqueOrThrow({ where: { slug: 'starter' } });
   const passwordHash = await bcrypt.hash('studio@12345', 10);
 
   const company = await prisma.company.create({
@@ -492,9 +525,7 @@ async function seedSmallStudio() {
         },
       },
       modules: {
-        create: (['appointments', 'customers', 'services', 'notifications'] as ModuleKey[]).map(
-          (module) => ({ module, enabled: true }),
-        ),
+        create: (plan.modules as ModuleKey[]).map((module) => ({ module, enabled: true })),
       },
       businessHours: { create: BUSINESS_HOURS },
       users: {

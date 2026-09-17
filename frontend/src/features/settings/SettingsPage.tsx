@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Check, Copy, ExternalLink, Plus, Save, ShieldCheck, Trash2, UserPlus } from 'lucide-react';
+import { Copy, ExternalLink, Plus, Save, ShieldCheck, Trash2, UserPlus } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input, Textarea } from '@/components/ui/input';
@@ -37,7 +37,6 @@ import {
   useCompany,
   useCompanyModules,
   useCompanyMutations,
-  usePlans,
   useSubscription,
   useUserMutations,
   useProfessionals,
@@ -47,12 +46,11 @@ import { useAuthStore } from '@/stores/auth.store';
 import { toast } from 'sonner';
 import { applyBrandColor } from '@/lib/utils';
 import { ImageUpload } from '@/components/ImageUpload';
-import { moduleLabel } from '@/lib/modules';
 import { HolidaysCard } from './HolidaysCard';
 import { BillingCard } from './BillingCard';
 import { ChangePasswordCard, SessionsCard } from './ChangePasswordCard';
 import { TwoFactorCard } from './TwoFactorCard';
-import { currency, dateTimeLabel, weekdayName } from '@/lib/format';
+import { dateTimeLabel, weekdayName } from '@/lib/format';
 import type { UserRole } from '@/types';
 
 const DEFAULT_HOURS = Array.from({ length: 7 }, (_, weekday) => ({
@@ -74,7 +72,6 @@ export function SettingsPage() {
   const { data: users } = useUsers({ perPage: 50 });
   const { data: professionals } = useProfessionals({ isActive: 'true' });
   const { data: subscription } = useSubscription();
-  const { data: plans } = usePlans();
   const { data: auditLogs } = useAuditLogs({ perPage: 30 });
 
   const companyMutations = useCompanyMutations();
@@ -159,6 +156,7 @@ export function SettingsPage() {
       <Tabs value={tab} onValueChange={(value) => setSearchParams({ tab: value })}>
         <TabsList className="flex-wrap">
           <TabsTrigger value="empresa">Empresa</TabsTrigger>
+          <TabsTrigger value="horarios">Horários e feriados</TabsTrigger>
           <TabsTrigger value="modulos">Módulos</TabsTrigger>
           {isAdmin ? <TabsTrigger value="usuarios">Usuários</TabsTrigger> : null}
           <TabsTrigger value="plano">Plano e cobrança</TabsTrigger>
@@ -422,6 +420,16 @@ export function SettingsPage() {
             </CardContent>
           </Card>
 
+        </TabsContent>
+
+        {/* --------------------------------------------- Horários e feriados */}
+        {/*
+          Os dois no mesmo lugar porque respondem à mesma pergunta: quando o
+          espaço atende. A semana dá a regra, o feriado dá a exceção. Separados,
+          quem fosse fechar no dia 25 tinha que adivinhar em qual aba procurar.
+        */}
+        <TabsContent value="horarios" className="space-y-4">
+
           <Card>
             <CardHeader>
               <CardTitle>Horário de funcionamento</CardTitle>
@@ -613,19 +621,25 @@ export function SettingsPage() {
 
         {/* ---------------------------------------------------------- Plano */}
         <TabsContent value="plano" className="space-y-4">
-          {/* A cobrança vem primeiro: é a única parte com prazo. */}
+          {/*
+            Só o plano que a empresa paga.
+
+            Antes esta aba mostrava a mesma informação três vezes: o cartão de
+            cobrança, um "Plano atual" que repetia nome e status, e uma grade
+            com todos os planos do catálogo. A grade ainda por cima não fazia
+            nada — mandava a pessoa subir até "Assinar", que é onde a troca
+            acontece de verdade, dentro do próprio cartão de cobrança.
+          */}
           <BillingCard />
 
+          {/* O que sobrou do "Plano atual": o quanto do plano já está em uso.
+              Isso o cartão de cobrança não diz, e é o que avisa que está na
+              hora de subir de plano. */}
           {subscription ? (
             <Card>
               <CardHeader>
-                <CardTitle>Plano atual: {subscription.subscription.plan.name}</CardTitle>
-                <CardDescription>
-                  Status: {subscription.subscription.status}
-                  {subscription.subscription.trialEndsAt
-                    ? ` · Teste até ${new Date(subscription.subscription.trialEndsAt).toLocaleDateString('pt-BR')}`
-                    : ''}
-                </CardDescription>
+                <CardTitle>Uso do plano</CardTitle>
+                <CardDescription>Quanto do seu limite já está ocupado</CardDescription>
               </CardHeader>
               <CardContent className="grid gap-3 sm:grid-cols-3">
                 {Object.entries(subscription.usage).map(([key, usage]) => (
@@ -653,51 +667,6 @@ export function SettingsPage() {
               </CardContent>
             </Card>
           ) : null}
-
-          <div className="grid gap-4 lg:grid-cols-3">
-            {plans?.map((plan) => {
-              const current = subscription?.subscription.plan.slug === plan.slug;
-              return (
-                <Card key={plan.id} className={current ? 'border-primary ring-1 ring-primary' : ''}>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle>{plan.name}</CardTitle>
-                      {current ? <Badge>Plano atual</Badge> : null}
-                    </div>
-                    <CardDescription>{plan.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <p className="text-3xl font-semibold">
-                      {currency(plan.price)}
-                      <span className="text-sm font-normal text-muted-foreground">/mês</span>
-                    </p>
-
-                    <ul className="space-y-1.5 text-sm">
-                      {plan.modules.map((module) => (
-                        <li key={module} className="flex items-center gap-2">
-                          <Check className="size-4 text-primary" />
-                          {moduleLabel(module)}
-                        </li>
-                      ))}
-                    </ul>
-
-                    <div className="space-y-1 text-xs text-muted-foreground">
-                      <p>Usuários: {plan.limits.users ?? 'ilimitado'}</p>
-                      <p>Profissionais: {plan.limits.professionals ?? 'ilimitado'}</p>
-                      <p>Agendamentos/mês: {plan.limits.appointmentsMonth ?? 'ilimitado'}</p>
-                    </div>
-
-                    {!current && isAdmin ? (
-                      <p className="rounded-lg border bg-muted/40 p-2.5 text-xs text-muted-foreground">
-                        Para mudar para o {plan.name}, escolha o plano em{' '}
-                        <strong>Assinar</strong>, acima — a troca emite a cobrança junto.
-                      </p>
-                    ) : null}
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
         </TabsContent>
 
         {/* ------------------------------------------------------ Auditoria */}
