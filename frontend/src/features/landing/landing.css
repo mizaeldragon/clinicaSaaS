@@ -935,12 +935,20 @@
   margin: 0;
 }
 
+/*
+ * O selo de cada plano, na família do vermelho.
+ *
+ * Em tom lavado, não cheio: o do Premium é sólido, e três selos com o mesmo
+ * peso acabariam com a hierarquia que diz qual plano é o mais completo.
+ */
 .lp-plano-selo {
   font-size: 9.5px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--cinza-2);
-  border: 1px solid rgba(27, 32, 68, 0.16);
+  font-weight: 600;
+  color: var(--rosa-escuro);
+  border: 1px solid rgba(225, 58, 92, 0.3);
+  background-image: linear-gradient(135deg, rgba(225, 58, 92, 0.14), rgba(225, 58, 92, 0.03));
   border-radius: 100px;
   padding: 6px 12px;
   white-space: nowrap;
@@ -1062,11 +1070,13 @@
   background: radial-gradient(circle, rgba(225, 58, 92, 0.5), transparent 68%);
 }
 
+/* O do Premium fica cheio, com o mesmo degradê dos botões. */
 .lp-plano-navy .lp-plano-selo {
   color: #fff;
-  background: var(--rosa);
+  background-image: linear-gradient(135deg, #f0577a 0%, #e13a5c 50%, #b82746 100%);
   border-color: transparent;
   font-weight: 600;
+  box-shadow: 0 8px 18px -10px rgba(225, 58, 92, 0.9);
 }
 
 .lp-plano-navy .lp-plano-desc {
