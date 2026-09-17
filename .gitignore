@@ -15,3 +15,8 @@ backend/uploads/
 # dumps do banco — nunca versionar
 backups/
 *.dump
+
+# O manual completo (como rodar, arquitetura, seguranca) fica fora do
+# repositorio: com o projeto publico, ele seria um convite a usar o codigo.
+# Continua nesta maquina, em docs/MANUAL-INTERNO.md.
+docs/MANUAL-INTERNO.md
