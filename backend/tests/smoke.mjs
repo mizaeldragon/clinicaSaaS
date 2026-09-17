@@ -65,9 +65,15 @@ const run = async () => {
 
   const lu = await login('lu@studionails.com', 'studio@12345');
   check('login do Studio Nails', Boolean(lu.accessToken));
+  // A Lu trabalha sozinha: Starter. Enquanto assinava o Pro com quatro
+  // módulos ligados na mão, esta conta era um estado que nenhum cadastro real
+  // conseguia produzir — o plano entrega os seus módulos no ato do cadastro.
   check(
-    'o studio assina o mesmo Pro, mas ligou só 4 módulos',
-    lu.company.modules.length === 4 && lu.company.plan.slug === 'pro',
+    'o studio assina o Starter e recebe os módulos do plano',
+    lu.company.plan.slug === 'starter' &&
+      lu.company.modules.length === 6 &&
+      !lu.company.modules.includes('commissions') &&
+      !lu.company.modules.includes('resources'),
     JSON.stringify(lu.company.modules),
   );
 
@@ -239,7 +245,10 @@ const run = async () => {
   check('espaço no Premium recebe o bloco de aluguéis', marciaDashboard.data.rentals !== null);
 
   const luDashboard = await api('/dashboard', { token: lu.accessToken });
-  check('empresa sem financeiro não recebe o bloco', luDashboard.data.financial === null);
+  // O Starter inclui financeiro: quem trabalha sozinha também precisa saber
+  // quanto entrou. O bloco de recursos continua cobrindo o caso contrário —
+  // módulo desligado, bloco ausente.
+  check('studio no Starter recebe o bloco financeiro', luDashboard.data.financial !== null);
   check('empresa sem recursos não recebe o bloco', luDashboard.data.resources === null);
 
   const reports = await api('/reports/professionals', { token: bella.accessToken });

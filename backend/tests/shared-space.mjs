@@ -207,7 +207,11 @@ const run = async () => {
   );
 
   console.log('\n=== 5. Cliente agenda pelo link ===');
-  const slot = anaSlots.slots[2];
+  // O primeiro livre, e não um índice fixo: os horários agora andam de acordo
+  // com a duração do serviço, então um Corte de 60 min oferece poucas opções na
+  // manhã alugada — pedir o terceiro item assumia uma grade densa que não
+  // existe mais.
+  const slot = anaSlots.slots[0];
   const booked = await api(`/public/${SLUG}/appointments`, {
     method: 'POST',
     body: {

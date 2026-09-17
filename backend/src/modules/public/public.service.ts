@@ -255,14 +255,45 @@ export async function getPublicAvailability(query: AvailabilityQueryDTO) {
     const duration = link?.customDuration ?? service.durationMinutes;
     const price = link?.customPrice ? Number(link.customPrice) : Number(service.price);
 
+    // Duração inválida travaria o laço abaixo para sempre.
+    if (duration <= 0) continue;
+
     const windows = await availabilityWindows(professional, day);
     const slots: { time: string; startsAt: Date; endsAt: Date; resourceId: string | null }[] = [];
+
+    // Tudo que já ocupa a agenda desta profissional, para saber onde a grade
+    // precisa se realinhar.
+    const ocupados = [
+      ...appointments.filter((a) => a.professionalId === professional.id),
+      ...timeOffs.filter((t) => t.professionalId === professional.id),
+    ];
 
     for (const window of windows) {
       const from = Math.max(window.start, openAt);
       const to = Math.min(window.end, closeAt);
 
-      for (let cursor = from; cursor + duration <= to; cursor += 15) {
+      /**
+       * Os começos possíveis.
+       *
+       * A grade anda de `duration` em `duration`, e não de 15 em 15. Com passo
+       * fixo, um serviço de 20 minutos marcado às 09:00 termina 09:20 e o
+       * próximo oferecido era 09:30: dez minutos de cadeira parada a cada
+       * atendimento. Ancorada na abertura, a grade ainda cai em hora redonda
+       * sempre que a duração divide a hora.
+       *
+       * Somam-se os instantes logo após cada compromisso já marcado — senão um
+       * atendimento que terminasse fora da grade empurraria todo o resto do dia
+       * e deixaria a brecha sem uso.
+       */
+      const inicios = new Set<number>();
+      for (let cursor = from; cursor + duration <= to; cursor += duration) inicios.add(cursor);
+
+      for (const ocupado of ocupados) {
+        const fim = Math.round((ocupado.endsAt.getTime() - day.getTime()) / 60_000);
+        if (fim >= from && fim + duration <= to) inicios.add(fim);
+      }
+
+      for (const cursor of [...inicios].sort((a, b) => a - b)) {
         const startsAt = new Date(day);
         startsAt.setMinutes(cursor);
         const endsAt = addMinutes(startsAt, duration);
