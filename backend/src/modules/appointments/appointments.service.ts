@@ -37,6 +37,7 @@ import type {
   UpdateAppointmentDTO,
   UpdateStatusDTO,
 } from './appointments.schema';
+import { avisarPaginaPublica } from '../../shared/services/publicAgenda.service';
 
 const APPOINTMENT_INCLUDE = {
   customer: { select: { id: true, name: true, phone: true, whatsapp: true, email: true } },
@@ -183,6 +184,7 @@ export const appointmentsService = {
       SOCKET_EVENTS.appointmentCreated,
       appointment,
     );
+    void avisarPaginaPublica(companyId);
 
     await notificationsService.notifyEvent(companyId, 'APPOINTMENT_CREATED', {
       title: 'Novo agendamento',
@@ -277,6 +279,7 @@ export const appointmentsService = {
       SOCKET_EVENTS.appointmentUpdated,
       appointment,
     );
+    void avisarPaginaPublica(companyId);
 
     if (dto.startsAt) {
       await scheduleReminders(companyId, appointment.id, appointment.startsAt);
@@ -346,6 +349,7 @@ export const appointmentsService = {
       SOCKET_EVENTS.appointmentUpdated,
       appointment,
     );
+    void avisarPaginaPublica(companyId);
 
     if (dto.status === 'CANCELED') {
       await notificationsService.notifyEvent(companyId, 'APPOINTMENT_CANCELED', {
@@ -368,6 +372,7 @@ export const appointmentsService = {
     emitToPortfolio(companyId, appointment.ownerProfessionalId, SOCKET_EVENTS.appointmentDeleted, {
       id,
     });
+    void avisarPaginaPublica(companyId);
   },
 
   /** Resumo do dia usado no dashboard. */

@@ -241,7 +241,7 @@ export function PublicAppointmentPage() {
                 <div className="flex justify-center py-8">
                   <Spinner />
                 </div>
-              ) : slots.length === 0 ? (
+              ) : !slots.some((slot) => slot.disponivel) ? (
                 <p className="rounded-xl border bg-muted/40 p-4 text-sm text-muted-foreground">
                   Nenhum horário livre neste dia. Escolha outra data.
                 </p>
@@ -251,9 +251,15 @@ export function PublicAppointmentPage() {
                     <button
                       key={slot.startsAt}
                       type="button"
-                      disabled={reschedule.isPending}
+                      disabled={reschedule.isPending || !slot.disponivel}
+                      title={slot.disponivel ? undefined : 'Este horário já foi marcado'}
                       onClick={() => confirmReschedule(slot)}
-                      className="rounded-xl border py-2.5 text-sm font-medium transition-colors hover:border-primary hover:bg-primary/5 disabled:opacity-50"
+                      className={cn(
+                        'rounded-xl border py-2.5 text-sm font-medium transition-colors',
+                        slot.disponivel
+                          ? 'hover:border-primary hover:bg-primary/5 disabled:opacity-50'
+                          : 'cursor-not-allowed border-transparent bg-muted/60 text-muted-foreground/60 line-through',
+                      )}
                     >
                       {slot.time}
                     </button>

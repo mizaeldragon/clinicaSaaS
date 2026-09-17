@@ -28,6 +28,7 @@ import { Label, UserAvatar } from '@/components/ui/primitives';
 import { PageLoader, Spinner } from '@/components/ui/feedback';
 import { ApiError } from '@/lib/api';
 import { applyBrandColor, cn } from '@/lib/utils';
+import { useAgendaPublicaAoVivo } from '@/hooks/useAgendaPublicaAoVivo';
 import { currency, dateTimeLabel } from '@/lib/format';
 
 type Step = 'service' | 'date' | 'slot' | 'form' | 'done';
@@ -49,6 +50,9 @@ const STEP_LABELS: Record<Exclude<Step, 'done'>, string> = {
  */
 export function PublicBookingPage() {
   const { slug = '', professionalSlug } = useParams();
+
+  // Enquanto a cliente decide, outra pode estar marcando o mesmo horario.
+  useAgendaPublicaAoVivo(slug);
   const solo = Boolean(professionalSlug);
 
   const space = useStorefront(slug, !solo);
@@ -374,11 +378,24 @@ export function PublicBookingPage() {
                           <button
                             key={slot.startsAt}
                             type="button"
+                            disabled={!slot.disponivel}
+                            aria-label={
+                              slot.disponivel ? slot.time : `${slot.time} — horário ocupado`
+                            }
+                            title={slot.disponivel ? undefined : 'Este horário já foi marcado'}
                             onClick={() => {
                               setSelected({ professionalId: entry.professional.id, slot });
                               setStep('form');
                             }}
-                            className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium transition-all hover:border-primary hover:bg-primary hover:text-primary-foreground"
+                            className={cn(
+                              'rounded-lg border px-3 py-1.5 text-sm font-medium transition-all',
+                              slot.disponivel
+                                ? 'border-border hover:border-primary hover:bg-primary hover:text-primary-foreground'
+                                : // Apagado e riscado: o cinza sozinho ainda parece
+                                  // clicável, e o traço diz "ocupado" sem precisar de
+                                  // legenda.
+                                  'cursor-not-allowed border-transparent bg-muted/60 text-muted-foreground/60 line-through',
+                            )}
                           >
                             {slot.time}
                           </button>

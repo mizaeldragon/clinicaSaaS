@@ -13,6 +13,7 @@ import {
 import { notificationsService } from '../notifications/notifications.service';
 import { BLOCKING_STATUSES } from '../appointments/scheduling.service';
 import type { AvailabilityQueryDTO, CreatePublicAppointmentDTO } from './public.schema';
+import { avisarPaginaPublica } from '../../shared/services/publicAgenda.service';
 
 const OCCUPYING_BOOKING_STATUSES = ['RESERVED', 'CONFIRMED'] as const;
 
@@ -259,7 +260,23 @@ export async function getPublicAvailability(query: AvailabilityQueryDTO) {
     if (duration <= 0) continue;
 
     const windows = await availabilityWindows(professional, day);
-    const slots: { time: string; startsAt: Date; endsAt: Date; resourceId: string | null }[] = [];
+    /**
+     * `disponivel: false` em vez de sumir da lista.
+     *
+     * Horário que some deixa a cliente achando que o salão fecha àquela hora, e
+     * ela desiste. Aparecendo apagado, ela entende que o lugar existe e está
+     * tomado — e escolhe o vizinho.
+     *
+     * Nada diz de quem é o horário ocupado: a página é pública, e quem marcou
+     * às 15h não é assunto de quem está olhando.
+     */
+    const slots: {
+      time: string;
+      startsAt: Date;
+      endsAt: Date;
+      resourceId: string | null;
+      disponivel: boolean;
+    }[] = [];
 
     // Tudo que já ocupa a agenda desta profissional, para saber onde a grade
     // precisa se realinhar.
@@ -298,6 +315,7 @@ export async function getPublicAvailability(query: AvailabilityQueryDTO) {
         startsAt.setMinutes(cursor);
         const endsAt = addMinutes(startsAt, duration);
 
+        // Horário que já passou nao volta: esse sim sai da lista.
         if (startsAt <= now) continue;
 
         const busy = appointments.some(
@@ -306,7 +324,6 @@ export async function getPublicAvailability(query: AvailabilityQueryDTO) {
             startsAt < appointment.endsAt &&
             endsAt > appointment.startsAt,
         );
-        if (busy) continue;
 
         const away = timeOffs.some(
           (timeOff) =>
@@ -314,18 +331,20 @@ export async function getPublicAvailability(query: AvailabilityQueryDTO) {
             startsAt < timeOff.endsAt &&
             endsAt > timeOff.startsAt,
         );
-        if (away) continue;
 
         slots.push({
           time: `${String(Math.floor(cursor / 60)).padStart(2, '0')}:${String(cursor % 60).padStart(2, '0')}`,
           startsAt,
           endsAt,
           resourceId: window.resourceId,
+          disponivel: !busy && !away,
         });
       }
     }
 
-    if (slots.length > 0) {
+    // Sem nenhum horário livre ela nao entra na lista: uma coluna inteira
+    // apagada nao ajuda ninguem a escolher.
+    if (slots.some((slot) => slot.disponivel)) {
       result.push({
         professional: {
           id: professional.id,
@@ -382,8 +401,13 @@ export async function createPublicAppointment(
     throw new ScheduleConflictError('Esta profissional não tem horário disponível nesta data');
   }
 
+  // `disponivel` na busca, e nao so a existencia do horario: desde que os
+  // ocupados passaram a aparecer apagados na lista, achar o horario deixou de
+  // significar que ele esta livre -- e reservar por cima seria agendamento
+  // duplo.
   const slot = professional.slots.find(
-    (candidate) => candidate.startsAt.getTime() === dto.startsAt.getTime(),
+    (candidate) =>
+      candidate.disponivel && candidate.startsAt.getTime() === dto.startsAt.getTime(),
   );
 
   if (!slot) {
@@ -461,6 +485,7 @@ export async function createPublicAppointment(
     SOCKET_EVENTS.appointmentCreated,
     appointment,
   );
+  void avisarPaginaPublica(companyId);
 
   // A locadora não é avisada do atendimento de quem aluga: a notificação vai
   // para a própria locatária.
@@ -571,6 +596,7 @@ export async function cancelPublicAppointment(companyId: string, token: string, 
     SOCKET_EVENTS.appointmentUpdated,
     canceled,
   );
+  void avisarPaginaPublica(companyId);
 
   await notificationsService.notifyEvent(companyId, 'APPOINTMENT_CANCELED', {
     title: 'Cancelamento pelo link',
@@ -606,7 +632,10 @@ export async function reschedulePublicAppointment(
   });
 
   const entry = availability.professionals[0];
-  const slot = entry?.slots.find((candidate) => candidate.startsAt.getTime() === startsAt.getTime());
+  // Mesma razao da reserva: a lista agora inclui os ocupados.
+  const slot = entry?.slots.find(
+    (candidate) => candidate.disponivel && candidate.startsAt.getTime() === startsAt.getTime(),
+  );
 
   if (!slot) {
     throw new ScheduleConflictError('Este horário não está mais livre. Escolha outro, por favor.');
@@ -632,6 +661,7 @@ export async function reschedulePublicAppointment(
     SOCKET_EVENTS.appointmentUpdated,
     updated,
   );
+  void avisarPaginaPublica(companyId);
 
   await notificationsService.notifyEvent(companyId, 'APPOINTMENT_CREATED', {
     title: 'Horário remarcado pelo link',

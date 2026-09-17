@@ -66,6 +66,8 @@ export interface PublicSlot {
   startsAt: string;
   endsAt: string;
   resourceId: string | null;
+  /** false quando alguem ja marcou: aparece apagado, sem sumir da lista. */
+  disponivel: boolean;
 }
 
 export interface PublicAvailability {

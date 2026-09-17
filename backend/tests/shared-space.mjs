@@ -208,11 +208,10 @@ const run = async () => {
   );
 
   console.log('\n=== 5. Cliente agenda pelo link ===');
-  // O primeiro livre, e não um índice fixo: os horários agora andam de acordo
-  // com a duração do serviço, então um Corte de 60 min oferece poucas opções na
-  // manhã alugada — pedir o terceiro item assumia uma grade densa que não
-  // existe mais.
-  const slot = anaSlots.slots[0];
+  // O primeiro LIVRE. A lista passou a incluir os ocupados, apagados, para a
+  // cliente entender que o horário existe e está tomado — então pegar o
+  // primeiro item pode cair num que o servidor recusa.
+  const slot = anaSlots.slots.find((s) => s.disponivel);
   const booked = await api(`/public/${SLUG}/appointments`, {
     method: 'POST',
     body: {

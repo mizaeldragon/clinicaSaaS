@@ -49,7 +49,9 @@ export function AppLayout() {
           Os cartões de dentro continuam visíveis porque têm borda própria; do
           contrário sumiriam, branco sobre branco.
         */}
-        <main className="px-3 pb-24 lg:px-5 lg:pb-6">
+        {/* O respiro em cima não é estética: sem ele o cartão encosta no
+            cabeçalho e o canto arredondado não tem onde aparecer. */}
+        <main className="px-3 pb-24 pt-2 lg:px-5 lg:pb-6 lg:pt-3">
           <div className="mx-auto w-full max-w-[1400px] rounded-2xl bg-card p-4 shadow-panel sm:p-6 lg:p-7">
             <Outlet />
           </div>
