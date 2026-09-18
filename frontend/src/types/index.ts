@@ -170,6 +170,8 @@ export interface Professional {
   commissionValue: number | null;
   /** PROFESSIONAL = locatária: aluga o espaço e cobra as próprias clientes. */
   revenueOwner?: 'COMPANY' | 'PROFESSIONAL';
+  /** Deixa ela marcar e remarcar na própria agenda. Locatária sempre pode. */
+  canManageOwnAgenda?: boolean;
   publicBookingEnabled?: boolean;
   /** Endereço do link público individual: /e/{empresa}/{publicSlug}. */
   publicSlug?: string | null;

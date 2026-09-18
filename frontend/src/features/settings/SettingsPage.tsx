@@ -4,7 +4,7 @@ import { Copy, ExternalLink, Plus, Save, ShieldCheck, Trash2, UserPlus } from 'l
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input, Textarea } from '@/components/ui/input';
-import { PhoneInput } from '@/components/ui/field';
+import { DocumentInput, PhoneInput } from '@/components/ui/field';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader, TBody, TD, TH, THead, TR, Table } from '@/components/ui/data';
 import { EmptyState, PageLoader } from '@/components/ui/feedback';
@@ -37,7 +37,6 @@ import {
   useCompany,
   useCompanyModules,
   useCompanyMutations,
-  useSubscription,
   useUserMutations,
   useProfessionals,
   useUsers,
@@ -71,7 +70,6 @@ export function SettingsPage() {
   const { data: modules } = useCompanyModules();
   const { data: users } = useUsers({ perPage: 50 });
   const { data: professionals } = useProfessionals({ isActive: 'true' });
-  const { data: subscription } = useSubscription();
   const { data: auditLogs } = useAuditLogs({ perPage: 30 });
 
   const companyMutations = useCompanyMutations();
@@ -207,10 +205,9 @@ export function SettingsPage() {
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="space-y-1.5">
                   <Label>CPF / CNPJ</Label>
-                  <Input
+                  <DocumentInput
                     value={form.document}
-                    placeholder="Só números"
-                    onChange={(e) => setForm((f) => ({ ...f, document: e.target.value }))}
+                    onChange={(v) => setForm((f) => ({ ...f, document: v }))}
                   />
                   <p className="text-xs text-muted-foreground">
                     Usado para emitir a cobrança da mensalidade
@@ -624,49 +621,14 @@ export function SettingsPage() {
           {/*
             Só o plano que a empresa paga.
 
-            Antes esta aba mostrava a mesma informação três vezes: o cartão de
-            cobrança, um "Plano atual" que repetia nome e status, e uma grade
-            com todos os planos do catálogo. A grade ainda por cima não fazia
-            nada — mandava a pessoa subir até "Assinar", que é onde a troca
-            acontece de verdade, dentro do próprio cartão de cobrança.
+            Antes esta aba mostrava a mesma informação de vários jeitos: o
+            cartão de cobrança, o histórico de mensalidades, uma tabela de uso
+            do limite e uma grade com todos os planos do catálogo. Quem abre
+            aqui quer saber uma coisa — qual plano está contratado. O resto
+            ficou de fora; a troca de plano continua dentro do próprio cartão
+            de cobrança, quando o pagamento está configurado.
           */}
           <BillingCard />
-
-          {/* O que sobrou do "Plano atual": o quanto do plano já está em uso.
-              Isso o cartão de cobrança não diz, e é o que avisa que está na
-              hora de subir de plano. */}
-          {subscription ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Uso do plano</CardTitle>
-                <CardDescription>Quanto do seu limite já está ocupado</CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-3 sm:grid-cols-3">
-                {Object.entries(subscription.usage).map(([key, usage]) => (
-                  <div key={key} className="rounded-lg border p-3">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                      {key === 'users' ? 'Usuários' : key === 'professionals' ? 'Profissionais' : 'Agendamentos/mês'}
-                    </p>
-                    <p className="mt-1 text-lg font-semibold">
-                      {usage.current}
-                      <span className="text-sm font-normal text-muted-foreground">
-                        {' '}
-                        / {usage.limit ?? '∞'}
-                      </span>
-                    </p>
-                    {usage.limit ? (
-                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-                        <div
-                          className="h-full rounded-full bg-primary"
-                          style={{ width: `${Math.min(100, (usage.current / usage.limit) * 100)}%` }}
-                        />
-                      </div>
-                    ) : null}
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          ) : null}
         </TabsContent>
 
         {/* ------------------------------------------------------ Auditoria */}

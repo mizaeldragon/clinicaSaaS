@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { Input, type InputProps } from './input';
-import { phoneTyping } from '@/lib/format';
+import { documentTyping, phoneTyping } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 /**
@@ -44,6 +44,31 @@ export const PhoneInput = React.forwardRef<HTMLInputElement, ControlledProps>(
   ),
 );
 PhoneInput.displayName = 'PhoneInput';
+
+/**
+ * CPF ou CNPJ com máscara, no mesmo campo.
+ *
+ * Um campo só, e não um par com seletor de tipo, porque a quantidade de dígitos
+ * já diz qual é — perguntar antes seria pedir à pessoa que classificasse o
+ * próprio documento para poder digitá-lo.
+ *
+ * Guarda o valor pontuado, como o telefone; o Asaas recebe só os dígitos, que o
+ * backend extrai na hora de criar o cliente.
+ */
+export const DocumentInput = React.forwardRef<HTMLInputElement, ControlledProps>(
+  ({ value, onChange, ...props }, ref) => (
+    <Input
+      ref={ref}
+      inputMode="numeric"
+      placeholder="000.000.000-00"
+      maxLength={18}
+      value={documentTyping(value ?? '')}
+      onChange={(event) => onChange(documentTyping(event.target.value))}
+      {...props}
+    />
+  ),
+);
+DocumentInput.displayName = 'DocumentInput';
 
 /**
  * Senha com o olho para revelar.

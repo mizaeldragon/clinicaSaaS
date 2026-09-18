@@ -102,6 +102,28 @@ export function phoneTyping(value: string): string {
   return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 }
 
+/**
+ * Máscara de CPF ou CNPJ enquanto a pessoa digita.
+ *
+ * Qual dos dois é só se sabe no 12º dígito — até lá vale o formato de CPF, e a
+ * pontuação se reescreve sozinha quando o número passa de 11. Como em
+ * `phoneTyping`, formata sempre a partir dos dígitos, nunca do texto já
+ * pontuado, para o backspace não esbarrar em ponto e barra.
+ */
+export function documentTyping(value: string): string {
+  const d = value.replace(/\D/g, '').slice(0, 14);
+
+  if (d.length <= 11) {
+    if (d.length <= 3) return d;
+    if (d.length <= 6) return `${d.slice(0, 3)}.${d.slice(3)}`;
+    if (d.length <= 9) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`;
+    return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+  }
+
+  if (d.length <= 12) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8)}`;
+  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
+}
+
 export function phoneMask(value?: string | null): string {
   if (!value) return '—';
   const digits = value.replace(/\D/g, '');

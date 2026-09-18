@@ -4,7 +4,7 @@ import { Building2, Mail, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { PasswordInput, PhoneInput } from '@/components/ui/field';
+import { DocumentInput, PasswordInput, PhoneInput } from '@/components/ui/field';
 import { Label } from '@/components/ui/primitives';
 import {
   Select,
@@ -41,6 +41,7 @@ export function RegisterForm({ onCreated }: { onCreated: () => void }) {
   const [form, setForm] = useState({
     companyName: '',
     companyType: 'OTHER',
+    document: '',
     adminName: '',
     email: '',
     password: '',
@@ -74,7 +75,12 @@ export function RegisterForm({ onCreated }: { onCreated: () => void }) {
     setLoading(true);
     try {
       await register({
-        company: { name: form.companyName, type: form.companyType, phone: form.phone || undefined },
+        company: {
+          name: form.companyName,
+          type: form.companyType,
+          phone: form.phone || undefined,
+          document: form.document || undefined,
+        },
         admin: {
           name: form.adminName,
           email: form.email,
@@ -108,20 +114,37 @@ export function RegisterForm({ onCreated }: { onCreated: () => void }) {
         />
       </div>
 
-      <div className="space-y-1.5">
-        <Label>Tipo de negócio</Label>
-        <Select value={form.companyType} onValueChange={(v) => set('companyType', v)}>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {Object.entries(COMPANY_TYPE).map(([value, label]) => (
-              <SelectItem key={value} value={value}>
-                {label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label>Tipo de negócio</Label>
+          <Select value={form.companyType} onValueChange={(v) => set('companyType', v)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(COMPANY_TYPE).map(([value, label]) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {/* Opcional de propósito. A promessa logo acima é "sem cartão de
+            crédito", e exigir documento fiscal antes de a pessoa ter visto o
+            sistema contradiz isso. Quem tem em mãos preenche agora e não
+            precisa voltar; quem não tem preenche em Configurações, que é onde a
+            assinatura cobra. */}
+        <div className="space-y-1.5">
+          <Label htmlFor="document">
+            CPF ou CNPJ <span className="font-normal text-muted-foreground">(opcional)</span>
+          </Label>
+          <DocumentInput
+            id="document"
+            value={form.document}
+            onChange={(v) => set('document', v)}
+          />
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">

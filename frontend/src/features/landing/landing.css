@@ -23,7 +23,23 @@
   --cinza-texto: #4e5370;
   --cinza-navy: #b4b9d2;
 
-  --serif: Newsreader, Georgia, serif;
+  /*
+   * A fonte dos títulos.
+   *
+   * Poppins: geométrica, letra redonda de compasso, sem serifa. Muda o tom da
+   * página — a didone dizia "revista de moda", esta diz "aplicativo novo".
+   *
+   * O nome da variável continua `--serif` porque é o papel que ela ocupa no
+   * desenho (a voz dos títulos, contra o corpo em Hanken Grotesk), e renomear
+   * treze usos para trocar de fonte seria mexer no que não está em discussão.
+   *
+   * `--peso-titulo` existe por causa desta troca: numa serifada o título em 400
+   * tem peso visual suficiente, numa geométrica de traço uniforme ele sai
+   * apagado. Cada família define o seu.
+   */
+  --serif: Poppins, 'Hanken Grotesk', system-ui, sans-serif;
+  --peso-titulo: 500;
+  font-optical-sizing: auto;
 
   font-family: 'Hanken Grotesk', system-ui, sans-serif;
   background: var(--creme);
@@ -105,21 +121,42 @@
   }
 }
 
+/*
+ * Trocador de fonte para comparar: `?fonte=newsreader` ou `?fonte=bodoni`.
+ *
+ * Existe só enquanto a escolha não está fechada: ver as duas em prosa corrida,
+ * na página real, decide em dez segundos o que nenhuma amostra de catálogo
+ * decide. Quando a decisão sair, some daqui junto com o `family=Newsreader` do
+ * import e o parâmetro lido na página.
+ */
+.lp[data-fonte='newsreader'] {
+  --serif: Newsreader, Georgia, serif;
+  --peso-titulo: 400;
+}
+
+.lp[data-fonte='bodoni'] {
+  --serif: 'Bodoni Moda', 'Bodoni 72', Didot, Georgia, serif;
+  --peso-titulo: 400;
+}
+
 /* --------------------------------------------------------------- títulos */
 
 .lp-h1,
 .lp-h2,
 .lp-h3 {
   font-family: var(--serif);
-  font-weight: 400;
+  font-weight: var(--peso-titulo);
   letter-spacing: -0.02em;
   margin: 0;
 }
 
 .lp-h1 {
   font-size: clamp(36px, 4.4vw, 72px);
-  line-height: 0.95;
-  max-width: 14ch;
+  /* Uma geométrica ocupa mais largura por letra que a serifada de antes: em
+     14ch o título do hero passava a quebrar em quatro linhas e partia a frase
+     em itálico no meio. */
+  line-height: 1.02;
+  max-width: 17ch;
   text-wrap: balance;
 }
 
@@ -136,6 +173,13 @@
 .lp-it {
   font-style: italic;
   color: var(--rosa);
+}
+
+/* No hero a frase em itálico carrega a ideia inteira — quebrada entre duas
+   linhas, ela vira duas metades sem sentido. Nas outras seções o título é
+   menor e pode quebrar à vontade. */
+.lp-hero .lp-it {
+  white-space: nowrap;
 }
 
 /* O par risco + palavra em versalete que abre cada seção. */
@@ -501,7 +545,7 @@
 .lp-ticker-grupo b {
   font-family: var(--serif);
   font-style: italic;
-  font-weight: 400;
+  font-weight: var(--peso-titulo);
   font-size: 21px;
 }
 
@@ -683,17 +727,21 @@
   color: var(--rosa-etiqueta);
 }
 
+/* O índice do cartão. Em cinza de 26% ele sumia contra o creme — virava
+   textura, não numeral. No vinho da etiqueta acima ele se lê de longe e ainda
+   fica claro que é ornamento, e não parte do título. */
 .lp-modulo-num {
   font-family: var(--serif);
-  font-size: 30px;
+  font-size: 36px;
   line-height: 1;
-  color: rgba(27, 32, 68, 0.26);
+  color: var(--rosa-etiqueta);
+  opacity: 0.8;
 }
 
 .lp-modulo h3 {
   position: relative;
   font-family: var(--serif);
-  font-weight: 400;
+  font-weight: var(--peso-titulo);
   font-size: 25px;
   line-height: 1.12;
   margin: 0 0 10px;
@@ -766,7 +814,8 @@
 }
 
 .lp-modulo-destaque .lp-modulo-num {
-  color: rgba(255, 255, 255, 0.55);
+  color: #fff;
+  opacity: 0.85;
 }
 
 /* Herda o desenho do cartão claro: o seletor `.lp-modulo h3` não o alcança,
@@ -774,7 +823,7 @@
 .lp-modulo-destaque h3 {
   position: relative;
   font-family: var(--serif);
-  font-weight: 400;
+  font-weight: var(--peso-titulo);
   font-size: 25px;
   line-height: 1.12;
   margin: 0 0 10px;
@@ -877,6 +926,178 @@
   box-shadow: 0 36px 70px -46px rgba(27, 32, 68, 0.5);
 }
 
+/* --------------------------------------------------------- inteligência */
+
+/*
+ * Faixa branca entre a agenda (creme) e os planos (areia): as seções aqui se
+ * separam por fundo, e sem a troca esta cairia dentro da anterior.
+ */
+.lp-ia {
+  background: #fff;
+  border-top: 1px solid rgba(27, 32, 68, 0.1);
+  border-bottom: 1px solid rgba(27, 32, 68, 0.1);
+  padding-top: 84px;
+  padding-bottom: 88px;
+}
+
+.lp-ia-cabeca {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px 60px;
+  margin-bottom: 44px;
+}
+
+.lp-ia-cabeca > div {
+  flex: 1 1 420px;
+}
+
+.lp-ia-cabeca .lp-eyebrow {
+  margin-bottom: 20px;
+}
+
+.lp-ia .lp-h2 {
+  line-height: 1.04;
+  margin: 0;
+}
+
+.lp-ia-lead {
+  flex: 1 1 300px;
+  max-width: 390px;
+  font-size: 15px;
+  font-weight: 300;
+  line-height: 1.7;
+  color: var(--cinza-texto);
+  margin: 0;
+  text-wrap: pretty;
+}
+
+.lp-ia-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(290px, 100%), 1fr));
+  gap: 18px;
+}
+
+.lp-ia-cartao {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(27, 32, 68, 0.12);
+  border-radius: 24px;
+  background: var(--creme-cartao);
+  padding: 28px 26px 26px;
+  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.35s ease;
+}
+
+.lp-ia-cartao:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 30px 56px -34px rgba(27, 32, 68, 0.55);
+}
+
+.lp-ia-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 26px;
+}
+
+.lp-ia-num {
+  font-family: var(--serif);
+  font-size: 36px;
+  line-height: 1;
+  color: var(--rosa-etiqueta);
+  opacity: 0.8;
+}
+
+.lp-ia-cartao h3 {
+  font-family: var(--serif);
+  font-weight: var(--peso-titulo);
+  font-size: 25px;
+  line-height: 1.12;
+  margin: 0 0 10px;
+}
+
+.lp-ia-cartao p {
+  font-size: 14.5px;
+  font-weight: 300;
+  line-height: 1.65;
+  color: var(--cinza-texto);
+  margin: 0 0 22px;
+}
+
+/* A linha de exemplo é o que prova a frase acima: um número com o motivo ao
+   lado, do jeito que aparece na tela. */
+.lp-ia-exemplo {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: auto;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(225, 58, 92, 0.07);
+}
+
+.lp-ia-exemplo i {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--rosa);
+  transform: translateY(-1px);
+}
+
+.lp-ia-exemplo span {
+  font-size: 12.5px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--rosa-escuro);
+}
+
+.lp-ia-nota {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px 36px;
+  margin-top: 34px;
+  padding-top: 26px;
+  border-top: 1px solid rgba(27, 32, 68, 0.12);
+}
+
+.lp-ia-nota p {
+  flex: 1 1 420px;
+  font-size: 14px;
+  font-weight: 300;
+  line-height: 1.7;
+  color: var(--cinza-texto);
+  margin: 0;
+  text-wrap: pretty;
+}
+
+.lp-ia-nota b {
+  font-weight: 600;
+  color: var(--tinta);
+}
+
+.lp .lp-ia-nota .lp-btn-mini {
+  flex: none;
+  background: var(--tinta);
+  color: #fff;
+  font-size: 10.5px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  font-weight: 600;
+  padding: 13px 22px;
+  border-radius: 100px;
+  transition: background 0.25s ease, color 0.25s ease;
+}
+
+.lp .lp-ia-nota .lp-btn-mini:hover {
+  background: var(--rosa);
+  color: #fff;
+}
+
 /* --------------------------------------------------------------- planos */
 
 .lp-planos {
@@ -930,7 +1151,7 @@
 
 .lp-plano-topo h3 {
   font-family: var(--serif);
-  font-weight: 400;
+  font-weight: var(--peso-titulo);
   font-size: 24px;
   margin: 0;
 }
@@ -1250,7 +1471,7 @@
 
 .lp-cta h2 {
   font-family: var(--serif);
-  font-weight: 400;
+  font-weight: var(--peso-titulo);
   font-size: clamp(18px, 2.4vw, 38px);
   line-height: 1.04;
   letter-spacing: -0.02em;
@@ -1423,7 +1644,7 @@
   align-items: baseline;
   gap: 16px;
   font-family: var(--serif);
-  font-weight: 400;
+  font-weight: var(--peso-titulo);
   font-size: 24px;
   letter-spacing: -0.01em;
   margin: 0 0 14px;
@@ -1483,6 +1704,15 @@
  * a foto sai e o bloco vira um cartão rosa comum.
  */
 @media (max-width: 700px) {
+  .lp-ia {
+    padding-top: 62px;
+    padding-bottom: 64px;
+  }
+
+  .lp-ia-cartao {
+    padding: 24px 22px;
+  }
+
   .lp-cta img {
     display: none;
   }

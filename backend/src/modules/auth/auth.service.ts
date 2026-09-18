@@ -83,7 +83,7 @@ interface AuthResult {
 function permissionsFor(
   role: UserRole,
   custom: string[],
-  professional?: { revenueOwner?: string } | null,
+  professional?: { revenueOwner?: string; canManageOwnAgenda?: boolean } | null,
 ): string[] {
   const permissions = resolvePermissions(role, custom);
 
@@ -103,8 +103,22 @@ function permissionsFor(
     return [...own];
   }
 
+  const proprias = permissions.filter((permission) => permission !== 'rentals:view_own');
+
+  /*
+   * A agenda em modo leitura é o padrão certo onde existe recepção: a agenda
+   * tem um dono, e duas mãos marcando no mesmo lugar é como se perde horário.
+   * Na clínica pequena, em que a profissional marca o retorno com a cliente
+   * ainda na cadeira, esse padrão vira atrito — e aí a dona libera no cadastro
+   * dela. O recorte de `appointments:view_all`, que ela não tem, é o que
+   * mantém "própria" em "própria agenda".
+   */
+  if (professional?.canManageOwnAgenda) {
+    proprias.push(PERMISSIONS.appointmentsManage);
+  }
+
   // Quem não aluga não tem turnos para acompanhar.
-  return permissions.filter((permission) => permission !== 'rentals:view_own');
+  return proprias;
 }
 
 async function issueSession(
@@ -228,7 +242,7 @@ export const authService = {
       prisma.user.findMany({
         where: { email: dto.email, isActive: true },
         include: {
-          professional: { select: { id: true, revenueOwner: true } },
+          professional: { select: { id: true, revenueOwner: true, canManageOwnAgenda: true } },
           company: { select: { slug: true, status: true } },
         },
       }),
@@ -292,7 +306,7 @@ export const authService = {
     const user = await tenantContext.runAsSystem(() =>
       prisma.user.findUnique({
         where: { id: userId },
-        include: { professional: { select: { id: true, revenueOwner: true } } },
+        include: { professional: { select: { id: true, revenueOwner: true, canManageOwnAgenda: true } } },
       }),
     );
     if (!user || !user.isActive) throw new UnauthorizedError('Conta indisponível.');
@@ -403,7 +417,7 @@ export const authService = {
         include: {
           user: {
             include: {
-              professional: { select: { id: true, revenueOwner: true } },
+              professional: { select: { id: true, revenueOwner: true, canManageOwnAgenda: true } },
               company: { select: { status: true } },
             },
           },
@@ -592,6 +606,7 @@ export const authService = {
               name: true,
               avatarUrl: true,
               revenueOwner: true,
+              canManageOwnAgenda: true,
               publicSlug: true,
               publicBookingEnabled: true,
             },

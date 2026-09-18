@@ -35,6 +35,7 @@ const EMPTY = {
   commissionType: 'NONE',
   commissionValue: '',
   revenueOwner: 'COMPANY' as 'COMPANY' | 'PROFESSIONAL',
+  canManageOwnAgenda: false,
   publicBookingEnabled: true,
   avatarUrl: null as string | null,
 };
@@ -69,6 +70,7 @@ export function ProfessionalDialog({
         commissionType: professional.commissionType ?? 'NONE',
         commissionValue: professional.commissionValue ? String(professional.commissionValue) : '',
         revenueOwner: professional.revenueOwner ?? 'COMPANY',
+        canManageOwnAgenda: professional.canManageOwnAgenda ?? false,
         publicBookingEnabled: professional.publicBookingEnabled ?? true,
         avatarUrl: professional.avatarUrl ?? null,
       });
@@ -98,6 +100,7 @@ export function ProfessionalDialog({
       specialties,
       serviceIds,
       revenueOwner: form.revenueOwner,
+      canManageOwnAgenda: form.canManageOwnAgenda,
       publicBookingEnabled: form.publicBookingEnabled,
       avatarUrl: form.avatarUrl,
       commissionType: form.commissionType === 'NONE' ? null : form.commissionType,
@@ -236,6 +239,25 @@ export function ProfessionalDialog({
                   : 'A jornada de trabalho define a disponibilidade e os atendimentos entram no seu financeiro.'}
               </p>
             </div>
+
+            {/* Só para a equipe da casa: a locatária marca na agenda dela por
+                definição — ela cobra a própria cliente. Repetir a pergunta ali
+                seria oferecer desligar algo que o sistema não desliga. */}
+            {form.revenueOwner === 'COMPANY' ? (
+              <label className="flex cursor-pointer items-center justify-between gap-3">
+                <span className="text-sm">
+                  Pode marcar na própria agenda
+                  <span className="block text-xs text-muted-foreground">
+                    Ela marca, remarca e cancela os horários dela — os das outras
+                    continuam fora do alcance. Deixe desligado se quem marca é a recepção.
+                  </span>
+                </span>
+                <Switch
+                  checked={form.canManageOwnAgenda}
+                  onCheckedChange={(checked) => set('canManageOwnAgenda', checked)}
+                />
+              </label>
+            ) : null}
 
             <label className="flex cursor-pointer items-center justify-between gap-3">
               <span className="text-sm">

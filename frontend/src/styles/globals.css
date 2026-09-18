@@ -1,6 +1,10 @@
-/* Inter no painel; Newsreader e Hanken Grotesk na vitrine. Num pedido só —
-   e o navegador só baixa a fonte que a página aberta realmente usa. */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Newsreader:ital,wght@0,400;1,400&family=Hanken+Grotesk:wght@300;400;500;600&display=swap');
+/* Inter no painel; Poppins nos títulos da vitrine e Hanken Grotesk no corpo.
+   Newsreader e Bodoni Moda continuam carregadas enquanto a escolha da
+   tipografia não está fechada — `?fonte=newsreader` e `?fonte=bodoni` trocam na
+   própria página. Quando a decisão sair, as duas saem daqui.
+
+   Num pedido só, e o navegador baixa apenas os recortes que a página abre. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..600;1,6..96,400..600&family=Newsreader:ital,wght@0,400;1,400&family=Hanken+Grotesk:wght@300;400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;

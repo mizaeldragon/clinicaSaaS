@@ -1,4 +1,4 @@
-import { Request, Router } from 'express';
+import { Request, RequestHandler, Router } from 'express';
 import { appointmentsService } from './appointments.service';
 import { getAvailableSlots } from './scheduling.service';
 import { validate } from '../../shared/middlewares/validate';
@@ -6,6 +6,8 @@ import { PERMISSIONS, requirePermission } from '../../shared/middlewares/rbac';
 import { requireModule } from '../../shared/middlewares/moduleGuard';
 import { asyncHandler, serialize } from '../../shared/utils/http';
 import { recordAudit } from '../../shared/services/audit.service';
+import { prisma } from '../../shared/database/prisma';
+import { ForbiddenError } from '../../shared/errors/AppError';
 import { z } from 'zod';
 import {
   checkAvailabilitySchema,
@@ -34,6 +36,54 @@ function scopeToProfessional(req: Request) {
   }
   return query;
 }
+
+/**
+ * Quem só enxerga a própria agenda também só escreve nela.
+ *
+ * A permissão de marcar chega pelo interruptor no cadastro da profissional, e
+ * ela vale para uma agenda só: a dela. Sem esta trava, `appointments:manage`
+ * abriria a agenda da casa inteira — e a promessa do interruptor deixaria de
+ * ser verdade no primeiro `PATCH` escrito à mão.
+ *
+ * Mesmo recorte do `scopeToProfessional`: quem tem visão global
+ * (`appointments:view_all`) passa direto, porque nesse caso a agenda da casa é
+ * dela por definição.
+ */
+const restrictToOwnAgenda: RequestHandler = asyncHandler(async (req, _res, next) => {
+  const user = req.user;
+  if (!user || user.role !== 'PROFESSIONAL') return next();
+  if (user.permissions.includes(PERMISSIONS.appointmentsViewAll)) return next();
+
+  const own = user.professionalId;
+  if (!own) {
+    throw new ForbiddenError('Este acesso não está vinculado a nenhuma profissional.');
+  }
+
+  // Marcar para outra, ou passar um atendimento seu para outra mão.
+  const corpo = req.body as { professionalId?: string | null } | undefined;
+  if (corpo?.professionalId && corpo.professionalId !== own) {
+    throw new ForbiddenError('Você só pode marcar na sua própria agenda.');
+  }
+
+  // Atendimento sem profissional existe (a casa marca e decide depois quem
+  // atende), mas não vindo dela: o que ela cria nasce na agenda dela.
+  if (req.method === 'POST' && corpo && !corpo.professionalId) {
+    corpo.professionalId = own;
+  }
+
+  // Mexer num atendimento que já existe: vale o dono de agora, não o do corpo.
+  if (req.params.id) {
+    const atual = await prisma.appointment.findFirst({
+      where: { id: req.params.id },
+      select: { professionalId: true },
+    });
+    if (atual && atual.professionalId !== own) {
+      throw new ForbiddenError('Este atendimento está na agenda de outra profissional.');
+    }
+  }
+
+  return next();
+});
 
 appointmentsRoutes.get(
   '/',
@@ -102,6 +152,7 @@ appointmentsRoutes.get(
 appointmentsRoutes.post(
   '/',
   requirePermission(PERMISSIONS.appointmentsManage),
+  restrictToOwnAgenda,
   validate({ body: createAppointmentSchema }),
   asyncHandler(async (req, res) => {
     const appointment = await appointmentsService.create(
@@ -123,6 +174,7 @@ appointmentsRoutes.post(
 appointmentsRoutes.patch(
   '/:id',
   requirePermission(PERMISSIONS.appointmentsManage),
+  restrictToOwnAgenda,
   validate({ params: idParamSchema, body: updateAppointmentSchema }),
   asyncHandler(async (req, res) => {
     const appointment = await appointmentsService.update(
@@ -144,6 +196,7 @@ appointmentsRoutes.patch(
 appointmentsRoutes.patch(
   '/:id/status',
   requirePermission(PERMISSIONS.appointmentsManage),
+  restrictToOwnAgenda,
   validate({ params: idParamSchema, body: updateStatusSchema }),
   asyncHandler(async (req, res) => {
     const appointment = await appointmentsService.updateStatus(
@@ -166,6 +219,7 @@ appointmentsRoutes.patch(
 appointmentsRoutes.delete(
   '/:id',
   requirePermission(PERMISSIONS.appointmentsManage),
+  restrictToOwnAgenda,
   validate({ params: idParamSchema }),
   asyncHandler(async (req, res) => {
     await appointmentsService.remove(req.companyId as string, req.params.id);

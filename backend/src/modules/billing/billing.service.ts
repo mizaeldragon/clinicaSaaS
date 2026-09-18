@@ -85,6 +85,12 @@ async function loadSubscription(companyId: string) {
 
 type LoadedSubscription = Awaited<ReturnType<typeof loadSubscription>>;
 
+/** CPF tem 11 dígitos, CNPJ tem 14 — qualquer outra coisa é meio preenchida. */
+function isCompleteDocument(value?: string | null): boolean {
+  const digits = value?.replace(/\D/g, '') ?? '';
+  return digits.length === 11 || digits.length === 14;
+}
+
 /**
  * Garante o cliente correspondente no Asaas. O CPF/CNPJ é exigido por eles e é
  * o único dado que a empresa talvez ainda não tenha preenchido.
@@ -252,8 +258,12 @@ export const billingService = {
         price: subscription.plan.price,
       },
       access: context ? evaluateAccess(context) : { kind: 'ok' as const },
-      /** Preenchido = a empresa pode assinar; vazio = falta o CPF/CNPJ. */
-      documentOnFile: Boolean(subscription.company.document),
+      /**
+       * Preenchido = a empresa pode assinar. Conta os dígitos em vez de só ver
+       * se há texto: o campo é mascarado, e um documento pela metade passaria
+       * no `Boolean` para depois quebrar no Asaas, com o botão já liberado.
+       */
+      documentOnFile: isCompleteDocument(subscription.company.document),
       openPayment: openPayment ?? null,
       payments,
     };

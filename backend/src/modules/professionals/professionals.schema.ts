@@ -23,6 +23,7 @@ export const createProfessionalSchema = z.object({
   commissionType: z.nativeEnum(CommissionType).nullable().optional(),
   commissionValue: z.coerce.number().min(0).nullable().optional(),
   revenueOwner: z.enum(['COMPANY', 'PROFESSIONAL']).optional(),
+  canManageOwnAgenda: z.boolean().optional(),
   publicBookingEnabled: z.boolean().optional(),
   serviceIds: z.array(z.string().uuid()).optional(),
   workingHours: z.array(workingHourSchema).optional(),

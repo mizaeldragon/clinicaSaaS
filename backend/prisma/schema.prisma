@@ -518,6 +518,12 @@ model Professional {
   /// Quando PROFESSIONAL, é uma locatária: cobra as próprias clientes e a
   /// empresa fatura apenas o aluguel do turno.
   revenueOwner         RevenueOwner @default(COMPANY)
+  /// Deixa esta profissional marcar e remarcar na própria agenda.
+  /// Falso por padrão: onde há recepção, a agenda tem um dono só. Numa clínica
+  /// pequena, em que ela marca o retorno com a cliente ainda na cadeira, a dona
+  /// liga aqui. Não alcança a agenda das outras — o alcance é a dela.
+  /// Locatária ignora este campo: quem cobra a própria cliente sempre marca.
+  canManageOwnAgenda   Boolean      @default(false)
   /// Aparece na página pública de agendamento.
   publicBookingEnabled Boolean      @default(true)
   /// Endereço do link público individual: /e/{empresa}/{publicSlug}.

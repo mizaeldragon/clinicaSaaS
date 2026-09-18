@@ -31,7 +31,7 @@ interface AuthState {
 }
 
 export interface RegisterPayload {
-  company: { name: string; type: string; phone?: string };
+  company: { name: string; type: string; phone?: string; document?: string };
   admin: { name: string; email: string; password: string; phone?: string };
   planSlug?: string;
 }

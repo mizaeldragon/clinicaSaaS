@@ -37,9 +37,10 @@ async function seedPlans() {
       trialDays: 5,
       maxUsers: 1,
       maxProfessionals: 1,
-      // Sem teto de atendimento: travar a agenda no fim do mês é travar o
-      // faturamento de quem menos pode perder cliente.
-      maxAppointmentsMonth: null,
+      // 2.000 por mês para uma pessoa só é teto que não se alcança atendendo:
+      // seriam 66 atendimentos por dia, todo dia. Existe como limite de plano,
+      // não como freio — quem chegar perto já precisa de equipe, e equipe é Pro.
+      maxAppointmentsMonth: 2000,
       modules: [
         'appointments',
         'customers',
@@ -60,7 +61,10 @@ async function seedPlans() {
       trialDays: 5,
       maxUsers: 8,
       maxProfessionals: 10,
-      maxAppointmentsMonth: 2000,
+      // Sem teto: uma clínica com dez profissionais passa de 2.000 atendimentos
+      // no mês sem nada de excepcional, e travar a agenda no fim do mês trava o
+      // faturamento de quem está pagando para não ter esse problema.
+      maxAppointmentsMonth: null,
       modules: [
         'appointments',
         'customers',

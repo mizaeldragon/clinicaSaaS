@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { BrandLogo } from '@/components/brand';
 import { useAuthStore } from '@/stores/auth.store';
 import './landing.css';
@@ -78,6 +78,35 @@ const MODULOS = [
   },
 ];
 
+/**
+ * As três leituras que o sistema faz do próprio histórico da empresa.
+ *
+ * O texto evita a promessa vazia de "IA" e diz de onde a resposta vem: são os
+ * atendimentos da própria casa, contados. É o que sustenta a frase de que nada
+ * sai para fora — e é também o que faz a recepção confiar e ligar para a
+ * cliente, porque o motivo aparece junto do número.
+ */
+const INTELIGENCIA = [
+  {
+    tag: 'Antes de acontecer',
+    nome: 'Risco de falta',
+    desc: 'Os atendimentos da semana ordenados por quem provavelmente não vem — com o motivo ao lado da nota, para a recepção saber para quem ligar.',
+    exemplo: 'Camila · 47% — faltou 4 das 11 vezes e não confirmou',
+  },
+  {
+    tag: 'Buraco na agenda',
+    nome: 'Encaixes possíveis',
+    desc: 'Os vãos entre um atendimento e outro, e quem já está marcada nos próximos dias e caberia ali. Sugere antecipar, sempre com a mesma profissional.',
+    exemplo: '45 min livres às 14h · 3 clientes aceitariam antecipar',
+  },
+  {
+    tag: 'Fim do mês',
+    nome: 'Resumo em palavras',
+    desc: 'O mês contado em frases, não em gráfico: cresceu ou caiu, por causa do quê, e o que merece atenção — inclusive quem costumava vir e sumiu.',
+    exemplo: '+12% em setembro · 4 clientes frequentes não voltaram',
+  },
+];
+
 const PLANOS = [
   {
     slug: 'starter',
@@ -102,6 +131,7 @@ const PLANOS = [
     itens: [
       'Agenda, clientes e serviços',
       'Financeiro, comissão e relatórios',
+      'Risco de falta, encaixes e resumo do mês',
       'Link público de agendamento',
     ],
   },
@@ -113,7 +143,7 @@ const PLANOS = [
     preco: '450',
     navy: true,
     itens: [
-      'Tudo do Pro',
+      'Tudo do Pro, inteligência inclusa',
       'Aluguel por turno, diária ou mês',
       'Contratos, cobrança e logins separados',
       'Login próprio para cada profissional',
@@ -133,6 +163,14 @@ const DUVIDAS = [
   [
     'O sistema evita conflito na mesma sala?',
     'Sim. Salas, cadeiras e equipamentos são recursos com disponibilidade própria: se estiver ocupado, o horário não aparece.',
+  ],
+  [
+    'Essa inteligência manda meus dados para algum lugar?',
+    'Não. As três leituras são calculadas aqui dentro, sobre os seus próprios atendimentos — nada é enviado para serviço externo e nada alimenta o treino de modelo nenhum.',
+  ],
+  [
+    'A inteligência vem em qual plano?',
+    'No Pro e no Premium. O Starter tem agenda, clientes, serviços e caixa; risco de falta, encaixes e resumo do mês entram junto com os relatórios, a partir do Pro.',
   ],
   [
     'As clientes precisam instalar um aplicativo?',
@@ -164,11 +202,18 @@ export function LandingPage() {
   const token = useAuthStore((state) => state.accessToken);
   const [aberta, setAberta] = useState<number>(0);
   const rolou = useRolou();
+  const [params] = useSearchParams();
+
+  // Temporário, enquanto a tipografia não está fechada: `?fonte=newsreader` e
+  // `?fonte=bodoni` devolvem as serifadas para comparar na própria página. Sai
+  // daqui junto com as regras `[data-fonte]` do CSS quando a escolha for feita.
+  const pedida = params.get('fonte');
+  const fonte = pedida === 'newsreader' || pedida === 'bodoni' ? pedida : undefined;
 
   if (token) return <Navigate to="/app" replace />;
 
   return (
-    <div className="lp">
+    <div className="lp" data-fonte={fonte}>
       {/* ------------------------------------------------------- barra topo */}
       <div className={rolou ? 'lp-topo lp-topo--flutuante' : 'lp-topo'} id="top">
         <div className="lp-wrap lp-pad lp-topo-linha">
@@ -179,6 +224,7 @@ export function LandingPage() {
           <nav className="lp-nav" aria-label="Navegação principal">
             <a href="#metodo">Método</a>
             <a href="#sistema">Sistema</a>
+            <a href="#inteligencia">Inteligência</a>
             <a href="#planos">Planos</a>
             <a href="#duvidas">Dúvidas</a>
           </nav>
@@ -374,6 +420,58 @@ export function LandingPage() {
         </div>
       </div>
 
+      {/* --------------------------------------------------- inteligência */}
+      {/* Depois da agenda e antes dos planos de propósito: a seção existe para
+          justificar o degrau do Starter para o Pro, e só convence quem já
+          entendeu o que o sistema faz no dia a dia. */}
+      <div className="lp-ia" id="inteligencia">
+        <div className="lp-wrap lp-pad">
+          <div className="lp-ia-cabeca">
+            <div>
+              <p className="lp-eyebrow">
+                <i />
+                <span>Inteligência</span>
+              </p>
+              <h2 className="lp-h2">
+                O seu histórico <span className="lp-it">avisando antes.</span>
+              </h2>
+            </div>
+            <p className="lp-ia-lead">
+              Cada atendimento que passou deixou uma pista. O sistema lê as suas e responde três
+              perguntas que ninguém tem tempo de calcular no meio do expediente.
+            </p>
+          </div>
+
+          <div className="lp-ia-grid">
+            {INTELIGENCIA.map((item, i) => (
+              <article className="lp-ia-cartao" key={item.nome}>
+                <div className="lp-ia-topo">
+                  <span className="lp-modulo-tag">{item.tag}</span>
+                  <span className="lp-ia-num">{String(i + 1).padStart(2, '0')}</span>
+                </div>
+                <h3>{item.nome}</h3>
+                <p>{item.desc}</p>
+                <div className="lp-ia-exemplo">
+                  <i aria-hidden />
+                  <span>{item.exemplo}</span>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <div className="lp-ia-nota">
+            <p>
+              <b>Incluído no Pro e no Premium.</b> Nada sai do sistema: a conta é feita sobre os
+              seus próprios atendimentos, e cada número aparece com o motivo do lado — para você
+              conferir antes de pegar o telefone.
+            </p>
+            <a href="#planos" className="lp-btn-mini">
+              Ver os planos
+            </a>
+          </div>
+        </div>
+      </div>
+
       {/* ---------------------------------------------------------- planos */}
       <div className="lp-planos" id="planos">
         <div className="lp-wrap lp-pad">
@@ -509,6 +607,7 @@ export function LandingPage() {
               <h3>Produto</h3>
               <a href="#metodo">Método</a>
               <a href="#sistema">Sistema</a>
+              <a href="#inteligencia">Inteligência</a>
               <a href="#planos">Planos</a>
               <a href="#duvidas">Dúvidas</a>
             </div>

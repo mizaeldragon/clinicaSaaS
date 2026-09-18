@@ -1,32 +1,25 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import {
-  AlertTriangle,
-  Barcode,
-  Check,
-  Copy,
-  CreditCard,
-  ExternalLink,
-  QrCode,
-  RefreshCw,
-} from 'lucide-react';
+import { Barcode, Check, Copy, CreditCard, ExternalLink, QrCode } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/primitives';
-import { EmptyState, Skeleton } from '@/components/ui/feedback';
+import { Skeleton } from '@/components/ui/feedback';
 import { useBilling, useBillingMutations, usePlans } from '@/api/queries';
 import { currency } from '@/lib/format';
-import type { AccessState, BillingType, SubscriptionPaymentStatus } from '@/types';
+import type { AccessState, BillingType } from '@/types';
 
 /**
  * Mensalidade do SaaS.
  *
- * Três coisas, nesta ordem: em que pé está a assinatura, como pagar a que está
- * em aberto, e o histórico. A cobrança em aberto vem primeiro porque é a única
- * com prazo — o resto é consulta.
+ * A aba responde uma pergunta só: qual plano esta empresa assinou. O histórico
+ * de cobranças e a tabela de uso saíram daqui — eram consulta, e enterravam a
+ * única linha que a dona abre esta aba para ver. O que sobra só aparece quando
+ * há algo a fazer: uma cobrança em aberto, ou a assinatura, quando o pagamento
+ * está configurado nesta instalação.
  */
 
 const BILLING_LABEL: Record<BillingType, string> = {
@@ -41,138 +34,61 @@ const BILLING_ICON: Record<BillingType, typeof QrCode> = {
   CREDIT_CARD: CreditCard,
 };
 
-const STATUS_LABEL: Record<SubscriptionPaymentStatus, string> = {
-  PENDING: 'Aguardando',
-  CONFIRMED: 'Pago',
-  RECEIVED: 'Pago',
-  OVERDUE: 'Vencido',
-  REFUNDED: 'Estornado',
-  CANCELED: 'Cancelado',
-};
-
-const STATUS_VARIANT: Record<SubscriptionPaymentStatus, 'success' | 'warning' | 'danger' | 'muted'> = {
-  PENDING: 'warning',
-  CONFIRMED: 'success',
-  RECEIVED: 'success',
-  OVERDUE: 'danger',
-  REFUNDED: 'muted',
-  CANCELED: 'muted',
-};
-
 const day = (value: string) => format(new Date(value), "dd 'de' MMM 'de' yyyy", { locale: ptBR });
 
-/** A frase que a dona lê no topo — a mesma regra que a API usa para trancar. */
-function accessLine(access: AccessState): { tone: 'ok' | 'warn' | 'bad'; text: string } {
+/** O selo ao lado do nome do plano. Em dia não vira selo — é o esperado. */
+function accessBadge(access: AccessState): { variant: 'warning' | 'danger'; text: string } | null {
   switch (access.kind) {
     case 'trial':
       return {
-        tone: access.daysLeft <= 3 ? 'warn' : 'ok',
-        text:
-          access.daysLeft === 1
-            ? 'Seu teste termina amanhã. Escolha uma forma de pagamento para não perder o acesso.'
-            : `Teste grátis: faltam ${access.daysLeft} dias (até ${day(access.endsAt)}).`,
+        variant: 'warning',
+        text: access.daysLeft === 1 ? 'Teste termina amanhã' : `Teste: ${access.daysLeft} dias`,
       };
     case 'trial_expired':
-      return {
-        tone: 'bad',
-        text: `O teste terminou em ${day(access.endsAt)}. Assine para voltar a lançar agendamentos.`,
-      };
+      return { variant: 'danger', text: 'Teste encerrado' };
     case 'past_due':
-      return {
-        tone: 'warn',
-        text: `Mensalidade vencida em ${day(access.dueAt)}. O acesso é bloqueado em ${day(access.blocksAt)}.`,
-      };
+      return { variant: 'warning', text: `Vencida em ${day(access.dueAt)}` };
     case 'past_due_blocked':
-      return {
-        tone: 'bad',
-        text: `O painel está bloqueado desde o vencimento em ${day(access.dueAt)}. Pague a cobrança para liberar.`,
-      };
+      return { variant: 'danger', text: 'Bloqueada' };
     case 'canceled':
-      return { tone: 'bad', text: 'Assinatura cancelada. Escolha um plano para reativar.' };
+      return { variant: 'danger', text: 'Cancelada' };
     default:
-      return { tone: 'ok', text: 'Assinatura em dia.' };
+      return null;
   }
 }
 
 export function BillingCard() {
   const { data, isLoading } = useBilling();
   const { data: plans } = usePlans();
-  const { subscribe, sync, cancel } = useBillingMutations();
+  const { subscribe, cancel } = useBillingMutations();
 
   const [planSlug, setPlanSlug] = useState<string | null>(null);
   const [billingType, setBillingType] = useState<BillingType>('PIX');
 
-  if (isLoading) return <Skeleton className="h-64 rounded-lg" />;
+  if (isLoading) return <Skeleton className="h-20 w-72 max-w-full rounded-xl" />;
   if (!data) return null;
 
   const chosenPlan = planSlug ?? data.plan.slug;
-  const access = accessLine(data.access);
+  const badge = accessBadge(data.access);
 
   return (
     <div className="space-y-4">
-      {/* ------------------------------------------------------------ estado */}
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <CardTitle>Plano {data.plan.name}</CardTitle>
-              <CardDescription>
-                {currency(data.plan.price)} por mês
-                {data.subscription.currentPeriodEnd
-                  ? ` · pago até ${day(data.subscription.currentPeriodEnd)}`
-                  : ''}
-              </CardDescription>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              loading={sync.isPending}
-              onClick={() => sync.mutate()}
-              disabled={!data.subscription.active}
-            >
-              <RefreshCw />
-              Atualizar
-            </Button>
-          </div>
+      {/* ------------------------------------------------------ plano atual */}
+      {/* Duas linhas de texto não pedem a largura da tela: o cartão fica do
+          tamanho do que diz, encostado à esquerda. */}
+      <Card className="w-fit max-w-full">
+        <CardHeader className="p-4">
+          <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+            Plano {data.plan.name}
+            {badge ? <Badge variant={badge.variant}>{badge.text}</Badge> : null}
+          </CardTitle>
+          <CardDescription className="text-xs">
+            {currency(data.plan.price)} por mês
+            {data.subscription.currentPeriodEnd
+              ? ` · pago até ${day(data.subscription.currentPeriodEnd)}`
+              : ''}
+          </CardDescription>
         </CardHeader>
-
-        <CardContent className="space-y-3">
-          <p
-            className={
-              access.tone === 'bad'
-                ? 'flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive'
-                : access.tone === 'warn'
-                  ? 'flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400'
-                  : 'flex items-start gap-2 rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground'
-            }
-          >
-            {access.tone === 'ok' ? (
-              <Check className="mt-0.5 size-4 shrink-0" />
-            ) : (
-              <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-            )}
-            {access.text}
-          </p>
-
-          {!data.gateway.enabled ? (
-            <p className="rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
-              O pagamento ainda não foi configurado nesta instalação. Enquanto isso o sistema
-              continua liberado — nenhuma conta é bloqueada sem haver como pagar.
-            </p>
-          ) : data.gateway.environment === 'sandbox' ? (
-            <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400">
-              Ambiente de teste do Asaas: as cobranças aqui não são reais.
-            </p>
-          ) : null}
-
-          {!data.documentOnFile ? (
-            <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400">
-              Preencha o CPF ou CNPJ da empresa na aba <strong>Empresa</strong> antes de assinar —
-              o pagamento é emitido no nome dele.
-            </p>
-          ) : null}
-        </CardContent>
       </Card>
 
       {/* ------------------------------------------------ cobrança em aberto */}
@@ -247,6 +163,13 @@ export function BillingCard() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
+            {!data.documentOnFile ? (
+              <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400">
+                Preencha o CPF ou CNPJ da empresa na aba <strong>Empresa</strong> antes de assinar —
+                o pagamento é emitido no nome dele.
+              </p>
+            ) : null}
+
             <div className="space-y-2">
               <Label>Plano</Label>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -329,50 +252,6 @@ export function BillingCard() {
           </CardContent>
         </Card>
       ) : null}
-
-      {/* --------------------------------------------------------- histórico */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Histórico de cobranças</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!data.payments.length ? (
-            <EmptyState
-              icon={CreditCard}
-              title="Nenhuma cobrança ainda"
-              description="As mensalidades aparecem aqui assim que a assinatura for criada."
-            />
-          ) : (
-            <ul className="divide-y rounded-lg border">
-              {data.payments.map((payment) => (
-                <li key={payment.id} className="flex flex-wrap items-center gap-3 px-3 py-2.5">
-                  <span className="w-32 shrink-0 text-sm tabular-nums text-muted-foreground">
-                    {day(payment.dueDate)}
-                  </span>
-                  <span className="w-24 shrink-0 text-sm font-medium tabular-nums">
-                    {currency(payment.value)}
-                  </span>
-                  <span className="hidden text-xs text-muted-foreground sm:inline">
-                    {BILLING_LABEL[payment.billingType]}
-                  </span>
-                  <span className="ml-auto flex items-center gap-2">
-                    <Badge variant={STATUS_VARIANT[payment.status]}>
-                      {STATUS_LABEL[payment.status]}
-                    </Badge>
-                    {payment.invoiceUrl ? (
-                      <Button variant="ghost" size="icon-sm" aria-label="Abrir fatura" asChild>
-                        <a href={payment.invoiceUrl} target="_blank" rel="noreferrer">
-                          <ExternalLink />
-                        </a>
-                      </Button>
-                    ) : null}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }
