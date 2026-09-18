@@ -51,7 +51,7 @@ import { useAuthStore } from '@/stores/auth.store';
 import { BILLING_CYCLE, PAYMENT_METHOD } from '@/config/labels';
 import { currency, monthLabel, shortDate } from '@/lib/format';
 import type { PaymentMethod, RentalPayment } from '@/types';
-import { ShiftBoard } from './ShiftBoard';
+import { OccupancyBoard } from './OccupancyBoard';
 import { ShiftSettings } from './ShiftSettings';
 
 const EMPTY = {
@@ -150,14 +150,14 @@ export function RentalsPage() {
 
       <Tabs defaultValue="shifts">
         <TabsList className="flex-wrap">
-          <TabsTrigger value="shifts">Turnos do dia</TabsTrigger>
+          <TabsTrigger value="shifts">Ocupação</TabsTrigger>
           <TabsTrigger value="contracts">Contratos</TabsTrigger>
           <TabsTrigger value="payments">Cobranças</TabsTrigger>
           <TabsTrigger value="settings">Configuração</TabsTrigger>
         </TabsList>
 
         <TabsContent value="shifts">
-          <ShiftBoard />
+          <OccupancyBoard />
         </TabsContent>
 
         <TabsContent value="contracts">

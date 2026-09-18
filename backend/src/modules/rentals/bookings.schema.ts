@@ -69,9 +69,18 @@ export const availabilityQuerySchema = z.object({
   resourceId: z.string().uuid().optional(),
 });
 
+/**
+ * Dia, semana ou mês: o que muda é o recorte, não a pergunta.
+ *
+ * Sem `refine` aqui de propósito — o `validate` das rotas espera um objeto Zod
+ * puro para poder ler `query`. A coerência do intervalo é conferida no serviço.
+ */
+export const occupancyQuerySchema = z.object({ from: calendarDate, to: calendarDate });
+
 export const idParamSchema = z.object({ id: z.string().uuid('Identificador inválido') });
 
 export type CreateBookingDTO = z.infer<typeof createBookingSchema>;
 export type UpdateBookingDTO = z.infer<typeof updateBookingSchema>;
 export type ListBookingsDTO = z.infer<typeof listBookingsSchema>;
 export type PayBookingDTO = z.infer<typeof payBookingSchema>;
+export type OccupancyQueryDTO = z.infer<typeof occupancyQuerySchema>;

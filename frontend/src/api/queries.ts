@@ -1016,6 +1016,32 @@ export const useDayMap = (date: string) =>
     }[];
   }>(['day-map', date], '/rentals/bookings/day-map', { date });
 
+/** Ocupação de um período — a mesma consulta serve dia, semana e mês. */
+export interface Occupancy {
+  from: string;
+  to: string;
+  resources: { id: string; name: string; category: { id: string; name: string } | null }[];
+  shifts: { id: string; name: string; startsAt: string; endsAt: string }[];
+  bookings: RentalBooking[];
+  porProfissional: {
+    professional: RentalBooking['professional'];
+    turnos: number;
+    espacos: string[];
+    total: number;
+    pago: number;
+    aberto: number;
+  }[];
+  totais: { turnos: number; profissionais: number; total: number; pago: number; aberto: number };
+}
+
+export const useOccupancy = (from: string, to: string, enabled = true) =>
+  useApiQuery<Occupancy>(
+    ['occupancy', from, to],
+    '/rentals/bookings/occupancy',
+    { from, to },
+    { enabled },
+  );
+
 export const useBookingStats = () =>
   useApiQuery<{
     bookingsToday: number;

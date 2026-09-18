@@ -487,6 +487,95 @@ export const bookingsService = {
   },
 
   /**
+   * Ocupação de um período — a resposta para "quem alugou o quê, e quando".
+   *
+   * Uma consulta só para dia, semana e mês: o que muda entre as três telas é o
+   * recorte da data, não a pergunta. Vem junto o elenco de espaços e turnos,
+   * porque a tela precisa desenhar também o que está **livre** — e vazio é o
+   * que a dona vende amanhã.
+   *
+   * O resumo por profissional é feito aqui, e não no navegador, porque é o que
+   * a dona lê primeiro: quem esteve no espaço no período, quantos turnos levou,
+   * quanto isso deu e quanto ainda falta receber.
+   */
+  async occupancy(from: Date, to: Date) {
+    const inicio = startOfDay(from);
+    const fim = endOfDay(to);
+
+    if (fim < inicio) {
+      throw new BadRequestError('O fim do período não pode ser antes do início');
+    }
+    // Dois meses cobrem a maior das três telas (o mês) com folga; acima disso o
+    // payload cresce sem ninguém ter pedido.
+    if ((fim.getTime() - inicio.getTime()) / 86400000 > 62) {
+      throw new BadRequestError('Período longo demais. Use até dois meses.');
+    }
+
+    const [resources, shifts, bookings] = await Promise.all([
+      prisma.resource.findMany({
+        where: { isRentable: true, isActive: true },
+        orderBy: { name: 'asc' },
+        include: { category: { select: { id: true, name: true } } },
+      }),
+      prisma.shift.findMany({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } }),
+      prisma.rentalBooking.findMany({
+        where: { date: { gte: inicio, lte: fim }, status: { in: OCCUPYING_STATUSES } },
+        orderBy: [{ date: 'asc' }, { startsAt: 'asc' }],
+        include: BOOKING_INCLUDE,
+      }),
+    ]);
+
+    const porProfissional = new Map<
+      string,
+      {
+        professional: { id: string; name: string; color: string; avatarUrl: string | null; phone: string | null };
+        turnos: number;
+        espacos: string[];
+        total: number;
+        pago: number;
+      }
+    >();
+
+    for (const booking of bookings) {
+      const atual = porProfissional.get(booking.professionalId) ?? {
+        professional: booking.professional,
+        turnos: 0,
+        espacos: [],
+        total: 0,
+        pago: 0,
+      };
+
+      atual.turnos += 1;
+      atual.total += num(booking.price);
+      atual.pago += num(booking.paidAmount);
+      if (!atual.espacos.includes(booking.resource.name)) atual.espacos.push(booking.resource.name);
+
+      porProfissional.set(booking.professionalId, atual);
+    }
+
+    const total = bookings.reduce((soma, b) => soma + num(b.price), 0);
+    const pago = bookings.reduce((soma, b) => soma + num(b.paidAmount), 0);
+
+    return {
+      from: inicio,
+      to: startOfDay(to),
+      resources,
+      shifts,
+      bookings,
+      porProfissional: [...porProfissional.values()]
+        .map((linha) => ({ ...linha, aberto: linha.total - linha.pago }))
+        .sort((a, b) => b.turnos - a.turnos || b.total - a.total),
+      totais: {
+        turnos: bookings.length,
+        profissionais: porProfissional.size,
+        total,
+        pago,
+        aberto: total - pago,
+      },
+    };
+  },
+
+  /**
    * Quem está trabalhando no espaço em um dia — base da página pública.
    * Inclui a equipe própria (que não depende de aluguel) e as locatárias do dia.
    */

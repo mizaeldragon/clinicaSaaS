@@ -11,6 +11,7 @@ import {
   createBookingSchema,
   idParamSchema,
   listBookingsSchema,
+  occupancyQuerySchema,
   payBookingSchema,
   updateBookingSchema,
 } from './bookings.schema';
@@ -31,6 +32,17 @@ bookingsRoutes.get(
   asyncHandler(async (req, res) => {
     const query = req.query as unknown as { date: Date; resourceId?: string };
     res.json(serialize(await bookingsService.dayMap(query.date, query.resourceId)));
+  }),
+);
+
+/** Quem alugou o quê no período — a mesma consulta serve dia, semana e mês. */
+bookingsRoutes.get(
+  '/occupancy',
+  canSeeAll,
+  validate({ query: occupancyQuerySchema }),
+  asyncHandler(async (req, res) => {
+    const { from, to } = req.query as unknown as { from: Date; to: Date };
+    res.json(serialize(await bookingsService.occupancy(from, to)));
   }),
 );
 
