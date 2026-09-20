@@ -62,42 +62,47 @@ export function AppRoutes() {
         <Route path="/app" element={<AppLayout />}>
           <Route index element={<DashboardPage />} />
 
-          <Route element={<ModuleRoute module="appointments" />}>
+          <Route element={<ModuleRoute module="appointments" permission="appointments:view" />}>
             <Route path="agenda" element={<AgendaPage />} />
           </Route>
 
-          <Route element={<ModuleRoute module="customers" />}>
+          <Route element={<ModuleRoute module="customers" permission="customers:view" />}>
             <Route path="clientes" element={<CustomersPage />} />
             <Route path="clientes/:id" element={<CustomerDetailPage />} />
           </Route>
 
-          <Route element={<ModuleRoute module="services" />}>
+          <Route element={<ModuleRoute module="services" permission="services:view" />}>
             <Route path="servicos" element={<ServicesPage />} />
           </Route>
 
-          <Route element={<ModuleRoute module="professionals" />}>
+          <Route element={<ModuleRoute module="professionals" permission="professionals:view" />}>
             <Route path="profissionais" element={<ProfessionalsPage />} />
             <Route path="profissionais/:id" element={<ProfessionalDetailPage />} />
           </Route>
 
-          <Route element={<ModuleRoute module="resources" />}>
+          <Route element={<ModuleRoute module="resources" permission="resources:view" />}>
             <Route path="recursos" element={<ResourcesPage />} />
           </Route>
 
-          <Route element={<ModuleRoute module="rentals" />}>
+          {/* As duas telas do aluguel têm donos diferentes: a visão do espaço é
+              de quem administra, e "meus turnos" é o extrato da locatária. */}
+          <Route element={<ModuleRoute module="rentals" permission="rentals:view" />}>
             <Route path="alugueis" element={<RentalsPage />} />
+          </Route>
+
+          <Route element={<ModuleRoute module="rentals" permission="rentals:view_own" />}>
             <Route path="meus-turnos" element={<MyShiftsPage />} />
           </Route>
 
-          <Route element={<ModuleRoute module="financial" />}>
+          <Route element={<ModuleRoute module="financial" permission="financial:view" />}>
             <Route path="financeiro" element={<FinancialPage />} />
           </Route>
 
-          <Route element={<ModuleRoute module="commissions" />}>
+          <Route element={<ModuleRoute module="commissions" permission="commissions:view" />}>
             <Route path="comissoes" element={<CommissionsPage />} />
           </Route>
 
-          <Route element={<ModuleRoute module="reports" />}>
+          <Route element={<ModuleRoute module="reports" permission="reports:view" />}>
             <Route path="relatorios" element={<ReportsPage />} />
           </Route>
 

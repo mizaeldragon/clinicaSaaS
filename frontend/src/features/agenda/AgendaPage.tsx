@@ -1,4 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { toast } from 'sonner';
 import {
   addDays,
   addMonths,
@@ -18,7 +20,13 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/feedback';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/primitives';
 import { SearchSelect } from '@/components/ui/search-select';
-import { useCalendar, useProfessionals, useResources, useServices } from '@/api/queries';
+import {
+  useAppointment,
+  useCalendar,
+  useProfessionals,
+  useResources,
+  useServices,
+} from '@/api/queries';
 import { useAuthStore } from '@/stores/auth.store';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { CalendarGrid } from './CalendarGrid';
@@ -53,6 +61,44 @@ export function AgendaPage() {
   const [editing, setEditing] = useState<Appointment | null>(null);
   const [slotDate, setSlotDate] = useState<Date | null>(null);
   const [selected, setSelected] = useState<Appointment | null>(null);
+
+  /*
+   * Abrir um atendimento por link: `/app/agenda?atendimento=<id>`.
+   *
+   * É por aqui que a notificação chega. Antes ela só se marcava como lida e a
+   * pessoa ficava na mesma tela, tendo que caçar na agenda o horário que o
+   * aviso acabara de mencionar — e, se fosse de outro mês, caçar duas vezes.
+   */
+  const [params, setParams] = useSearchParams();
+  const pedido = params.get('atendimento');
+  const { data: atendimentoPedido, isError: pedidoFalhou } = useAppointment(pedido);
+
+  // Atendimento apagado depois do aviso: melhor dizer do que deixar a pessoa
+  // olhando uma agenda que não abriu nada.
+  useEffect(() => {
+    if (!pedidoFalhou) return;
+    toast.error('Este atendimento não existe mais.');
+  }, [pedidoFalhou]);
+
+  useEffect(() => {
+    if (!atendimentoPedido) return;
+
+    // A semana salta para a do atendimento, senão ele abriria por cima de uma
+    // agenda que não é a dele.
+    setReference(new Date(atendimentoPedido.startsAt));
+    setSelected(atendimentoPedido);
+
+    // O parâmetro sai da URL depois de usado: recarregar a página não deve
+    // reabrir o cartão, e voltar no navegador não deve piscar de novo.
+    setParams(
+      (atual) => {
+        const proximo = new URLSearchParams(atual);
+        proximo.delete('atendimento');
+        return proximo;
+      },
+      { replace: true },
+    );
+  }, [atendimentoPedido, setParams]);
 
   const range = useMemo(() => {
     if (view === 'day') return { from: startOfDay(reference), to: endOfDay(reference) };
@@ -164,7 +210,9 @@ export function AgendaPage() {
 
       {showFilters ? (
         <Card className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
-          {hasModule('professionals') ? (
+          {/* Módulo ligado não basta: a locatária enxerga a própria agenda e
+              mais nada, e um filtro de profissionais vazio só engana. */}
+          {hasModule('professionals') && can('professionals:view') ? (
             <SearchSelect
               allowClear
               options={(professionals?.data ?? []).map((p) => ({
@@ -186,7 +234,7 @@ export function AgendaPage() {
             placeholder="Todos os serviços"
           />
 
-          {hasModule('resources') ? (
+          {hasModule('resources') && can('resources:view') ? (
             <SearchSelect
               allowClear
               options={(resources?.data ?? []).map((r) => ({ value: r.id, label: r.name }))}
@@ -215,7 +263,9 @@ export function AgendaPage() {
 
       {/* Os vaos do dia de referencia. Em modo semana a data e o dia em que a
           pessoa esta ancorada, que e o mais proximo do que ela esta olhando. */}
-      {hasModule('reports') ? <EncaixesCard data={diaDeReferência} /> : null}
+      {hasModule('reports') && can('reports:view') ? (
+        <EncaixesCard data={diaDeReferência} />
+      ) : null}
 
       {isLoading ? (
         <Skeleton className="h-[560px] rounded-xl" />

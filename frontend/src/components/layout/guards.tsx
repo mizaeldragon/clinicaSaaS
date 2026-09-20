@@ -25,9 +25,18 @@ export function ProtectedRoute() {
   return <Outlet />;
 }
 
-/** Bloqueia a rota quando o módulo não está habilitado para a empresa. */
-export function ModuleRoute({ module }: { module: ModuleKey }) {
+/**
+ * Bloqueia a rota por módulo (o que a empresa contratou) e por permissão (o que
+ * esta pessoa alcança).
+ *
+ * Só o módulo não bastava: ele é da empresa inteira. Numa casa com aluguel,
+ * todos os módulos estão ligados, então a locatária que digitasse
+ * `/app/relatorios` na barra de endereços abria a página — o menu escondia, a
+ * rota não. Ela via a tela montar e cada consulta voltar 403.
+ */
+export function ModuleRoute({ module, permission }: { module: ModuleKey; permission?: string }) {
   const hasModule = useAuthStore((state) => state.hasModule(module));
+  const can = useAuthStore((state) => state.can);
 
   if (!hasModule) {
     return (
@@ -35,6 +44,16 @@ export function ModuleRoute({ module }: { module: ModuleKey }) {
         icon={Lock}
         title="Módulo não habilitado"
         description="Este recurso não faz parte da configuração atual da sua empresa. Você pode ativá-lo em Configurações › Módulos, se o seu plano permitir."
+      />
+    );
+  }
+
+  if (permission && !can(permission)) {
+    return (
+      <EmptyState
+        icon={Lock}
+        title="Você não tem acesso a esta parte"
+        description="Seu perfil não alcança esta tela. Se precisar dela, peça a quem administra a conta."
       />
     );
   }

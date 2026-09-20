@@ -33,6 +33,27 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     if (err.code === 'P2002') {
       const target = (err.meta?.target as string[] | undefined)?.filter((t) => t !== 'companyId');
+
+      /*
+       * O índice que impede agendamento duplo fala a língua do banco. Traduz
+       * aqui: quem levou este erro foi a segunda cliente a clicar no mesmo
+       * horário, e "já existe um registro com este valor" não diz nada a ela.
+       */
+      const ehAgendaOcupada =
+        typeof err.meta?.target === 'string'
+          ? err.meta.target.includes('appointments_sem_duplo')
+          : Boolean(target?.includes('startsAt'));
+
+      if (ehAgendaOcupada) {
+        res.status(409).json({
+          error: {
+            code: 'SCHEDULE_CONFLICT',
+            message: 'Este horário acabou de ser ocupado. Escolha outro, por favor.',
+          },
+        });
+        return;
+      }
+
       res.status(409).json({
         error: {
           code: 'UNIQUE_CONSTRAINT',

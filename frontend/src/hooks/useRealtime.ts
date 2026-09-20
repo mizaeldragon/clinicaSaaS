@@ -85,6 +85,12 @@ export function useRealtime() {
       queryClient.invalidateQueries({ queryKey: ['rentals'] });
       queryClient.invalidateQueries({ queryKey: ['rental-payments'] });
       queryClient.invalidateQueries({ queryKey: ['rental-stats'] });
+      // O mesmo aviso vale para a grade: reserva criada, paga ou liberada por
+      // um contrato que caiu muda o que está ocupado na tela de quem olha.
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['day-map'] });
+      queryClient.invalidateQueries({ queryKey: ['occupancy'] });
+      queryClient.invalidateQueries({ queryKey: ['booking-stats'] });
     });
 
     socket.on('financial.updated', () => {

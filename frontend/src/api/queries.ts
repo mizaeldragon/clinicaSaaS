@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { api, ApiError } from '@/lib/api';
+import { useAuthStore } from '@/stores/auth.store';
 import type {
   Appointment,
   Commission,
@@ -87,6 +88,19 @@ function useApiQuery<T>(key: readonly unknown[], path: string, params?: Record<s
     queryFn: () => api.get<T>(path, params),
     ...options,
   });
+}
+
+/**
+ * Só busca o que esta pessoa pode ver.
+ *
+ * O menu já esconde o que ela não alcança, mas a tela não é só menu: a agenda
+ * pede a lista de profissionais para o filtro, o painel pede o risco de falta.
+ * Numa locatária — que enxerga a própria agenda e mais nada — cada um desses
+ * pedidos voltava 403, enchendo o console de erro vermelho e assustando quem
+ * abrisse o inspetor. Sem permissão, a consulta simplesmente não parte.
+ */
+function usePermitido(permission: string): boolean {
+  return useAuthStore((state) => state.can(permission));
 }
 
 /* --------------------------------------------------------------- Dashboard */
@@ -242,11 +256,15 @@ export function useServiceMutations() {
 }
 
 /* ----------------------------------------------------------- Profissionais */
-export const useProfessionals = (params: Record<string, unknown> = {}) =>
-  useApiQuery<Paginated<Professional>>(keys.professionals(params), '/professionals', {
-    perPage: 100,
-    ...params,
-  });
+export const useProfessionals = (params: Record<string, unknown> = {}) => {
+  const permitido = usePermitido('professionals:view');
+  return useApiQuery<Paginated<Professional>>(
+    keys.professionals(params),
+    '/professionals',
+    { perPage: 100, ...params },
+    { enabled: permitido },
+  );
+};
 
 export const useProfessional = (id: string) =>
   useApiQuery<Professional>(keys.professional(id), `/professionals/${id}`);
@@ -287,9 +305,24 @@ export function useProfessionalMutations() {
       onError: handleError,
     }),
     remove: useMutation({
-      mutationFn: (id: string) => api.delete(`/professionals/${id}`),
-      onSuccess: () => {
-        toast.success('Profissional removido');
+      mutationFn: (id: string) =>
+        api.delete<{ deactivated: boolean; appointments: number; bookings: number }>(
+          `/professionals/${id}`,
+        ),
+      /*
+       * Dizer "removido" quando a pessoa continua na lista é o caminho mais
+       * curto para alguém clicar de novo achando que falhou. Quem tem histórico
+       * fica inativa — e o aviso explica isso, e por quê.
+       */
+      onSuccess: (resultado) => {
+        if (resultado?.deactivated) {
+          toast.success('Profissional ficou inativa', {
+            description:
+              'Ela tem histórico no sistema (atendimentos ou turnos), e apagar levaria isso junto.',
+          });
+        } else {
+          toast.success('Profissional removida');
+        }
         invalidate();
       },
       onError: handleError,
@@ -388,8 +421,15 @@ export function useAppointmentMutations() {
 }
 
 /* ---------------------------------------------------------------- Recursos */
-export const useResources = (params: Record<string, unknown> = {}) =>
-  useApiQuery<Paginated<Resource>>(keys.resources(params), '/resources', { perPage: 100, ...params });
+export const useResources = (params: Record<string, unknown> = {}) => {
+  const permitido = usePermitido('resources:view');
+  return useApiQuery<Paginated<Resource>>(
+    keys.resources(params),
+    '/resources',
+    { perPage: 100, ...params },
+    { enabled: permitido },
+  );
+};
 
 export const useResourceCategories = () =>
   useApiQuery<ResourceCategory[]>(keys.resourceCategories, '/resources/categories');
@@ -482,6 +522,11 @@ export function useRentalMutations() {
     qc.invalidateQueries({ queryKey: ['rental-stats'] });
     qc.invalidateQueries({ queryKey: ['resources'] });
     qc.invalidateQueries({ queryKey: ['dashboard'] });
+    // O contrato ocupa a grade: encerrar ou excluir devolve turnos a ela, e a
+    // tela precisa refletir isso sem a pessoa ter que recarregar a página.
+    qc.invalidateQueries({ queryKey: ['bookings'] });
+    qc.invalidateQueries({ queryKey: ['day-map'] });
+    qc.invalidateQueries({ queryKey: ['occupancy'] });
   };
 
   return {
@@ -490,6 +535,25 @@ export function useRentalMutations() {
       onSuccess: () => {
         toast.success('Contrato de aluguel criado');
         invalidate();
+      },
+      onError: handleError,
+    }),
+    /**
+     * Cadastro e acesso da locatária num pedido só.
+     *
+     * Sem aviso próprio: quem chama é o formulário do contrato, e dois avisos
+     * seguidos ("locatária criada", "contrato criado") contariam a mesma
+     * novidade duas vezes.
+     */
+    createRenter: useMutation({
+      mutationFn: (body: { name: string; phone?: string; email: string; password: string }) =>
+        api.post<{ professional: Professional; user: { id: string; email: string } }>(
+          '/rentals/renters',
+          body,
+        ),
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: ['professionals'] });
+        qc.invalidateQueries({ queryKey: ['users'] });
       },
       onError: handleError,
     }),
@@ -1304,8 +1368,15 @@ export interface ResumoDeRisco {
   principais: AtendimentoEmRisco[];
 }
 
-export const useRiscoDeFalta = (dias = 7) =>
-  useApiQuery<ResumoDeRisco>(keys.insights('no-show', dias), '/insights/no-show/resumo', { dias });
+export const useRiscoDeFalta = (dias = 7) => {
+  const permitido = usePermitido('reports:view');
+  return useApiQuery<ResumoDeRisco>(
+    keys.insights('no-show', dias),
+    '/insights/no-show/resumo',
+    { dias },
+    { enabled: permitido },
+  );
+};
 
 export interface Encaixe {
   professional: { id: string; name: string };
@@ -1324,8 +1395,15 @@ export interface Encaixe {
   }[];
 }
 
-export const useEncaixes = (data: string) =>
-  useApiQuery<Encaixe[]>(keys.insights('encaixes', data), '/insights/encaixes', { data });
+export const useEncaixes = (data: string) => {
+  const permitido = usePermitido('reports:view');
+  return useApiQuery<Encaixe[]>(
+    keys.insights('encaixes', data),
+    '/insights/encaixes',
+    { data },
+    { enabled: permitido },
+  );
+};
 
 export interface ResumoDoMes {
   mes: string;
@@ -1340,5 +1418,12 @@ export interface ResumoDoMes {
   temDados: boolean;
 }
 
-export const useResumoDoMes = (mes: string) =>
-  useApiQuery<ResumoDoMes>(keys.insights('resumo', mes), '/insights/resumo-do-mes', { mes });
+export const useResumoDoMes = (mes: string) => {
+  const permitido = usePermitido('reports:view');
+  return useApiQuery<ResumoDoMes>(
+    keys.insights('resumo', mes),
+    '/insights/resumo-do-mes',
+    { mes },
+    { enabled: permitido },
+  );
+};

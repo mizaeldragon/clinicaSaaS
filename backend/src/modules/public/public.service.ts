@@ -11,7 +11,7 @@ import {
   userOfProfessional,
 } from '../../shared/services/portfolio.service';
 import { notificationsService } from '../notifications/notifications.service';
-import { BLOCKING_STATUSES } from '../appointments/scheduling.service';
+import { BLOCKING_STATUSES, findConflicts } from '../appointments/scheduling.service';
 import type { AvailabilityQueryDTO, CreatePublicAppointmentDTO } from './public.schema';
 import { avisarPaginaPublica } from '../../shared/services/publicAgenda.service';
 
@@ -417,6 +417,32 @@ export async function createPublicAppointment(
   }
 
   const appointment = await prisma.$transaction(async (tx) => {
+    /*
+     * Confere de novo, agora dentro da transação.
+     *
+     * A busca de disponibilidade acima aconteceu fora daqui, e entre uma coisa
+     * e outra cabe outra cliente: duas pessoas clicando no mesmo horário
+     * passavam as duas pela checagem. Esta segunda olhada fecha quase toda a
+     * janela; o resto — dois INSERTs no mesmo instante — é barrado pelo índice
+     * único `appointments_sem_duplo`, no banco.
+     */
+    const conflitos = await findConflicts(
+      {
+        professionalId: dto.professionalId ?? null,
+        roomId: slot.resourceId ?? null,
+        resourceId: null,
+        startsAt: slot.startsAt,
+        endsAt: slot.endsAt,
+      },
+      tx,
+    );
+
+    if (conflitos.length > 0) {
+      throw new ScheduleConflictError(
+        'Este horário acabou de ser ocupado. Escolha outro, por favor.',
+      );
+    }
+
     // Quem alugou o espaço tem carteira própria: a cliente entra na carteira da
     // profissional escolhida. A mesma pessoa pode ser cliente da casa e de uma
     // locatária — são dois negócios diferentes debaixo do mesmo teto.

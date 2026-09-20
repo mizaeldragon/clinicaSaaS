@@ -15,7 +15,10 @@ import { SOCKET_EVENTS, emitToCompany } from '../../websocket/io';
 import { notificationsService } from '../notifications/notifications.service';
 import { logger } from '../../shared/utils/logger';
 import { bookingsService } from './bookings.service';
+import { professionalsService } from '../professionals/professionals.service';
+import { usersService } from '../users/users.service';
 import type {
+  CreateRenterDTO,
   CreateRentalDTO,
   ListPaymentsDTO,
   ListRentalsDTO,
@@ -69,6 +72,97 @@ function nextOccurrence(cycle: RentalBillingCycle, from: Date): Date {
   }
 }
 
+/**
+ * Limpa a agenda quando um contrato deixa de valer.
+ *
+ * Um contrato de turno não é só cobrança: ele ocupa o espaço, e essa ocupação
+ * vira reserva no quadro. Se o contrato sai e as reservas ficam, a grade mostra
+ * a mesa ocupada por alguém que não aluga mais — e a dona deixa de vender um
+ * turno que está livre.
+ *
+ * O que some é só o futuro e só o que ninguém pagou. O passado aconteceu (a
+ * pessoa esteve lá), e turno pago é dinheiro que entrou, com lançamento no
+ * caixa: apagar qualquer um dos dois seria reescrever história.
+ *
+ * Reserva avulsa, feita na mão pela grade, não tem contrato e não é tocada.
+ */
+async function limparReservasFuturas(rentalId: string): Promise<{ removidas: number; mantidas: number }> {
+  const hoje = startOfDay(new Date());
+
+  const [removiveis, mantidas] = await Promise.all([
+    prisma.rentalBooking.findMany({
+      where: { rentalId, date: { gte: hoje }, paidAmount: { lte: 0 } },
+      select: { id: true },
+    }),
+    prisma.rentalBooking.count({
+      where: { rentalId, OR: [{ date: { lt: hoje } }, { paidAmount: { gt: 0 } }] },
+    }),
+  ]);
+
+  if (removiveis.length > 0) {
+    await prisma.rentalBooking.deleteMany({ where: { id: { in: removiveis.map((r) => r.id) } } });
+  }
+
+  return { removidas: removiveis.length, mantidas };
+}
+
+/**
+ * Dois contratos no mesmo espaço só brigam quando disputam o mesmo horário.
+ *
+ * A checagem antiga olhava só o recurso, e com isso impedia o que é a razão de
+ * existir de um espaço compartilhado: alugar a mesma cadeira para a Ana de
+ * manhã e para a Bia à tarde. O conflito exige coincidir turno *e* dia da
+ * semana — e contrato sem turno, que toma o espaço inteiro, briga com todos.
+ *
+ * Mora fora do `create` porque editar um contrato muda exatamente os mesmos
+ * campos: sem isso, bastava criar no turno da manhã e trocar para a tarde pelo
+ * PATCH para passar por cima de quem já estava lá.
+ */
+async function assertSemConflitoDeContrato(alvo: {
+  resourceId: string;
+  resourceName: string;
+  startsAt: Date;
+  shiftId: string | null;
+  weekdays: number[];
+  ignorarId?: string;
+}): Promise<void> {
+  const vigentes = await prisma.rental.findMany({
+    where: {
+      resourceId: alvo.resourceId,
+      status: { in: ['ACTIVE', 'OVERDUE'] },
+      OR: [{ endsAt: null }, { endsAt: { gt: alvo.startsAt } }],
+      ...(alvo.ignorarId ? { id: { not: alvo.ignorarId } } : {}),
+    },
+    select: { renterName: true, shiftId: true, weekdays: true },
+  });
+
+  const overlapping = vigentes.find((atual) => {
+    // Um dos dois toma o espaço inteiro: não há como dividir.
+    if (!atual.shiftId || !alvo.shiftId) return true;
+    if (atual.shiftId !== alvo.shiftId) return false;
+
+    // Mesmo turno: só conflita se cair no mesmo dia da semana. Lista vazia
+    // significa "todo dia", e aí abrange qualquer outra.
+    if (atual.weekdays.length === 0 || alvo.weekdays.length === 0) return true;
+    return alvo.weekdays.some((dia) => atual.weekdays.includes(dia));
+  });
+
+  if (!overlapping) return;
+
+  // A frase muda conforme quem atropela quem: sem isso, pedir o espaço inteiro
+  // devolvia "já ocupado neste turno", e a pessoa ficava procurando um turno
+  // que ela nem tinha escolhido.
+  const detalhe = !alvo.shiftId
+    ? 'em pelo menos um turno'
+    : overlapping.shiftId
+      ? 'neste turno e nestes dias'
+      : 'para o espaço inteiro';
+
+  throw new ConflictError(
+    `O recurso "${alvo.resourceName}" já possui um contrato ativo ${detalhe} (${overlapping.renterName})`,
+  );
+}
+
 export const rentalsService = {
   async list(query: ListRentalsDTO) {
     const pagination = getPagination(query);
@@ -120,18 +214,13 @@ export const rentalsService = {
     const resource = await prisma.resource.findFirst({ where: { id: dto.resourceId } });
     if (!resource) throw new NotFoundError('Recurso');
 
-    const overlapping = await prisma.rental.findFirst({
-      where: {
-        resourceId: dto.resourceId,
-        status: { in: ['ACTIVE', 'OVERDUE'] },
-        OR: [{ endsAt: null }, { endsAt: { gt: dto.startsAt } }],
-      },
+    await assertSemConflitoDeContrato({
+      resourceId: dto.resourceId,
+      resourceName: resource.name,
+      startsAt: dto.startsAt,
+      shiftId: dto.shiftId ?? null,
+      weekdays: dto.weekdays ?? [],
     });
-    if (overlapping) {
-      throw new ConflictError(
-        `O recurso "${resource.name}" já possui um contrato ativo (${overlapping.renterName})`,
-      );
-    }
 
     const { generateFirstCharge, ...data } = dto;
 
@@ -160,17 +249,88 @@ export const rentalsService = {
     return rental;
   },
 
+  /**
+   * Coloca uma locatária no espaço: cadastro, acesso e link, de uma vez.
+   *
+   * Eram três telas — profissional, usuário e contrato —, e a do meio ficava em
+   * Configurações, longe de quem estava fazendo o aluguel. Quem aluga não existe
+   * sem login: é por ele que ela enxerga a própria agenda e as próprias
+   * clientes. Então nascem juntos.
+   *
+   * O e-mail é conferido antes de qualquer escrita, e se o usuário falhar
+   * mesmo assim a profissional recém-criada é desfeita — meia locatária, sem
+   * acesso, é pior que nenhuma: ela apareceria na lista e no link público sem
+   * ninguém conseguir entrar.
+   */
+  async createRenter(companyId: string, dto: CreateRenterDTO) {
+    const duplicado = await tenantContext.runAsSystem(() =>
+      prisma.user.findFirst({ where: { companyId, email: dto.email } }),
+    );
+    if (duplicado) {
+      throw new ConflictError('Já existe um acesso com este e-mail nesta empresa');
+    }
+
+    const professional = await professionalsService.create(companyId, {
+      name: dto.name,
+      phone: dto.phone,
+      specialties: dto.specialties ?? [],
+      color: '#8B5CF6',
+      revenueOwner: 'PROFESSIONAL',
+      publicBookingEnabled: true,
+    });
+
+    try {
+      const user = await usersService.create(companyId, {
+        name: dto.name,
+        email: dto.email,
+        password: dto.password,
+        phone: dto.phone,
+        role: 'PROFESSIONAL',
+        professionalId: professional.id,
+      });
+
+      logger.info({ companyId, professionalId: professional.id }, 'Locatária criada com acesso');
+      return { professional, user };
+    } catch (error) {
+      await prisma.professional
+        .delete({ where: { id: professional.id } })
+        .catch(() => undefined);
+      throw error;
+    }
+  },
+
   async update(companyId: string, id: string, dto: UpdateRentalDTO) {
     const current = await this.get(id);
+
+    // Trocar turno ou dias é remarcar o espaço: passa pela mesma porta da
+    // criação, ignorando o próprio contrato na conta.
+    const mexeNoHorario = dto.shiftId !== undefined || dto.weekdays !== undefined;
+    if (mexeNoHorario && current.status === 'ACTIVE') {
+      await assertSemConflitoDeContrato({
+        resourceId: current.resourceId,
+        resourceName: current.resource.name,
+        startsAt: current.startsAt,
+        shiftId: dto.shiftId !== undefined ? dto.shiftId : current.shiftId,
+        weekdays: dto.weekdays ?? current.weekdays,
+        ignorarId: id,
+      });
+    }
+
     const rental = await prisma.rental.update({ where: { id }, data: dto });
 
-    // Encerrar/cancelar libera o recurso.
+    // Encerrar/cancelar libera o recurso, cancela o que estava por cobrar e
+    // devolve à grade os turnos que este contrato ainda ocupava adiante.
     if (dto.status && ['ENDED', 'CANCELED'].includes(dto.status) && current.status === 'ACTIVE') {
       await prisma.resource.update({ where: { id: current.resourceId }, data: { status: 'AVAILABLE' } });
       await prisma.rentalPayment.updateMany({
         where: { rentalId: id, status: 'PENDING' },
         data: { status: PaymentStatus.CANCELED },
       });
+
+      const limpeza = await limparReservasFuturas(id);
+      if (limpeza.removidas > 0) {
+        logger.info({ rentalId: id, ...limpeza }, 'Contrato encerrado — turnos futuros liberados');
+      }
     }
 
     emitToCompany(companyId, SOCKET_EVENTS.rentalPaymentUpdated, { rentalId: id });
@@ -186,8 +346,18 @@ export const rentalsService = {
       );
     }
     await prisma.rentalPayment.deleteMany({ where: { rentalId: id } });
+
+    // Antes de apagar o contrato: as reservas dele saem da grade. Depois do
+    // delete não haveria como encontrá-las — o vínculo vira nulo e elas
+    // passariam por reservas avulsas, ocupando o espaço para sempre.
+    const limpeza = await limparReservasFuturas(id);
+
     await prisma.resource.update({ where: { id: rental.resourceId }, data: { status: 'AVAILABLE' } });
-    return prisma.rental.delete({ where: { id } });
+    const removido = await prisma.rental.delete({ where: { id } });
+
+    logger.info({ rentalId: id, ...limpeza }, 'Contrato excluído — turnos futuros liberados');
+
+    return removido;
   },
 
   // ------------------------------------------------------------ pagamentos

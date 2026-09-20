@@ -1,10 +1,49 @@
+import crypto from 'node:crypto';
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { env } from '../../config/env';
 import { billingService } from './billing.service';
 import { asyncHandler } from '../../shared/utils/http';
 import { logger } from '../../shared/utils/logger';
 
 export const webhookRoutes = Router();
+
+/**
+ * Teto para quem bate nesta porta.
+ *
+ * O Asaas manda um punhado de eventos por minuto; quem manda centenas está
+ * tentando adivinhar o token ou derrubar a fila. Generoso o bastante para não
+ * atrapalhar uma reentrega em lote depois de uma queda.
+ */
+const webhookLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: { code: 'RATE_LIMITED', message: 'too many requests' } },
+});
+
+/**
+ * Compara o token sem vazar onde ele começou a diferir.
+ *
+ * `!==` para na primeira letra errada, e a diferença de tempo entre "errou no
+ * primeiro caractere" e "errou no último" é medível pela rede — dá para
+ * descobrir o token letra a letra. `timingSafeEqual` leva sempre o mesmo tempo.
+ */
+function tokenConfere(recebido: string | undefined, esperado: string): boolean {
+  if (!recebido) return false;
+
+  const a = Buffer.from(recebido);
+  const b = Buffer.from(esperado);
+  // Tamanhos diferentes já bastam para recusar, e `timingSafeEqual` exige
+  // buffers iguais — comparar contra ele mesmo mantém o custo constante.
+  if (a.length !== b.length) {
+    crypto.timingSafeEqual(b, b);
+    return false;
+  }
+
+  return crypto.timingSafeEqual(a, b);
+}
 
 /**
  * Webhook do Asaas — a única porta por onde "foi pago" entra no sistema.
@@ -19,10 +58,10 @@ export const webhookRoutes = Router();
  */
 webhookRoutes.post(
   '/asaas',
+  webhookLimiter,
   asyncHandler(async (req, res) => {
     if (env.ASAAS_WEBHOOK_TOKEN) {
-      const received = req.header('asaas-access-token');
-      if (received !== env.ASAAS_WEBHOOK_TOKEN) {
+      if (!tokenConfere(req.header('asaas-access-token'), env.ASAAS_WEBHOOK_TOKEN)) {
         logger.warn({ ip: req.ip }, 'Webhook do Asaas com token inválido');
         res.status(401).json({ error: 'unauthorized' });
         return;

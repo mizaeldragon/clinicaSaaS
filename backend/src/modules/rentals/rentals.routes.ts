@@ -6,6 +6,7 @@ import { requireModule } from '../../shared/middlewares/moduleGuard';
 import { asyncHandler, serialize } from '../../shared/utils/http';
 import { recordAudit } from '../../shared/services/audit.service';
 import {
+  createRenterSchema,
   createRentalSchema,
   idParamSchema,
   listPaymentsSchema,
@@ -23,6 +24,30 @@ rentalsRoutes.get(
   validate({ query: listRentalsSchema }),
   asyncHandler(async (req, res) => {
     res.json(serialize(await rentalsService.list(req.query as never)));
+  }),
+);
+
+/**
+ * Cadastra a locatária e o acesso dela de uma vez.
+ *
+ * Exige as duas permissões, e não uma: criar login é assunto de quem administra
+ * a conta, não de quem só cuida dos aluguéis.
+ */
+rentalsRoutes.post(
+  '/renters',
+  requirePermission(PERMISSIONS.rentalsManage),
+  requirePermission(PERMISSIONS.usersManage),
+  validate({ body: createRenterSchema }),
+  asyncHandler(async (req, res) => {
+    const criada = await rentalsService.createRenter(req.companyId as string, req.body);
+    await recordAudit({
+      action: 'rental.renter.created',
+      entity: 'Professional',
+      entityId: criada.professional.id,
+      after: { name: criada.professional.name, email: req.body.email },
+      ip: req.ip,
+    });
+    res.status(201).json(serialize(criada));
   }),
 );
 

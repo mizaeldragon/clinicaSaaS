@@ -197,16 +197,23 @@ export function BookingDialog({
 
           <div className="space-y-1.5">
             <Label>Profissional *</Label>
+            {/* Só locatárias: a equipe da casa trabalha no espaço, não o aluga.
+                Enquanto a lista trazia todo mundo, era fácil reservar um turno
+                para a própria dona — e a casa acabava cobrando aluguel de si
+                mesma. */}
             <SearchSelect
-              options={(professionals?.data ?? []).map((professional) => ({
-                value: professional.id,
-                label: professional.name,
-                description: professional.specialties.join(', '),
-                color: professional.color,
-              }))}
+              options={(professionals?.data ?? [])
+                .filter((professional) => professional.revenueOwner === 'PROFESSIONAL')
+                .map((professional) => ({
+                  value: professional.id,
+                  label: professional.name,
+                  description: professional.specialties.join(', '),
+                  color: professional.color,
+                }))}
               value={professionalId}
               onChange={setProfessionalId}
               placeholder="Quem vai usar o espaço"
+              emptyText="Nenhuma locatária cadastrada — crie uma junto com o contrato"
             />
           </div>
 

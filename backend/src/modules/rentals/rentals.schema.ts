@@ -63,6 +63,23 @@ export const payRentalSchema = z.object({
   paidAt: z.coerce.date().default(() => new Date()),
 });
 
+/**
+ * A locatária e o acesso dela, num pedido só.
+ *
+ * Antes eram três telas para colocar uma pessoa no espaço: cadastrar a
+ * profissional, criar o usuário em Configurações e voltar para fazer o
+ * contrato. Quem aluga não existe sem login — é com ele que ela vê a própria
+ * agenda —, então os dois nascem juntos.
+ */
+export const createRenterSchema = z.object({
+  name: z.string().min(2, 'Informe o nome').max(120),
+  phone: z.string().max(20).optional(),
+  email: z.string().email('E-mail inválido').toLowerCase().trim(),
+  /** Provisória: ela troca no primeiro acesso, em Minha conta. */
+  password: z.string().min(8, 'A senha deve ter no mínimo 8 caracteres').max(72),
+  specialties: z.array(z.string().max(60)).max(10).optional(),
+});
+
 export const idParamSchema = z.object({ id: z.string().uuid('Identificador inválido') });
 
 export type CreateRentalDTO = z.infer<typeof createRentalSchema>;
@@ -70,3 +87,4 @@ export type UpdateRentalDTO = z.infer<typeof updateRentalSchema>;
 export type ListRentalsDTO = z.infer<typeof listRentalsSchema>;
 export type ListPaymentsDTO = z.infer<typeof listPaymentsSchema>;
 export type PayRentalDTO = z.infer<typeof payRentalSchema>;
+export type CreateRenterDTO = z.infer<typeof createRenterSchema>;

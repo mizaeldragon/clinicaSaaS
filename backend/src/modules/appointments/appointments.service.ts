@@ -7,6 +7,7 @@ import {
   PlanLimitError,
 } from '../../shared/errors/AppError';
 import { getPagination, paginated } from '../../shared/utils/http';
+import { somar } from '../../shared/utils/money';
 import { getCompanyContext } from '../../shared/services/companyContext.service';
 import { addMinutes, endOfMonth, referenceMonth, startOfMonth } from '../../shared/utils/datetime';
 import { SOCKET_EVENTS } from '../../websocket/io';
@@ -124,7 +125,7 @@ export const appointmentsService = {
 
       const items = await resolveServices(tx, dto.services, dto.professionalId ?? null);
       const totalDuration = items.reduce((sum, i) => sum + i.durationMinutes * i.quantity, 0);
-      const totalPrice = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+      const totalPrice = somar(items.map((i) => i.price * i.quantity));
 
       const startsAt = dto.startsAt;
       const endsAt = dto.endsAt ?? addMinutes(startsAt, totalDuration);
@@ -214,7 +215,7 @@ export const appointmentsService = {
         ? items.reduce((sum, i) => sum + i.durationMinutes * i.quantity, 0)
         : current.durationMinutes;
       const totalPrice = items
-        ? items.reduce((sum, i) => sum + i.price * i.quantity, 0)
+        ? somar(items.map((i) => i.price * i.quantity))
         : Number(current.totalPrice);
 
       const startsAt = dto.startsAt ?? current.startsAt;

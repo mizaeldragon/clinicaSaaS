@@ -1,6 +1,6 @@
 import { ModuleKey } from '@prisma/client';
 import { prisma } from '../../shared/database/prisma';
-import { endOfDay, endOfMonth, startOfDay, startOfMonth } from '../../shared/utils/datetime';
+import { dayKey, endOfDay, endOfMonth, startOfDay, startOfMonth } from '../../shared/utils/datetime';
 import { appointmentsService } from '../appointments/appointments.service';
 import { financialService } from '../financial/financial.service';
 import { resourcesService } from '../resources/resources.service';
@@ -129,12 +129,12 @@ export const dashboardService = {
     for (let i = 0; i < 30; i += 1) {
       const day = new Date(from);
       day.setDate(from.getDate() + i);
-      const key = day.toISOString().slice(0, 10);
+      const key = dayKey(day);
       buckets.set(key, { date: key, revenue: 0, count: 0 });
     }
 
     for (const appointment of appointments) {
-      const key = appointment.startsAt.toISOString().slice(0, 10);
+      const key = dayKey(appointment.startsAt);
       const bucket = buckets.get(key);
       if (!bucket) continue;
       bucket.revenue += num(appointment.totalPrice);

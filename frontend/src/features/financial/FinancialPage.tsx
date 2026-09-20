@@ -49,7 +49,7 @@ import {
 } from '@/api/queries';
 import { useAuthStore } from '@/stores/auth.store';
 import { PAYMENT_METHOD, TRANSACTION_ORIGIN } from '@/config/labels';
-import { compactCurrency, currency, percent, shortDate } from '@/lib/format';
+import { compactCurrency, currency, dateInput, percent, shortDate } from '@/lib/format';
 import type { PaymentMethod, TransactionType } from '@/types';
 
 const CHART_COLORS = ['#7C3AED', '#EC4899', '#0EA5E9', '#14B8A6', '#F59E0B', '#EF4444', '#64748B'];
@@ -61,7 +61,7 @@ const EMPTY = {
   categoryId: '',
   paymentMethod: 'PIX' as PaymentMethod,
   paymentStatus: 'PAID',
-  competenceDate: new Date().toISOString().slice(0, 10),
+  competenceDate: dateInput(),
   dueDate: '',
   notes: '',
 };

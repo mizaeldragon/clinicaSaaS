@@ -12,7 +12,7 @@ import {
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input, Textarea } from '@/components/ui/input';
-import { PhoneInput } from '@/components/ui/field';
+import { PasswordInput, PhoneInput } from '@/components/ui/field';
 import { PageHeader, Pagination, StatCard, TBody, TD, TH, THead, TR, Table } from '@/components/ui/data';
 import { EmptyState, Skeleton } from '@/components/ui/feedback';
 import { Label, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/primitives';
@@ -46,20 +46,33 @@ import {
   useRentalStats,
   useRentals,
   useResources,
+  useShifts,
 } from '@/api/queries';
 import { useAuthStore } from '@/stores/auth.store';
 import { BILLING_CYCLE, PAYMENT_METHOD } from '@/config/labels';
-import { currency, monthLabel, shortDate } from '@/lib/format';
+import { currency, dateInput, monthLabel, shortDate } from '@/lib/format';
 import type { PaymentMethod, RentalPayment } from '@/types';
 import { OccupancyBoard } from './OccupancyBoard';
 import { ShiftSettings } from './ShiftSettings';
 
+const DIAS = [
+  { valor: 0, curto: 'D' },
+  { valor: 1, curto: 'S' },
+  { valor: 2, curto: 'T' },
+  { valor: 3, curto: 'Q' },
+  { valor: 4, curto: 'Q' },
+  { valor: 5, curto: 'S' },
+  { valor: 6, curto: 'S' },
+];
+
 const EMPTY = {
   resourceId: '',
   professionalId: '',
+  shiftId: '',
+  weekdays: [] as number[],
   renterName: '',
   renterPhone: '',
-  startsAt: new Date().toISOString().slice(0, 10),
+  startsAt: dateInput(),
   endsAt: '',
   amount: '',
   billingCycle: 'MONTHLY',
@@ -67,8 +80,12 @@ const EMPTY = {
   notes: '',
 };
 
+/** Locatária nova: o cadastro e o acesso dela, digitados no próprio contrato. */
+const NOVA = { name: '', phone: '', email: '', password: '' };
+
 export function RentalsPage() {
   const canManage = useAuthStore((s) => s.can('rentals:manage'));
+  const canManageUsers = useAuthStore((s) => s.can('users:manage'));
 
   const [page, setPage] = useState(1);
   const [paymentsPage, setPaymentsPage] = useState(1);
@@ -77,21 +94,67 @@ export function RentalsPage() {
   const { data: stats } = useRentalStats();
   const { data: resources } = useResources({ isRentable: 'true' });
   const { data: professionals } = useProfessionals({ isActive: 'true' });
+  const { data: shifts } = useShifts();
   const mutations = useRentalMutations();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState(EMPTY);
+  /*
+   * Quem vai ocupar o espaço: alguém que já aluga, ou uma pessoa nova.
+   *
+   * Antes o contrato só perguntava um nome solto e, opcionalmente, "vincular a
+   * um profissional". Quem aluga precisa de login — é por ele que ela vê a
+   * própria agenda —, e criar esse login era outra tela, em Configurações, que
+   * ninguém adivinhava ser necessária. Agora os dois nascem aqui.
+   */
+  const [modo, setModo] = useState<'existente' | 'nova'>('nova');
+  const [nova, setNova] = useState(NOVA);
+
+  // Só locatárias: a equipe da casa não aluga o espaço em que trabalha.
+  const locatarias = (professionals?.data ?? []).filter(
+    (p) => p.revenueOwner === 'PROFESSIONAL' && p.isActive,
+  );
   const [payTarget, setPayTarget] = useState<RentalPayment | null>(null);
   const [payForm, setPayForm] = useState({ amount: '', paymentMethod: 'PIX' as PaymentMethod });
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+
+    /*
+     * A locatária vem antes do contrato, e não depois: se o cadastro falhar
+     * (e-mail repetido, limite do plano), nada é criado e a pessoa corrige com
+     * o formulário ainda preenchido. Na ordem inversa, sobraria um contrato
+     * órfão de alguém que não existe.
+     */
+    let professionalId = form.professionalId;
+    let renterName = form.renterName;
+    let renterPhone = form.renterPhone;
+
+    if (modo === 'nova') {
+      const criada = await mutations.createRenter
+        .mutateAsync({
+          name: nova.name,
+          phone: nova.phone || undefined,
+          email: nova.email,
+          password: nova.password,
+        })
+        .catch(() => null);
+
+      if (!criada) return;
+
+      professionalId = criada.professional.id;
+      renterName = criada.professional.name;
+      renterPhone = nova.phone;
+    }
+
     await mutations.create
       .mutateAsync({
         resourceId: form.resourceId,
-        professionalId: form.professionalId || null,
-        renterName: form.renterName,
-        renterPhone: form.renterPhone || null,
+        professionalId: professionalId || null,
+        renterName,
+        renterPhone: renterPhone || null,
+        shiftId: form.shiftId || null,
+        weekdays: form.shiftId ? form.weekdays : [],
         startsAt: new Date(`${form.startsAt}T12:00:00`).toISOString(),
         endsAt: form.endsAt ? new Date(`${form.endsAt}T12:00:00`).toISOString() : null,
         amount: Number(form.amount),
@@ -103,6 +166,8 @@ export function RentalsPage() {
       .then(() => {
         setDialogOpen(false);
         setForm(EMPTY);
+        setNova(NOVA);
+        setModo('nova');
       })
       .catch(() => undefined);
   }
@@ -372,43 +437,107 @@ export function RentalsPage() {
               />
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="renterName">Responsável *</Label>
-                <Input
-                  id="renterName"
-                  required
-                  value={form.renterName}
-                  onChange={(e) => setForm((f) => ({ ...f, renterName: e.target.value }))}
-                />
+            {/* ------------------------------------------------ locatária */}
+            <div className="space-y-3 rounded-xl border p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <Label className="text-sm font-semibold">Quem vai alugar</Label>
+                <div className="flex rounded-lg border p-0.5">
+                  {(
+                    [
+                      { valor: 'nova' as const, texto: 'Cadastrar agora' },
+                      { valor: 'existente' as const, texto: 'Já cadastrada' },
+                    ]
+                  ).map((opcao) => (
+                    <button
+                      key={opcao.valor}
+                      type="button"
+                      onClick={() => setModo(opcao.valor)}
+                      className={
+                        modo === opcao.valor
+                          ? 'rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground'
+                          : 'rounded-md px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground'
+                      }
+                    >
+                      {opcao.texto}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="renterPhone">Telefone</Label>
-                <PhoneInput
-                  id="renterPhone"
-                  value={form.renterPhone}
-                  onChange={(v) => setForm((f) => ({ ...f, renterPhone: v }))}
-                />
-              </div>
-            </div>
 
-            <div className="space-y-1.5">
-              <Label>Vincular a um profissional (opcional)</Label>
-              <SearchSelect
-                allowClear
-                options={(professionals?.data ?? []).map((p) => ({ value: p.id, label: p.name }))}
-                value={form.professionalId}
-                onChange={(v) =>
-                  setForm((f) => ({
-                    ...f,
-                    professionalId: v,
-                    renterName:
-                      f.renterName ||
-                      (professionals?.data.find((p) => p.id === v)?.name ?? f.renterName),
-                  }))
-                }
-                placeholder="Sem vínculo"
-              />
+              {modo === 'existente' ? (
+                <SearchSelect
+                  options={locatarias.map((p) => ({ value: p.id, label: p.name }))}
+                  value={form.professionalId}
+                  onChange={(v) =>
+                    setForm((f) => ({
+                      ...f,
+                      professionalId: v,
+                      renterName: locatarias.find((p) => p.id === v)?.name ?? f.renterName,
+                      renterPhone: locatarias.find((p) => p.id === v)?.phone ?? f.renterPhone,
+                    }))
+                  }
+                  placeholder="Selecione a locatária"
+                  emptyText="Nenhuma locatária cadastrada ainda"
+                />
+              ) : !canManageUsers ? (
+                <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400">
+                  Criar acesso é coisa de administrador. Peça para quem administra a conta
+                  cadastrar a locatária, ou escolha uma já cadastrada.
+                </p>
+              ) : (
+                <>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="novaNome">Nome *</Label>
+                      <Input
+                        id="novaNome"
+                        required
+                        minLength={2}
+                        value={nova.name}
+                        onChange={(e) => setNova((n) => ({ ...n, name: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="novaTelefone">Telefone</Label>
+                      <PhoneInput
+                        id="novaTelefone"
+                        value={nova.phone}
+                        onChange={(v) => setNova((n) => ({ ...n, phone: v }))}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="novaEmail">E-mail de acesso *</Label>
+                      <Input
+                        id="novaEmail"
+                        type="email"
+                        required
+                        value={nova.email}
+                        onChange={(e) => setNova((n) => ({ ...n, email: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="novaSenha">Senha provisória *</Label>
+                      <PasswordInput
+                        id="novaSenha"
+                        required
+                        minLength={8}
+                        placeholder="Mínimo de 8 caracteres"
+                        value={nova.password}
+                        onChange={(e) => setNova((n) => ({ ...n, password: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-muted-foreground">
+                    Com esse acesso ela entra no sistema e vê a agenda e as clientes dela — que
+                    ficam fora da sua. O link de agendamento dela sai pronto em Profissionais, e ela
+                    troca a senha no primeiro acesso.
+                  </p>
+                </>
+              )}
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -476,6 +605,93 @@ export function RentalsPage() {
                   onChange={(e) => setForm((f) => ({ ...f, dueDay: e.target.value }))}
                 />
               </div>
+            </div>
+
+            {/* ------------------------------------------- turnos do contrato */}
+            {/*
+              É isto que abre a agenda dela.
+
+              A disponibilidade de uma locatária vem dos turnos que ela alugou —
+              não de jornada de trabalho. Sem turno e sem dias, o contrato só
+              gera cobrança, e o link público dela responde "nenhum horário
+              livre" para sempre, sem dizer por quê.
+            */}
+            <div className="space-y-3 rounded-xl border p-4">
+              <div>
+                <Label className="text-sm font-semibold">Quando ela usa o espaço</Label>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  É o turno reservado que abre a agenda dela no link de agendamento.
+                </p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Turno</Label>
+                  <Select
+                    value={form.shiftId || 'nenhum'}
+                    onValueChange={(v) =>
+                      setForm((f) => ({ ...f, shiftId: v === 'nenhum' ? '' : v }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o turno" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="nenhum">Sem turno fixo (só cobrança)</SelectItem>
+                      {(shifts ?? []).map((shift) => (
+                        <SelectItem key={shift.id} value={shift.id}>
+                          {shift.name} · {shift.startsAt}–{shift.endsAt}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>Dias da semana</Label>
+                  <div className="flex gap-1">
+                    {DIAS.map((dia, i) => {
+                      const marcado = form.weekdays.includes(dia.valor);
+                      return (
+                        <button
+                          key={dia.valor}
+                          type="button"
+                          disabled={!form.shiftId}
+                          onClick={() =>
+                            setForm((f) => ({
+                              ...f,
+                              weekdays: marcado
+                                ? f.weekdays.filter((d) => d !== dia.valor)
+                                : [...f.weekdays, dia.valor],
+                            }))
+                          }
+                          className={
+                            marcado
+                              ? 'size-9 rounded-lg bg-primary text-sm font-medium text-primary-foreground'
+                              : 'size-9 rounded-lg border text-sm text-muted-foreground transition-colors enabled:hover:border-primary enabled:hover:text-primary disabled:opacity-40'
+                          }
+                          aria-label={`Dia ${i}`}
+                        >
+                          {dia.curto}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {form.shiftId && form.weekdays.length ? (
+                <p className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                  Os turnos dos próximos 30 dias são reservados automaticamente, e o link de
+                  agendamento dela passa a abrir nesses horários.
+                </p>
+              ) : (
+                <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+                  Sem turno e dias, o contrato só gera cobrança: a agenda dela{' '}
+                  <strong>não abre</strong> no link. Dá para reservar turnos avulsos depois, pela
+                  grade da aba Ocupação.
+                </p>
+              )}
             </div>
 
             <div className="space-y-1.5">

@@ -31,6 +31,17 @@ const TENANT_MODELS = new Set<string>([
   'Commission',
   'Notification',
   'AuditLog',
+  /*
+   * Os quatro abaixo estavam de fora, e o esquecimento vazava entre empresas:
+   * `GET /shifts` de uma casa devolvia os turnos da outra, o feriado de uma
+   * fechava a agenda pública da outra, e a grade de ocupação misturava reservas
+   * de espaços que nem existem ali. Nenhum dos serviços filtrava na mão, porque
+   * todos confiavam neste filtro.
+   */
+  'Holiday',
+  'Shift',
+  'ResourceShiftPrice',
+  'RentalBooking',
 ]);
 
 const WHERE_OPERATIONS = new Set([

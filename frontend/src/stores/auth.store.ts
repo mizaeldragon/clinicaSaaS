@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { api, configureApi } from '@/lib/api';
 import { applyBrandColor, resetBrandColor } from '@/lib/utils';
+import { queryClient } from '@/lib/queryClient';
 import type { AuthResponse, AuthUser, CompanyContext, ModuleKey } from '@/types';
 
 interface AuthState {
@@ -46,6 +47,17 @@ export const useAuthStore = create<AuthState>()(
       hydrated: false,
 
       setSession: (data) => {
+        /*
+         * Cache da sessão anterior morre aqui.
+         *
+         * O React Query guarda o que já foi buscado e entrega na hora, antes de
+         * conferir com o servidor. Sem esta limpeza, quem saía de uma empresa e
+         * entrava em outra no mesmo navegador via, por um instante, os dados da
+         * anterior — nome de cliente, faturamento, agenda. O servidor sempre
+         * respondeu certo; era a tela que mostrava o que já tinha em mãos.
+         */
+        queryClient.clear();
+
         set({
           accessToken: data.accessToken,
           refreshToken: data.refreshToken,
@@ -85,6 +97,7 @@ export const useAuthStore = create<AuthState>()(
           await api.public.post('/auth/logout', { refreshToken }).catch(() => undefined);
         }
         set({ accessToken: null, refreshToken: null, user: null, company: null });
+        queryClient.clear();
         resetBrandColor();
       },
 
@@ -95,6 +108,7 @@ export const useAuthStore = create<AuthState>()(
       logoutAll: async () => {
         await api.post('/auth/logout-all', {}).catch(() => undefined);
         set({ accessToken: null, refreshToken: null, user: null, company: null });
+        queryClient.clear();
         resetBrandColor();
       },
 
@@ -141,6 +155,8 @@ configureApi({
   setTokens: ({ accessToken, refreshToken }) => useAuthStore.setState({ accessToken, refreshToken }),
   onLogout: () => {
     useAuthStore.setState({ accessToken: null, refreshToken: null, user: null, company: null });
+    // Sessão expirada derruba do mesmo jeito: o cache dela não fica para trás.
+    queryClient.clear();
     resetBrandColor();
   },
 });

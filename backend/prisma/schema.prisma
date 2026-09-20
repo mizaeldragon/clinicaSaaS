@@ -701,6 +701,11 @@ model Appointment {
   @@index([companyId, status])
   @@index([companyId, customerId])
   @@index([companyId, ownerProfessionalId, startsAt])
+  /// Existe também um índice ÚNICO PARCIAL `appointments_sem_duplo`
+  /// (professionalId, startsAt) para status diferentes de CANCELED/NO_SHOW,
+  /// criado na migração `20260920120000_sem_agendamento_duplo`. O Prisma não
+  /// sabe descrever índice parcial no schema — se um `migrate dev` propuser
+  /// removê-lo, é engano: ele é a única trava real contra agendamento duplo.
   @@map("appointments")
 }
 

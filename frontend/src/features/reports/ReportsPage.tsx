@@ -19,7 +19,7 @@ import { Label, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui
 import { useReport } from '@/api/queries';
 import { ResumoDoMesCard } from '@/features/insights/ResumoDoMesCard';
 import { APPOINTMENT_STATUS } from '@/config/labels';
-import { compactCurrency, currency, percent, weekdayName } from '@/lib/format';
+import { compactCurrency, currency, dateInput, percent, weekdayName } from '@/lib/format';
 import type { AppointmentStatus } from '@/types';
 
 interface AppointmentsReport {
@@ -57,12 +57,12 @@ interface CustomersReport {
 
 function firstDayOfMonth() {
   const date = new Date();
-  return new Date(date.getFullYear(), date.getMonth(), 1).toISOString().slice(0, 10);
+  return dateInput(new Date(date.getFullYear(), date.getMonth(), 1));
 }
 
 export function ReportsPage() {
   const [from, setFrom] = useState(firstDayOfMonth());
-  const [to, setTo] = useState(new Date().toISOString().slice(0, 10));
+  const [to, setTo] = useState(dateInput());
 
   const params = {
     from: new Date(`${from}T00:00:00`).toISOString(),

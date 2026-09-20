@@ -140,13 +140,15 @@ professionalsRoutes.delete(
   requirePermission(PERMISSIONS.professionalsManage),
   validate({ params: idParamSchema }),
   asyncHandler(async (req, res) => {
-    await professionalsService.remove(req.params.id);
+    const resultado = await professionalsService.remove(req.params.id);
     await recordAudit({
-      action: 'professional.removed',
+      action: resultado.deactivated ? 'professional.deactivated' : 'professional.removed',
       entity: 'Professional',
       entityId: req.params.id,
       ip: req.ip,
     });
-    res.status(204).send();
+    // Responde o que de fato aconteceu, em vez de 204: apagar e inativar são
+    // desfechos diferentes, e a tela precisa contar o certo para a pessoa.
+    res.json(resultado);
   }),
 );

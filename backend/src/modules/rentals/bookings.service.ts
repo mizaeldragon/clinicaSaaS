@@ -16,6 +16,7 @@ import {
 } from '../../shared/errors/AppError';
 import { getPagination, paginated } from '../../shared/utils/http';
 import { endOfDay, startOfDay, timeToMinutes } from '../../shared/utils/datetime';
+import { somar } from '../../shared/utils/money';
 import { SOCKET_EVENTS, emitToCompany, emitToProfessional } from '../../websocket/io';
 import { logger } from '../../shared/utils/logger';
 import { shiftsService } from '../shifts/shifts.service';
@@ -290,7 +291,7 @@ export const bookingsService = {
       total: days.length,
       available: free.length,
       blocked: days.length - free.length,
-      amount: free.reduce((sum, day) => sum + day.price, 0),
+      amount: somar(free.map((day) => day.price)),
     };
   },
 

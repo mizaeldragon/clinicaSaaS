@@ -171,11 +171,17 @@ export const professionalsService = {
       ]),
     );
 
+    // Quem já trabalhou aqui não se apaga: o atendimento, a comissão e o turno
+    // alugado dela são história da casa, e sumiriam junto, em cascata. Vira
+    // inativa — e a tela precisa dizer isso com todas as letras, senão a pessoa
+    // clica em "remover" de novo achando que falhou.
     if (appointments > 0 || bookings > 0) {
-      return prisma.professional.update({ where: { id }, data: { isActive: false } });
+      await prisma.professional.update({ where: { id }, data: { isActive: false } });
+      return { deactivated: true, appointments, bookings };
     }
 
-    return prisma.professional.delete({ where: { id } });
+    await prisma.professional.delete({ where: { id } });
+    return { deactivated: false, appointments: 0, bookings: 0 };
   },
 
   async syncServices(tx: TxClient, companyId: string, professionalId: string, serviceIds: string[]) {

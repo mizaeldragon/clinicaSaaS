@@ -35,6 +35,20 @@ export function calendarDate(value: string | Date): Date {
   return new Date(`${iso}T12:00:00`);
 }
 
+/**
+ * A data como o campo `<input type="date">` espera, no fuso de quem digita.
+ *
+ * `toISOString().slice(0, 10)` devolve a data em UTC: no Brasil, das 21h em
+ * diante ela já é a de amanhã. Era assim que um lançamento feito às 22h nascia
+ * com a data do dia seguinte, e o relatório do mês começava no último dia do
+ * mês anterior.
+ */
+export function dateInput(date: Date = new Date()): string {
+  const mes = String(date.getMonth() + 1).padStart(2, '0');
+  const dia = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${mes}-${dia}`;
+}
+
 export function dateLabel(value: string | Date | null | undefined): string {
   const date = toDate(value);
   if (!date) return '—';

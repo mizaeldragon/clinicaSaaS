@@ -54,6 +54,21 @@ export function addMonths(date: Date, months: number): Date {
 }
 
 /** "2026-09" a partir de uma data. */
+/**
+ * A data de calendário, no fuso de quem usa: "2026-09-19".
+ *
+ * `toISOString().slice(0, 10)` devolve a data em UTC — e o Brasil está três
+ * horas atrás. Um atendimento das 21h30 vira o dia seguinte lá, e o
+ * faturamento da noite aparecia no gráfico do dia errado (quando não sumia,
+ * caindo fora da janela). Aqui a data sai dos campos locais, que é como a dona
+ * conta o dia dela.
+ */
+export function dayKey(date: Date): string {
+  const mes = String(date.getMonth() + 1).padStart(2, '0');
+  const dia = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${mes}-${dia}`;
+}
+
 export function referenceMonth(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 }

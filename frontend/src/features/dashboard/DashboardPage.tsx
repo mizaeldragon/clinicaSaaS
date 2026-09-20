@@ -45,6 +45,7 @@ export function DashboardPage() {
   const user = useAuthStore((s) => s.user);
   const company = useAuthStore((s) => s.company);
   const hasModule = useAuthStore((s) => s.hasModule);
+  const can = useAuthStore((s) => s.can);
 
   // Quem atende tem link próprio para divulgar; quem só administra, não.
   const ownLink = user?.professional?.publicSlug ?? null;
@@ -163,7 +164,7 @@ export function DashboardPage() {
 
       {/* Antes do gráfico de propósito: e a unica coisa desta tela em que da
           para agir hoje, ligando para confirmar. */}
-      {hasModule('reports') ? <RiscoDeFaltaCard /> : null}
+      {hasModule('reports') && can('reports:view') ? <RiscoDeFaltaCard /> : null}
 
       <div className="grid gap-4 lg:grid-cols-3">
         {/* ------------------------------------------------------- Gráfico */}

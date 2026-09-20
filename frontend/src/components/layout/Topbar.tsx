@@ -27,6 +27,26 @@ export function Topbar({ onOpenMenu }: { onOpenMenu: () => void }) {
 
   const unread = notifications?.unread ?? 0;
   const [somLigado, setSomLigado] = useState(avisoLigado);
+  // Controlado para poder fechar sozinho quando o clique leva para a agenda.
+  const [notificacoesAbertas, setNotificacoesAbertas] = useState(false);
+
+  /**
+   * O clique na notificação leva ao que ela avisa.
+   *
+   * Marcar como lida era tudo o que acontecia antes — e o aviso "Novo
+   * agendamento, Ana Paula, 22/09 às 09:30" deixava a pessoa procurando esse
+   * horário na agenda, às vezes em outro mês. Quando a notificação carrega o
+   * atendimento, a agenda abre nele.
+   */
+  function abrirNotificacao(item: { id: string; data: Record<string, unknown> | null }) {
+    markAsRead.mutate(item.id);
+
+    const appointmentId = item.data?.appointmentId;
+    if (typeof appointmentId !== 'string') return;
+
+    setNotificacoesAbertas(false);
+    navigate(`/app/agenda?atendimento=${appointmentId}`);
+  }
 
   async function alternarSom() {
     const ligando = !somLigado;
@@ -72,7 +92,7 @@ export function Topbar({ onOpenMenu }: { onOpenMenu: () => void }) {
         {somLigado ? <Volume2 /> : <VolumeX className="text-muted-foreground" />}
       </Button>
 
-      <Popover>
+      <Popover open={notificacoesAbertas} onOpenChange={setNotificacoesAbertas}>
         <PopoverTrigger asChild>
           <Button variant="ghost" size="icon" className="relative" aria-label="Notificações">
             <Bell />
@@ -103,7 +123,7 @@ export function Topbar({ onOpenMenu }: { onOpenMenu: () => void }) {
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => markAsRead.mutate(item.id)}
+                  onClick={() => abrirNotificacao(item)}
                   className={cn(
                     'flex w-full flex-col gap-0.5 border-b border-border/60 px-4 py-3 text-left transition-colors hover:bg-muted/60',
                     !item.readAt && 'bg-primary/5',
