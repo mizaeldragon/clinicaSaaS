@@ -1,0 +1,110 @@
+# Confere o que dá para conferir sem banco: tipos, lint e build dos dois lados.
+#
+# Existe para pegar o erro antes do deploy. Railway e Vercel buildam sozinhos
+# quando a `main` recebe push — sem isto, a primeira notícia de um build
+# quebrado seria o painel fora do ar.
+#
+# Os testes e2e (`backend/tests/`) não entram aqui: eles sobem a API contra um
+# Postgres populado com o seed de demonstração, e dependem de `migrate reset`.
+# Rodam na sua máquina, de propósito.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Push seguido cancela o build anterior do mesmo branch — o que interessa é o
+# resultado do último commit, não a fila inteira.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend — tipos, lint e build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependências
+        working-directory: backend
+        run: npm ci
+
+      # O client do Prisma é gerado, não versionado: sem isto o `tsc` não acha
+      # os tipos de nenhum model e o build falha inteiro.
+      - name: Gerar o client do Prisma
+        working-directory: backend
+        run: npx prisma generate
+
+      - name: Conferir tipos
+        working-directory: backend
+        run: npm run typecheck
+
+      - name: Lint
+        working-directory: backend
+        run: npm run lint
+
+      - name: Build
+        working-directory: backend
+        run: npm run build
+
+  frontend:
+    name: Painel — tipos, lint e build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependências
+        working-directory: frontend
+        run: npm ci
+
+      - name: Conferir tipos
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+
+      # `npm run build` já roda `tsc -b` antes do Vite — é o mesmo comando que a
+      # Vercel executa, então o que passar aqui passa lá.
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+  auditoria:
+    name: Vulnerabilidades em dependências de produção
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Só `--omit=dev`: falha em ferramenta de desenvolvimento não vai para o
+      # ar, e tratar isso como erro faria o CI virar ruído até ser ignorado.
+      - name: Backend
+        working-directory: backend
+        run: npm audit --omit=dev --audit-level=moderate
+
+      - name: Painel
+        working-directory: frontend
+        run: npm audit --omit=dev --audit-level=moderate

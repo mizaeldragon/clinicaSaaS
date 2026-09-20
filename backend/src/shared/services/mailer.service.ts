@@ -116,7 +116,24 @@ export const mailer = {
       // pessoa precisa. Em produção é falha de configuração.
       const write = env.isProduction ? logger.error.bind(logger) : logger.info.bind(logger);
       write(
-        { to: input.to, subject: input.subject, action: input.action?.url },
+        {
+          to: input.to,
+          subject: input.subject,
+          /*
+           * O link fica de fora em produção — e ele é justamente o que dá
+           * acesso.
+           *
+           * `action.url` carrega o token de redefinir senha. Escrito aqui, ele
+           * vai para o log da hospedagem: lido por quem tem o projeto, guardado
+           * por semanas, e válido por uma hora. Quem abrisse o log trocaria a
+           * senha de qualquer conta sem precisar da caixa de e-mail de
+           * ninguém.
+           *
+           * Em desenvolvimento o link continua, porque não há caixa de e-mail e
+           * é assim que se testa o fluxo.
+           */
+          action: env.isProduction ? undefined : input.action?.url,
+        },
         env.isProduction
           ? 'E-MAIL NÃO ENVIADO: SMTP_HOST não configurado'
           : 'E-mail (SMTP desligado — conteúdo no log)',

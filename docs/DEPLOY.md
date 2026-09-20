@@ -89,7 +89,15 @@ $env:DATABASE_URL="<a DATABASE_PUBLIC_URL do Railway>"
 cd backend && npm run seed:plans
 ```
 
-Isso cria **apenas** Pro e Premium. Nunca rode `npm run seed` contra produção:
+Isso cria **apenas os três planos** — Starter, Pro e Premium. Nenhuma empresa,
+nenhum cliente, nenhum agendamento: o banco continua zerado no que interessa. É
+`upsert` por slug, então dá para rodar de novo depois se você ajustar um preço.
+
+Não é opcional: sem plano ativo o cadastro recusa a primeira empresa
+(`auth.service.ts`, "Nenhum plano disponível para assinatura"), e a tela que
+criaria um plano é do super admin — que também não existe num banco vazio.
+
+Nunca rode `npm run seed` contra produção:
 ele cria as contas de demonstração, cujas senhas estão publicadas neste
 repositório.
 
@@ -146,10 +154,18 @@ empresa e confirme que entra.
 
 ---
 
-## 5. E-mail (quando quiser)
+## 5. E-mail (antes de entregar para alguém)
 
-Sem SMTP o sistema funciona, mas **a cliente não recebe confirmação de
-agendamento** e o "esqueci minha senha" não chega a ninguém.
+Esta é a única parte desta lista que **bloqueia o lançamento de verdade**.
+
+Sem SMTP o sistema sobe e funciona, mas o "esqueci minha senha" não chega a
+ninguém — e não existe tela de admin para redefinir a senha de um cliente. Quem
+esquecer a senha fica trancado para fora **em definitivo**. A cliente também
+não recebe confirmação de agendamento.
+
+O token de redefinição chega a ser criado no banco; só o e-mail não sai. Em
+produção o link **não** é escrito no log de propósito: ele vale por uma hora e
+daria acesso à conta para quem lesse o log da hospedagem.
 
 ```
 SMTP_HOST=smtp.seu-provedor.com
@@ -161,6 +177,11 @@ MAIL_FROM=CliniStudio <nao-responda@seu-dominio.com.br>
 ```
 
 Em produção, SMTP ausente é registrado como **erro** no log, não como aviso.
+
+Depois de configurar, prove que funciona antes de confiar: peça um "esqueci
+minha senha" para um e-mail seu e confirme que a mensagem chega — inclusive
+olhando o spam. Remetente novo costuma cair lá, e um link de redefinição no
+spam é o mesmo que link nenhum.
 
 ---
 
@@ -196,8 +217,31 @@ adicione um Redis no Railway, ponha `REDIS_ENABLED=true`,
 ## Depois de estar no ar
 
 - **Backup fora do Railway.** O snapshot deles fica no mesmo lugar que o banco.
-  `scripts/backup-db.ps1 -Url "<DATABASE_PUBLIC_URL>" -Destino D:\backups`,
-  agendado. Nenhuma outra defesa recupera dado apagado.
+  Nenhuma outra defesa recupera dado apagado. Uma vez só:
+
+  ```powershell
+  .\scripts\agendar-backup.ps1 -Url "<DATABASE_PUBLIC_URL>" -Destino "D:\backups\clinistudio"
+  ```
+
+  Isso guarda a URL num arquivo que só o seu usuário lê, registra a tarefa
+  diária no Agendador do Windows e **roda um backup na sua frente** para provar
+  que funciona. O `backup-db.ps1` confere cada dump com `pg_restore --list` e se
+  recusa a rodar a rotação quando o dump sai vazio ou ilegível — senão uma
+  `-Url` errada apagaria, em duas semanas, todos os backups bons.
+
+  Conferir depois: `Get-ScheduledTaskInfo -TaskName 'CliniStudio - backup do banco'`
+  (`LastTaskResult` 0 é sucesso).
+
+  Duas coisas que o script **não** resolve: ele depende deste computador estar
+  ligado, e um backup nunca restaurado é só uma suposição — teste um
+  `pg_restore` num banco descartável de vez em quando. E não tente mover isso
+  para o GitHub Actions: **o repositório é público** e o dump viraria um
+  artifact baixável por qualquer pessoa.
+- **O CI já roda sozinho.** `.github/workflows/ci.yml` confere tipos, lint,
+  build e `npm audit --omit=dev` dos dois lados a cada push na `main` e em cada
+  PR. Railway e Vercel buildam em paralelo com isso, então o CI não segura o
+  deploy — ele te avisa. Vale ligar a proteção do branch em *Settings › Branches*
+  se quiser que segure de fato.
 - **Cloudflare na frente**, se DDoS preocupar. Os limites por IP da API seguram
   um atacante; uma botnet, não.
 - **Alertas de segurança do GitHub ligados**: *Settings › Code security* →
