@@ -30,10 +30,18 @@ import { ApiError } from '@/lib/api';
  *
  * O plano chega pela URL (`/cadastro?plano=premium`), posto lá pelo botão do
  * cartão na landing. Aqui ele só aparece confirmado, com um caminho de volta
- * para a comparação. Sem parâmetro — quem veio pelo alternador do login, por
- * exemplo — vale o primeiro plano da lista, e o aviso diz qual é.
+ * para a comparação.
+ *
+ * Duas portas levam a este formulário, e elas terminam em lugares diferentes:
+ *
+ * - `?plano=<slug>&assinar=1` — veio do "Assinar" de um cartão. A pessoa já
+ *   decidiu pagar, então depois de criar a conta ela cai na tela de cobrança
+ *   com o plano escolhido, não no painel.
+ * - sem parâmetro — veio do "Começar teste grátis", abaixo dos cartões. Entra
+ *   no painel com o plano mais completo, porque é isso que o convite promete:
+ *   todos os recursos por cinco dias.
  */
-export function RegisterForm({ onCreated }: { onCreated: () => void }) {
+export function RegisterForm({ onCreated }: { onCreated: (destino: string) => void }) {
   const register = useAuthStore((state) => state.register);
   const { data: plans } = usePublicPlans();
   const [searchParams] = useSearchParams();
@@ -50,11 +58,37 @@ export function RegisterForm({ onCreated }: { onCreated: () => void }) {
   });
   const [loading, setLoading] = useState(false);
 
+  // Veio do "Assinar" de um cartão: termina na tela de cobrança, não no painel.
+  const querAssinar = searchParams.get('assinar') === '1';
+
+  /*
+   * O teste roda no plano mais completo, medido pelos módulos que ele liga.
+   *
+   * Podia ser `plans[0]`, mas aí o convite mentiria: ele promete "todos os
+   * recursos", e o primeiro da lista é o mais simples. Contar módulos em vez de
+   * procurar o slug `premium` mantém isso verdadeiro se você renomear os planos
+   * ou inserir um nível novo no meio.
+   */
+  const maisCompleto = plans?.reduce(
+    (melhor, item) => (item.modules.length > melhor.modules.length ? item : melhor),
+    plans[0],
+  );
+
   // Só aceita slug que exista de verdade: a URL é de quem chega, e um valor
   // inventado faria o cadastro falhar lá no fim, depois de tudo preenchido.
   const escolhido = searchParams.get('plano');
-  const plan = plans?.find((item) => item.slug === escolhido) ?? plans?.[0];
+  const plan = plans?.find((item) => item.slug === escolhido) ?? maisCompleto;
   const planSlug = plan?.slug ?? 'pro';
+
+  /*
+   * CPF/CNPJ é opcional no teste e obrigatório em quem vai assinar.
+   *
+   * A cobrança do Asaas é emitida no nome do documento — sem ele a pessoa
+   * criaria a conta, cairia na tela de pagamento e esbarraria num aviso
+   * mandando voltar às configurações. Pedir aqui, onde ela já está preenchendo
+   * dados da empresa, evita a viagem.
+   */
+  const documentoObrigatorio = querAssinar;
 
   function set<K extends keyof typeof form>(key: K, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -89,8 +123,13 @@ export function RegisterForm({ onCreated }: { onCreated: () => void }) {
         },
         planSlug,
       });
-      toast.success('Empresa criada! Seu plano já está ativo.');
-      onCreated();
+      if (querAssinar) {
+        toast.success('Conta criada! Agora é só escolher como pagar.');
+        onCreated('/app/configuracoes?tab=plano');
+      } else {
+        toast.success('Empresa criada! Seu teste começou.');
+        onCreated('/app');
+      }
     } catch (error) {
       if (error instanceof ApiError) toast.error(error.message);
       else toast.error('Não foi possível criar a conta');
@@ -130,20 +169,26 @@ export function RegisterForm({ onCreated }: { onCreated: () => void }) {
             </SelectContent>
           </Select>
         </div>
-        {/* Opcional de propósito. A promessa logo acima é "sem cartão de
+        {/* Opcional no teste de propósito: a promessa é "sem cartão de
             crédito", e exigir documento fiscal antes de a pessoa ter visto o
-            sistema contradiz isso. Quem tem em mãos preenche agora e não
-            precisa voltar; quem não tem preenche em Configurações, que é onde a
-            assinatura cobra. */}
+            sistema contradiz isso. Quem vem pelo "Assinar" já decidiu pagar, e
+            aí o documento é obrigatório — a cobrança é emitida no nome dele. */}
         <div className="space-y-1.5">
           <Label htmlFor="document">
-            CPF ou CNPJ <span className="font-normal text-muted-foreground">(opcional)</span>
+            CPF ou CNPJ{' '}
+            {documentoObrigatorio ? null : (
+              <span className="font-normal text-muted-foreground">(opcional)</span>
+            )}
           </Label>
           <DocumentInput
             id="document"
+            required={documentoObrigatorio}
             value={form.document}
             onChange={(v) => set('document', v)}
           />
+          {documentoObrigatorio ? (
+            <p className="text-xs text-muted-foreground">A cobrança é emitida neste nome.</p>
+          ) : null}
         </div>
       </div>
 

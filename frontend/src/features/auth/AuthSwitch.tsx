@@ -50,6 +50,16 @@ export function AuthSwitch() {
 
   const mode: Mode = location.pathname.startsWith('/cadastro') ? 'register' : 'login';
 
+  /*
+   * Quem chegou pelo "Assinar" de um cartão não está testando nada — prometer
+   * "sem cartão de crédito" no cabeçalho de quem veio pagar é promessa trocada.
+   */
+  const querAssinar = new URLSearchParams(location.search).get('assinar') === '1';
+  const subtitulo =
+    mode === 'register' && querAssinar
+      ? 'Crie a conta da empresa para concluir a assinatura'
+      : COPY[mode].subtitle;
+
   // Preenchido quando a conta tem segundo fator: a senha passou, falta o código.
   const [challenge, setChallenge] = useState<string | null>(null);
   const [code, setCode] = useState('');
@@ -129,7 +139,7 @@ export function AuthSwitch() {
   }
 
   return (
-    <AuthShell title={COPY[mode].title} subtitle={COPY[mode].subtitle}>
+    <AuthShell title={COPY[mode].title} subtitle={subtitulo}>
       <div className="space-y-6">
         {/* ----------------------------------------------------- interruptor */}
         <div
@@ -172,7 +182,7 @@ export function AuthSwitch() {
         {mode === 'login' ? (
           <LoginForm onTwoFactorRequired={setChallenge} onSignedIn={concluir} />
         ) : (
-          <RegisterForm onCreated={() => navigate('/app', { replace: true })} />
+          <RegisterForm onCreated={(destino) => navigate(destino, { replace: true })} />
         )}
       </div>
     </AuthShell>

@@ -1338,6 +1338,89 @@
   box-shadow: 0 14px 28px -16px rgba(0, 0, 0, 0.5);
 }
 
+/* Debaixo do botão, em letra miúda: responde "vou ficar preso?" no momento em
+   que a pergunta aparece — com o dedo sobre o botão, não na seção de dúvidas
+   três telas abaixo. */
+.lp-plano-rodape {
+  margin: 12px 0 0;
+  text-align: center;
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--cinza-2);
+}
+
+.lp-plano-navy .lp-plano-rodape {
+  color: var(--cinza-navy);
+}
+
+/* ---------------------------------------------------- o convite do teste
+ *
+ * Fora dos cartões, depois dos três preços.
+ *
+ * Fica numa faixa discreta de propósito: se tivesse o mesmo peso visual dos
+ * cartões, viraria a quarta opção da comparação — e a mais barata delas, o que
+ * esvaziaria as outras três. Aqui ele é o que deve ser: a saída de quem leu os
+ * preços e ainda não se decidiu.
+ */
+.lp-planos-teste {
+  margin-top: 34px;
+  padding: 22px 26px;
+  border: 1px dashed rgba(27, 32, 68, 0.22);
+  border-radius: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px 20px;
+  text-align: center;
+}
+
+.lp-planos-teste p {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.6;
+  color: var(--cinza-2);
+}
+
+.lp-planos-teste p b {
+  font-weight: 600;
+  color: var(--tinta);
+}
+
+.lp .lp-planos-teste-btn {
+  border: 1px solid rgba(27, 32, 68, 0.28);
+  background: #fff;
+  color: var(--tinta);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 12px 22px;
+  border-radius: 100px;
+  white-space: nowrap;
+  transition: background 0.25s ease, color 0.25s ease, border-color 0.25s ease;
+}
+
+.lp .lp-planos-teste-btn:hover {
+  background: var(--tinta);
+  color: #fff;
+  border-color: var(--tinta);
+}
+
+/* Empilhado no celular: lado a lado, a frase ficaria com três palavras por
+   linha e o botão espremido contra a borda. */
+@media (max-width: 640px) {
+  .lp-planos-teste {
+    flex-direction: column;
+    padding: 20px;
+  }
+
+  .lp .lp-planos-teste-btn {
+    width: 100%;
+    text-align: center;
+  }
+}
+
 /* --------------------------------------------------------------- dúvidas */
 
 .lp-duvidas {

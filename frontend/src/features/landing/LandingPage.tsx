@@ -520,12 +520,31 @@ export function LandingPage() {
                 </div>
 
                 {/* O plano escolhido viaja na URL: a decisão acontece aqui, na
-                    comparação, e não no meio do formulário de cadastro. */}
-                <Link to={`/cadastro?plano=${plano.slug}`} className="lp-plano-btn">
-                  Começar grátis
+                    comparação, e não no meio do formulário de cadastro.
+                    `assinar=1` diz que esta pessoa veio pagar — o cadastro
+                    termina na tela de cobrança, não no painel. */}
+                <Link to={`/cadastro?plano=${plano.slug}&assinar=1`} className="lp-plano-btn">
+                  Assinar {plano.nome}
                 </Link>
+
+                <p className="lp-plano-rodape">Pagamento mensal · cancele quando quiser</p>
               </article>
             ))}
+          </div>
+
+          {/* O teste fica fora dos cartões de propósito.
+              Dentro de cada um, ele competia com a assinatura e ganhava sempre:
+              ninguém escolhe pagar quando "grátis" está no mesmo botão. Aqui
+              embaixo ele vira o que é — a saída para quem ainda não se decidiu,
+              depois de ter lido os três preços. */}
+          <div className="lp-planos-teste">
+            <p>
+              Quer testar antes de assinar? Comece com <b>5 dias grátis</b>, com todos os recursos e
+              sem cartão de crédito.
+            </p>
+            <Link to="/cadastro" className="lp-planos-teste-btn">
+              Começar teste grátis →
+            </Link>
           </div>
         </div>
       </div>
