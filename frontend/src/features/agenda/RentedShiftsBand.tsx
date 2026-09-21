@@ -25,8 +25,18 @@ export function RentedShiftsBand({ days, from, to }: RentedShiftsBandProps) {
   // Só faz sentido para quem aluga o espaço, não para quem o ocupa.
   const enabled = hasModule('rentals') && can('rentals:view');
 
+  /*
+   * `enabled` precisa chegar no React Query, não só nos parâmetros.
+   *
+   * Antes ele só trocava o corpo da consulta, e a consulta partia de todo
+   * jeito: numa casa sem o módulo de aluguel — a Pro, por exemplo — toda
+   * abertura da agenda pedia `/rentals/bookings` para receber 403. O
+   * componente devolvia `null` logo abaixo e ninguém via nada, mas o erro
+   * ficava no console e um WARN no log da API a cada carregamento.
+   */
   const { data } = useBookings(
-    enabled ? { from: from.toISOString(), to: to.toISOString(), perPage: 200 } : {},
+    { from: from.toISOString(), to: to.toISOString(), perPage: 200 },
+    { enabled },
   );
 
   const byDay = useMemo(() => {

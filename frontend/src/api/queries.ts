@@ -1060,11 +1060,15 @@ export interface RentalBooking {
   shift: { id: string; name: string; startsAt: string; endsAt: string } | null;
 }
 
-export const useBookings = (params: Record<string, unknown> = {}) =>
+export const useBookings = (
+  params: Record<string, unknown> = {},
+  options?: { enabled?: boolean },
+) =>
   useApiQuery<Paginated<RentalBooking> & { totals: { status: string; amount: number; paidAmount: number }[] }>(
     ['bookings', params],
     '/rentals/bookings',
     params,
+    options,
   );
 
 export const useDayMap = (date: string) =>
