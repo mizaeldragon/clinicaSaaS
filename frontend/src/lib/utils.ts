@@ -104,23 +104,51 @@ const TINTA_VAR = `${TINTA.h} ${TINTA.s}% ${TINTA.l}%`;
 const CONTRASTE_MINIMO = 4.5;
 
 /**
+ * Brilho percebido (YIQ), de 0 a 255.
+ *
+ * Não é a mesma conta da luminância acima. Esta pesa o verde muito acima do
+ * vermelho e do azul porque é assim que o olho enxerga: um vermelho saturado
+ * parece escuro, mesmo sendo um canal no máximo.
+ */
+function brilhoPercebido(hex: string): number | null {
+  const hsl = hexToHsl(hex);
+  if (!hsl) return null;
+
+  const [r, g, b] = hslToRgb(hsl).map((v) => v * 255);
+  return (r * 299 + g * 587 + b * 114) / 1000;
+}
+
+/**
+ * Onde a cor deixa de pedir texto branco e passa a pedir texto escuro.
+ *
+ * 145 em vez dos 128 do meio da escala: empurra a virada um pouco para o lado
+ * claro, o que mantém branco nos tons médios — o vermelho, o azul e o roxo que
+ * as clínicas mais escolhem.
+ */
+const VIRADA_DE_BRILHO = 145;
+
+/**
  * Escolhe entre texto claro e escuro para escrever em cima de uma cor.
  *
  * A cliente escolhe a cor do próprio espaço, e nada impede que escolha um rosa
  * quase branco. Com o texto fixo em branco, o botão "Salvar alterações" vira
- * uma mancha clara sem palavra legível dentro. Aqui a decisão passa a ser da
- * cor: mede-se o contraste contra branco e contra a tinta escura do tema, e
- * ganha o maior.
+ * uma mancha clara sem palavra legível dentro.
+ *
+ * A decisão é do brilho percebido, e não da razão de contraste da WCAG. As duas
+ * discordam justamente nas cores saturadas de tom médio: num vermelho como
+ * `#f33f3f` a razão dá uma vantagem mínima ao texto escuro, e o resultado é
+ * preto sobre vermelho — tecnicamente defensável e feio de olhar. O brilho
+ * percebido põe esse vermelho abaixo da virada e devolve branco, que é o que
+ * qualquer pessoa escreveria ali.
+ *
+ * Claro e muito claro continuam recebendo texto escuro, que é o caso que fez
+ * esta função existir.
  */
 export function foregroundParaFundo(hex: string): string {
-  const hsl = hexToHsl(hex);
-  if (!hsl) return BRANCO;
+  const brilho = brilhoPercebido(hex);
+  if (brilho === null) return BRANCO;
 
-  const fundo = luminancia(hslToRgb(hsl));
-  const comBranco = contraste(fundo, luminancia([1, 1, 1]));
-  const comTinta = contraste(fundo, luminancia(hslToRgb(TINTA)));
-
-  return comBranco >= comTinta ? BRANCO : TINTA_VAR;
+  return brilho >= VIRADA_DE_BRILHO ? TINTA_VAR : BRANCO;
 }
 
 /**
