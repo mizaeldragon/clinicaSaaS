@@ -4,11 +4,54 @@ import { cn } from '@/lib/utils';
 import { Button } from './button';
 import { Card } from './card';
 
-/* ------------------------------------------------------------------ Table */
+/* ------------------------------------------------------------------ Table
+ *
+ * No celular a tabela vira uma pilha de cartões — quem faz isso é o CSS
+ * (`.tabela-cards`, em globals.css). O que falta lá é o rótulo de cada valor,
+ * e é o que este componente resolve aqui.
+ *
+ * Copiar o texto de cada `<th>` para o `data-label` da célula da mesma coluna
+ * poderia ser feito à mão, tabela por tabela — são quinze no sistema, e toda
+ * coluna nova depois dependeria de alguém lembrar. Lendo do próprio cabeçalho
+ * depois que o navegador montou, nenhuma delas precisou ser editada, e as
+ * futuras já nascem certas.
+ */
 export function Table({ className, ...props }: React.HTMLAttributes<HTMLTableElement>) {
+  const ref = React.useRef<HTMLTableElement>(null);
+
+  // Sem lista de dependências de propósito: a tabela muda de conteúdo a cada
+  // página, filtro e ordenação, e os rótulos precisam acompanhar. O custo é
+  // percorrer algumas dezenas de células — as listas todas são paginadas.
+  React.useEffect(() => {
+    const table = ref.current;
+    if (!table) return;
+
+    const titulos = Array.from(table.querySelectorAll('thead th')).map((th) =>
+      (th.textContent ?? '').trim(),
+    );
+    if (!titulos.length) return;
+
+    for (const linha of Array.from(table.querySelectorAll('tbody tr'))) {
+      const celulas = Array.from(linha.children) as HTMLTableCellElement[];
+
+      // Linha de uma célula só que atravessa a tabela ("Nenhum registro"):
+      // não é par de rótulo e valor, então fica sem rótulo.
+      if (celulas.length === 1 && celulas[0].colSpan > 1) {
+        delete celulas[0].dataset.label;
+        continue;
+      }
+
+      celulas.forEach((celula, indice) => {
+        const titulo = titulos[indice];
+        if (titulo) celula.dataset.label = titulo;
+        else delete celula.dataset.label;
+      });
+    }
+  });
+
   return (
-    <div className="w-full overflow-x-auto">
-      <table className={cn('w-full caption-bottom text-sm', className)} {...props} />
+    <div className="tabela-cards w-full sm:overflow-x-auto">
+      <table ref={ref} className={cn('w-full caption-bottom text-sm', className)} {...props} />
     </div>
   );
 }

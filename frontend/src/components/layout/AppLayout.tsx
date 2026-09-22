@@ -27,10 +27,18 @@ export function AppLayout() {
     setMenuOpen(false);
   }, [location.pathname]);
 
-  // Barra inferior no mobile com os 4 itens mais usados.
+  /*
+   * Barra inferior com TUDO que a pessoa alcança — não só os cinco primeiros.
+   *
+   * Cortar em cinco escondia Financeiro, Comissões e Relatórios atrás do menu
+   * lateral, que no celular é uma gaveta que ninguém abre. Como a lista varia
+   * (o Premium tem Aluguéis, a locatária tem quase nada), a barra rola de lado
+   * em vez de espremer todo mundo: cabem cinco por tela e o sexto aparece pela
+   * metade na borda, que é o que convida a rolar.
+   */
   const mobileItems = NAV_ITEMS.filter((item) =>
     isNavItemVisible(item, { role, hasModule, can }),
-  ).slice(0, 5);
+  );
 
   return (
     <div className="min-h-screen bg-shell">
@@ -58,15 +66,25 @@ export function AppLayout() {
         </main>
       </div>
 
-      <nav className="safe-bottom fixed inset-x-0 bottom-0 z-30 flex bg-card/95 shadow-[0_-1px_3px_rgb(16_24_40/0.06)] backdrop-blur-md lg:hidden">
+      <nav className="no-scrollbar safe-bottom fixed inset-x-0 bottom-0 z-30 flex overflow-x-auto bg-card/95 shadow-[0_-1px_3px_rgb(16_24_40/0.06)] backdrop-blur-md lg:hidden">
         {mobileItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
             end={item.to === '/app'}
+            /* O item ativo se traz para a vista sozinho: quem abre Relatórios
+               pelo menu lateral não deve encontrar a barra parada no começo,
+               sem sinal de onde está. */
+            ref={(node) => {
+              if (node?.classList.contains('text-primary')) {
+                node.scrollIntoView({ block: 'nearest', inline: 'center' });
+              }
+            }}
             className={({ isActive }) =>
               cn(
-                'flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium transition-colors',
+                // `w-[20%]` com `shrink-0`: cinco cabem na tela e o sexto
+                // aparece pela metade, que é o que mostra haver mais.
+                'flex w-[20%] shrink-0 flex-col items-center gap-0.5 py-2 text-[10px] font-medium transition-colors',
                 isActive ? 'text-primary' : 'text-muted-foreground',
               )
             }

@@ -171,3 +171,79 @@
     padding-bottom: env(safe-area-inset-bottom);
   }
 }
+
+/* ------------------------------------------------------- tabela em cartões
+ *
+ * No celular, tabela some e cada linha vira um cartão com "rótulo: valor".
+ *
+ * Uma tabela de cinco colunas em 375px ou estoura a tela ou encolhe o texto
+ * até ninguém conseguir ler. Rolar de lado para descobrir quanto custa um
+ * serviço é pior do que ler quatro linhas empilhadas.
+ *
+ * Os rótulos saem do próprio cabeçalho: o componente Table copia o texto de
+ * cada <th> para o `data-label` da célula correspondente. Por isso as quinze
+ * tabelas do sistema viraram cartões sem que nenhuma delas fosse editada.
+ */
+@media (max-width: 639px) {
+  .tabela-cards table,
+  .tabela-cards tbody,
+  .tabela-cards tr,
+  .tabela-cards td {
+    display: block;
+    width: 100%;
+  }
+
+  /* O cabeçalho sai: cada valor carrega o próprio rótulo agora. */
+  .tabela-cards thead {
+    display: none;
+  }
+
+  .tabela-cards tr {
+    margin-bottom: 0.625rem;
+    border: 1px solid hsl(var(--border) / 0.7);
+    border-radius: 0.75rem;
+    padding: 0.25rem 0.875rem;
+    background: hsl(var(--card));
+  }
+
+  .tabela-cards tr:last-child {
+    margin-bottom: 0;
+  }
+
+  /* O hover da linha não faz sentido num cartão que ninguém aponta. */
+  .tabela-cards tr:hover {
+    background: hsl(var(--card));
+  }
+
+  .tabela-cards td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid hsl(var(--border) / 0.4);
+    text-align: right;
+  }
+
+  .tabela-cards td:last-child {
+    border-bottom: 0;
+  }
+
+  .tabela-cards td[data-label]::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    text-align: left;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: hsl(var(--muted-foreground));
+  }
+
+  /* Célula que ocupa a tabela inteira — o "nenhum registro" das listas
+     vazias — não é par de rótulo e valor: centraliza e ocupa tudo. */
+  .tabela-cards td[colspan]:not([data-label]) {
+    justify-content: center;
+    text-align: center;
+  }
+}

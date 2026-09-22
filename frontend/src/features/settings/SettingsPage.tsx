@@ -1,6 +1,22 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Copy, ExternalLink, Plus, Save, ShieldCheck, Trash2, UserPlus } from 'lucide-react';
+import {
+  Building2,
+  ClipboardList,
+  Clock,
+  Copy,
+  CreditCard,
+  ExternalLink,
+  Plus,
+  Save,
+  ShieldCheck,
+  SlidersHorizontal,
+  Trash2,
+  UserCircle,
+  UserPlus,
+  Users,
+  type LucideIcon,
+} from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input, Textarea } from '@/components/ui/input';
@@ -58,6 +74,17 @@ const DEFAULT_HOURS = Array.from({ length: 7 }, (_, weekday) => ({
   closesAt: '19:00',
   isClosed: weekday === 0,
 }));
+
+/** As abas em ordem de uso, com o ícone que as representa no celular. */
+const ABAS: { valor: string; rotulo: string; icone: LucideIcon; somenteAdmin?: boolean }[] = [
+  { valor: 'empresa', rotulo: 'Empresa', icone: Building2 },
+  { valor: 'horarios', rotulo: 'Horários e feriados', icone: Clock },
+  { valor: 'modulos', rotulo: 'Módulos', icone: SlidersHorizontal },
+  { valor: 'usuarios', rotulo: 'Usuários', icone: Users, somenteAdmin: true },
+  { valor: 'plano', rotulo: 'Plano e cobrança', icone: CreditCard },
+  { valor: 'conta', rotulo: 'Minha conta', icone: UserCircle },
+  { valor: 'auditoria', rotulo: 'Auditoria', icone: ClipboardList, somenteAdmin: true },
+];
 
 export function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -158,14 +185,22 @@ export function SettingsPage() {
       />
 
       <Tabs value={tab} onValueChange={(value) => setSearchParams({ tab: value })}>
+        {/*
+          No celular, só o ícone.
+
+          Sete abas de texto em 375px quebravam em três fileiras sobrepostas,
+          cobrindo o título do cartão logo abaixo. Em ícone cabem todas numa
+          linha. O nome continua no `title` e no `aria-label`, então quem usa
+          leitor de tela ouve o mesmo de sempre e quem passa o dedo e segura vê
+          a dica.
+        */}
         <TabsList className="flex-wrap">
-          <TabsTrigger value="empresa">Empresa</TabsTrigger>
-          <TabsTrigger value="horarios">Horários e feriados</TabsTrigger>
-          <TabsTrigger value="modulos">Módulos</TabsTrigger>
-          {isAdmin ? <TabsTrigger value="usuarios">Usuários</TabsTrigger> : null}
-          <TabsTrigger value="plano">Plano e cobrança</TabsTrigger>
-          <TabsTrigger value="conta">Minha conta</TabsTrigger>
-          {isAdmin ? <TabsTrigger value="auditoria">Auditoria</TabsTrigger> : null}
+          {ABAS.filter((aba) => !aba.somenteAdmin || isAdmin).map((aba) => (
+            <TabsTrigger key={aba.valor} value={aba.valor} title={aba.rotulo} aria-label={aba.rotulo}>
+              <aba.icone className="size-4 shrink-0" />
+              <span className="hidden sm:inline">{aba.rotulo}</span>
+            </TabsTrigger>
+          ))}
         </TabsList>
 
         {/* ------------------------------------------------------- Empresa */}
@@ -413,27 +448,35 @@ export function SettingsPage() {
               {company?.slug ? (
                 <div className="space-y-1.5">
                   <Label>Endereço do link</Label>
-                  <div className="flex gap-2">
+                  {/* Empilhado no celular: lado a lado, o campo ficava com uns
+                      quatro centímetros e o endereço aparecia cortado logo no
+                      "https://" — justamente o pedaço que não interessa. */}
+                  <div className="flex flex-col gap-2 sm:flex-row">
                     <Input readOnly value={`${window.location.origin}/e/${company.slug}`} />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        void navigator.clipboard
-                          .writeText(`${window.location.origin}/e/${company.slug}`)
-                          .then(() => toast.success('Link copiado'))
-                          .catch(() => toast.error('Não foi possível copiar'));
-                      }}
-                    >
-                      <Copy />
-                      Copiar
-                    </Button>
-                    <Button type="button" variant="outline" asChild>
-                      <a href={`/e/${company.slug}`} target="_blank" rel="noreferrer">
-                        <ExternalLink />
-                        Abrir
-                      </a>
-                    </Button>
+                    {/* Os dois botões dividem a linha embaixo do campo; no
+                        desktop voltam para o lado dele. */}
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="flex-1 sm:flex-none"
+                        onClick={() => {
+                          void navigator.clipboard
+                            .writeText(`${window.location.origin}/e/${company.slug}`)
+                            .then(() => toast.success('Link copiado'))
+                            .catch(() => toast.error('Não foi possível copiar'));
+                        }}
+                      >
+                        <Copy />
+                        Copiar
+                      </Button>
+                      <Button type="button" variant="outline" className="flex-1 sm:flex-none" asChild>
+                        <a href={`/e/${company.slug}`} target="_blank" rel="noreferrer">
+                          <ExternalLink />
+                          Abrir
+                        </a>
+                      </Button>
+                    </div>
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Compartilhe na bio do Instagram ou no WhatsApp.
