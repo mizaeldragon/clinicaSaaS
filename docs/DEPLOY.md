@@ -263,6 +263,7 @@ adicione um Redis no Railway, ponha `REDIS_ENABLED=true`,
 | Sintoma | Causa quase sempre |
 |---|---|
 | Build falha, "no package.json" | falta **Root Directory** (`backend` / `frontend`) |
+| Build falha com `EBUSY: rmdir '/app/node_modules/.cache'` (exit 240) | é `npm ci` no `buildCommand`. O Railway monta um cache de build dentro do `node_modules`, e o `npm ci` apaga a pasta inteira antes de instalar — esbarra no ponto de montagem. O [railway.json](../backend/railway.json) usa `npm install`, que instala por cima sem apagar e respeita o `package-lock.json` igual |
 | Painel abre, login dá erro de rede | `VITE_API_URL` errada, ou faltou redeploy da Vercel |
 | Login responde mas o navegador bloqueia | `CORS_ORIGINS` sem o domínio exato do painel (com `https://`, sem barra no fim) |
 | 404 ao recarregar `/app/agenda` | `vercel.json` não subiu, ou Root Directory errado |
