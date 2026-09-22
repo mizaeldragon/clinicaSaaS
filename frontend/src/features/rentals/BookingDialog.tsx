@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { endOfMonth, endOfWeek, format, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/primitives';
@@ -23,6 +24,7 @@ import { SearchSelect } from '@/components/ui/search-select';
 import {
   useBookingMutations,
   useBookingPreview,
+  useDayMap,
   useProfessionals,
   useResources,
   useShifts,
@@ -90,7 +92,54 @@ export function BookingDialog({
 
   // Sincroniza com a célula clicada no mapa do dia.
   const effectiveResource = resourceId || target?.resourceId || '';
-  const effectiveShifts = shiftIds.length ? shiftIds : target?.shiftId ? [target.shiftId] : [];
+  // Memoizado porque um efeito depende dele: recriado a cada render, o efeito
+  // que limpa turno ocupado rodaria sem parar.
+  const effectiveShifts = useMemo(
+    () => (shiftIds.length ? shiftIds : target?.shiftId ? [target.shiftId] : []),
+    [shiftIds, target?.shiftId],
+  );
+
+  /*
+   * Quem já ocupa cada turno deste espaço, neste dia.
+   *
+   * Serve para apagar o turno antes do clique. Sem isto a pessoa escolhia
+   * "Manhã", preenchia o resto e só no fim lia "nenhum dia livre neste
+   * período" — o sistema sabia desde o começo e deixava ela trabalhar à toa.
+   */
+  const dayMap = useDayMap(date.toISOString());
+
+  const ocupacaoDoEspaco = useMemo(() => {
+    const espaco = dayMap.data?.resources.find((r) => r.id === effectiveResource);
+    if (!espaco) return { diaInteiro: null, porTurno: new Map<string, string>() };
+
+    const porTurno = new Map<string, string>();
+    for (const t of espaco.shifts) {
+      if (t.booking) porTurno.set(t.shiftId, t.booking.professional?.name ?? 'outra profissional');
+    }
+
+    return {
+      diaInteiro: espaco.daily ? (espaco.daily.professional?.name ?? 'outra profissional') : null,
+      porTurno,
+    };
+  }, [dayMap.data, effectiveResource]);
+
+  /*
+   * Turno ocupado não fica marcado.
+   *
+   * O botão "Reservar turno" abre o diálogo já com um turno escolhido, e ele
+   * pode ser justamente um que está tomado. Aí o botão ficaria apagado e
+   * selecionado ao mesmo tempo, e o resumo contaria um turno que não existe.
+   * Some da seleção assim que a ocupação chega.
+   */
+  useEffect(() => {
+    if (!dayMap.data) return;
+
+    const bloqueado = (id: string) =>
+      Boolean(ocupacaoDoEspaco.diaInteiro) || ocupacaoDoEspaco.porTurno.has(id);
+
+    const livres = effectiveShifts.filter((id) => !bloqueado(id));
+    if (livres.length !== effectiveShifts.length) setShiftIds(livres);
+  }, [dayMap.data, ocupacaoDoEspaco, effectiveShifts]);
 
   const until = useMemo(() => {
     if (period === 'day') return null;
@@ -236,26 +285,39 @@ export function BookingDialog({
               <div className="flex flex-wrap gap-2">
                 {(shifts ?? []).map((shift) => {
                   const active = effectiveShifts.includes(shift.id);
+                  const quemOcupa =
+                    ocupacaoDoEspaco.diaInteiro ?? ocupacaoDoEspaco.porTurno.get(shift.id) ?? null;
+                  const ocupado = Boolean(quemOcupa);
+
                   return (
                     <button
                       key={shift.id}
                       type="button"
+                      disabled={ocupado}
+                      title={
+                        ocupado
+                          ? `Já reservado para ${quemOcupa} neste dia`
+                          : `${shift.startsAt} às ${shift.endsAt}`
+                      }
                       onClick={() => setShiftIds(toggle(effectiveShifts, shift.id))}
                       className={cn(
                         'rounded-lg border px-3 py-1.5 text-sm transition-colors',
-                        active
-                          ? 'border-primary bg-primary text-primary-foreground'
-                          : 'hover:bg-muted',
+                        ocupado
+                          ? 'cursor-not-allowed border-dashed bg-muted/40 text-muted-foreground opacity-60'
+                          : active
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'hover:bg-muted',
                       )}
                     >
+                      {ocupado ? <Lock className="mr-1 inline size-3 align-[-1px]" /> : null}
                       {shift.name}
                       <span
                         className={cn(
                           'ml-1.5 text-xs',
-                          active ? 'opacity-80' : 'text-muted-foreground',
+                          active && !ocupado ? 'opacity-80' : 'text-muted-foreground',
                         )}
                       >
-                        {shift.startsAt}–{shift.endsAt}
+                        {ocupado ? quemOcupa : `${shift.startsAt}–${shift.endsAt}`}
                       </span>
                     </button>
                   );
@@ -263,6 +325,9 @@ export function BookingDialog({
               </div>
               <p className="text-xs text-muted-foreground">
                 Pode marcar mais de um — manhã e tarde no mesmo dia, por exemplo.
+                {ocupacaoDoEspaco.diaInteiro
+                  ? ` O espaço está com diária de ${ocupacaoDoEspaco.diaInteiro} neste dia, então nenhum turno está livre.`
+                  : ''}
               </p>
             </div>
           ) : null}
