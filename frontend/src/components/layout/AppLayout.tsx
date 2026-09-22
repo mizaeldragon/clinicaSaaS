@@ -28,17 +28,27 @@ export function AppLayout() {
   }, [location.pathname]);
 
   /*
-   * Barra inferior com TUDO que a pessoa alcança — não só os cinco primeiros.
+   * Barra inferior com TUDO que a pessoa alcança, sem rolagem.
    *
    * Cortar em cinco escondia Financeiro, Comissões e Relatórios atrás do menu
-   * lateral, que no celular é uma gaveta que ninguém abre. Como a lista varia
-   * (o Premium tem Aluguéis, a locatária tem quase nada), a barra rola de lado
-   * em vez de espremer todo mundo: cabem cinco por tela e o sexto aparece pela
-   * metade na borda, que é o que convida a rolar.
+   * lateral, que no celular é uma gaveta que ninguém abre. Tudo visível de uma
+   * vez é o que faz a barra valer: o que precisa ser arrastado para aparecer
+   * está tão escondido quanto estava.
    */
   const mobileItems = NAV_ITEMS.filter((item) =>
     isNavItemVisible(item, { role, hasModule, can }),
   );
+
+  /*
+   * O rótulo cabe? Então aparece.
+   *
+   * Dividindo 375px por nove itens sobram 41px — não cabe "Profissionais", e
+   * texto cortado pela metade informa menos que ícone nenhum. Acima de cinco
+   * itens a barra fica só com os ícones; até cinco, cada um tem 75px e o nome
+   * cabe inteiro. Assim a locatária, que alcança três telas, continua lendo os
+   * nomes, e o administrador do Premium, que alcança dez, vê todas elas.
+   */
+  const cabeRotulo = mobileItems.length <= 5;
 
   return (
     <div className="min-h-screen bg-shell">
@@ -66,31 +76,28 @@ export function AppLayout() {
         </main>
       </div>
 
-      <nav className="no-scrollbar safe-bottom fixed inset-x-0 bottom-0 z-30 flex overflow-x-auto bg-card/95 shadow-[0_-1px_3px_rgb(16_24_40/0.06)] backdrop-blur-md lg:hidden">
+      <nav className="safe-bottom fixed inset-x-0 bottom-0 z-30 flex bg-card/95 shadow-[0_-1px_3px_rgb(16_24_40/0.06)] backdrop-blur-md lg:hidden">
         {mobileItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
             end={item.to === '/app'}
-            /* O item ativo se traz para a vista sozinho: quem abre Relatórios
-               pelo menu lateral não deve encontrar a barra parada no começo,
-               sem sinal de onde está. */
-            ref={(node) => {
-              if (node?.classList.contains('text-primary')) {
-                node.scrollIntoView({ block: 'nearest', inline: 'center' });
-              }
-            }}
+            // Sem rótulo na tela, o nome ainda precisa existir para quem usa
+            // leitor de tela e para quem segura o dedo no ícone.
+            title={item.label}
+            aria-label={item.label}
             className={({ isActive }) =>
               cn(
-                // `w-[20%]` com `shrink-0`: cinco cabem na tela e o sexto
-                // aparece pela metade, que é o que mostra haver mais.
-                'flex w-[20%] shrink-0 flex-col items-center gap-0.5 py-2 text-[10px] font-medium transition-colors',
+                // `flex-1` com `min-w-0`: todos dividem a largura por igual e
+                // nenhum empurra a barra para fora da tela.
+                'flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors',
+                cabeRotulo ? 'py-2' : 'py-3',
                 isActive ? 'text-primary' : 'text-muted-foreground',
               )
             }
           >
-            <item.icon className="size-5" />
-            <span className="truncate px-1">{item.label}</span>
+            <item.icon className="size-5 shrink-0" />
+            {cabeRotulo ? <span className="truncate px-1">{item.label}</span> : null}
           </NavLink>
         ))}
       </nav>

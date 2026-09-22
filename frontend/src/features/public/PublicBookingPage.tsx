@@ -168,7 +168,7 @@ export function PublicBookingPage() {
       ) : null}
 
       <header className="border-b border-border/60 bg-card/80 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center gap-3 px-5 py-4">
+        <div className="mx-auto flex max-w-5xl items-center gap-3 px-5 py-4">
           <div className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-primary text-primary-foreground">
             {host?.avatarUrl ? (
               <img src={host.avatarUrl} alt="" className="size-full object-cover" />
@@ -214,7 +214,7 @@ export function PublicBookingPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-5 py-6 pb-16">
+      <main className="mx-auto w-full max-w-5xl px-5 py-6 pb-16">
         {step === 'done' ? (
           <Confirmation
             company={company}
@@ -587,7 +587,15 @@ function RodapeDaCasa({
 
   return (
     <footer className="mt-auto border-t border-border/60 bg-card/50">
-      <div className="mx-auto grid max-w-3xl gap-6 px-5 py-8 text-sm sm:grid-cols-3">
+      {/*
+        Colunas que se ajustam ao que a casa preencheu.
+
+        Com `sm:grid-cols-3` fixo, uma clínica sem endereço cadastrado ficava
+        com duas colunas à esquerda e um buraco à direita — parecia defeito. O
+        `auto-fit` distribui só o que existe: duas informações ocupam metade
+        cada, três ocupam um terço.
+      */}
+      <div className="mx-auto grid max-w-5xl gap-x-10 gap-y-6 px-5 py-8 text-sm [grid-template-columns:repeat(auto-fit,minmax(min(15rem,100%),1fr))]">
         {endereco.length ? (
           <div>
             <h2 className="mb-2 flex items-center gap-1.5 font-semibold">
@@ -608,15 +616,22 @@ function RodapeDaCasa({
               <Clock className="size-3.5 text-primary" />
               Horário
             </h2>
-            <dl className="space-y-0.5 text-muted-foreground">
+            {/*
+              Grade de duas colunas coladas ao conteúdo, não `justify-between`.
+
+              Espalhando, numa coluna larga o dia ficava numa ponta e o horário
+              na outra, com um vão no meio — o olho perdia qual horário era de
+              qual dia. `w-fit` mantém os dois juntos e o par legível.
+            */}
+            <dl className="grid w-fit grid-cols-[auto_auto] gap-x-5 gap-y-1 text-muted-foreground">
               {faixas.map((faixa) => (
-                <div key={faixa.de} className="flex justify-between gap-3">
+                <div key={faixa.de} className="contents">
                   <dt>
                     {faixa.de === faixa.ate
                       ? DIAS_CURTOS[faixa.de]
                       : `${DIAS_CURTOS[faixa.de]} a ${DIAS_CURTOS[faixa.ate]}`}
                   </dt>
-                  <dd className="shrink-0 tabular-nums">{faixa.texto}</dd>
+                  <dd className="tabular-nums">{faixa.texto}</dd>
                 </div>
               ))}
             </dl>
