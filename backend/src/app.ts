@@ -8,6 +8,7 @@ import { env } from './config/env';
 import { routes } from './routes';
 import { UPLOADS_DIR, UPLOADS_ROUTE } from './modules/uploads/uploads.routes';
 import { errorHandler, notFoundHandler } from './shared/middlewares/errorHandler';
+import { ForbiddenError } from './shared/errors/AppError';
 import { globalRateLimiter } from './shared/middlewares/rateLimit';
 import { logger } from './shared/utils/logger';
 
@@ -39,7 +40,25 @@ export function createApp(): Application {
           callback(null, true);
           return;
         }
-        callback(new Error('Origem não permitida pelo CORS'));
+        /*
+         * 403, não 500.
+         *
+         * Um `Error` cru aqui cai no handler genérico e vira "Internal Server
+         * Error": o navegador mostra 500 no preflight, o log registra como
+         * falha do servidor, e qualquer alerta futuro dispara como se a API
+         * tivesse caído. Mas não caiu — ela recusou uma origem, que é o
+         * trabalho dela.
+         *
+         * A diferença aparece justamente no pior momento: quando falta o
+         * domínio do painel em CORS_ORIGINS, que é o erro mais comum de toda
+         * primeira subida. 403 com este texto diz o que fazer; 500 manda
+         * procurar defeito onde não há.
+         */
+        callback(
+          new ForbiddenError(
+            `Origem não permitida pelo CORS: ${origin}. Inclua este endereço em CORS_ORIGINS.`,
+          ),
+        );
       },
       credentials: true,
     }),
