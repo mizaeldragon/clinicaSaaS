@@ -152,19 +152,48 @@ async function seedSuperAdmin() {
  * empresa, e a tela de cadastro só sabe criar empresa. Sem ele não há painel
  * do SaaS.
  */
-async function seedSuperAdminDeProducao() {
+async function seedSuperAdminDeProducao({ exigir }: { exigir: boolean }) {
   const email = process.env.SUPERADMIN_EMAIL?.toLowerCase().trim();
   const senha = process.env.SUPERADMIN_PASSWORD;
   const nome = process.env.SUPERADMIN_NAME?.trim() || 'Super Admin';
 
   if (!email || !senha) {
-    throw new ErroDeUso(
-      'Defina SUPERADMIN_EMAIL e SUPERADMIN_PASSWORD antes de rodar este comando.',
-    );
+    /*
+     * Sem as variáveis: erro quando alguém pediu a conta explicitamente
+     * (`seed:admin`), silêncio quando isto roda junto do deploy.
+     *
+     * O super admin é opcional — o sistema funciona inteiro sem ele, e quem
+     * nunca definiu as variáveis não está esperando conta nenhuma. Derrubar o
+     * boot por causa disso tiraria o sistema do ar por uma escolha que a pessoa
+     * fez de propósito.
+     */
+    if (exigir) {
+      throw new ErroDeUso(
+        'Defina SUPERADMIN_EMAIL e SUPERADMIN_PASSWORD antes de rodar este comando.',
+      );
+    }
+    console.log('· Super admin: variáveis não definidas, pulando.');
+    return;
+  }
+
+  /*
+   * A existência vem antes da validação da senha, e a ordem importa.
+   *
+   * Isto roda a cada deploy. A checagem de vazamento é uma chamada HTTP para
+   * fora; fazê-la antes gastaria uma ida à rede em toda subida do container
+   * para, no fim, descobrir que a conta já existe e não fazer nada.
+   */
+  const existente = await prisma.user.findFirst({ where: { email, companyId: null } });
+  if (existente) {
+    if (exigir) {
+      console.log(`✔ Super admin ${email} já existe — nada foi alterado.`);
+      console.log('  Para trocar a senha, use "Esqueci minha senha" no painel.');
+    }
+    return;
   }
 
   if (senha.length < 8 || senha.length > 72) {
-    throw new ErroDeUso('A senha precisa ter entre 8 e 72 caracteres.');
+    throw new ErroDeUso('A senha do super admin precisa ter entre 8 e 72 caracteres.');
   }
 
   // A conta mais poderosa do sistema não pode ser a única isenta da regra que
@@ -173,15 +202,8 @@ async function seedSuperAdminDeProducao() {
   const vazamento = await checkBreachedPassword(senha);
   if (vazamento.breached) {
     throw new ErroDeUso(
-      `Esta senha aparece em ${vazamento.count} vazamento(s) conhecido(s). Escolha outra.`,
+      `A senha do super admin aparece em ${vazamento.count} vazamento(s) conhecido(s). Escolha outra.`,
     );
-  }
-
-  const existente = await prisma.user.findFirst({ where: { email, companyId: null } });
-  if (existente) {
-    console.log(`✔ Super admin ${email} já existe — nada foi alterado.`);
-    console.log('  Para trocar a senha, use "Esqueci minha senha" no painel.');
-    return;
   }
 
   await prisma.user.create({
@@ -1136,12 +1158,29 @@ async function main() {
 
   if (process.argv.includes('--admin')) {
     console.log('\n🔑 Criando o super admin (modo produção)...\n');
-    await seedSuperAdminDeProducao();
+    await seedSuperAdminDeProducao({ exigir: true });
     console.log(
       '\n✅ Pronto. Agora APAGUE SUPERADMIN_EMAIL e SUPERADMIN_PASSWORD das variáveis:\n' +
         '   nada mais as lê, e senha guardada em variável é senha que qualquer\n' +
         '   pessoa com acesso ao projeto consegue ler.\n',
     );
+    return;
+  }
+
+  /*
+   * O que toda subida de produção precisa ter feito antes de atender.
+   *
+   * Roda no `startCommand`, logo depois do `migrate deploy`. As duas etapas são
+   * idempotentes: os planos são `upsert` por slug, e o super admin só nasce se
+   * ainda não existir. Repetir a cada deploy não muda nada.
+   *
+   * Está aqui, e não num comando manual, porque etapa obrigatória que depende
+   * de alguém lembrar de abrir um console não é obrigatória — é armadilha. Sem
+   * os planos, o cadastro da primeira empresa é recusado.
+   */
+  if (process.argv.includes('--deploy')) {
+    await seedPlans();
+    await seedSuperAdminDeProducao({ exigir: false });
     return;
   }
 

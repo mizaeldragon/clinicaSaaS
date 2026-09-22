@@ -92,34 +92,40 @@ do painel — em produção o curinga `*` é recusado de propósito.
 Ainda não tem domínio próprio? Use por enquanto os endereços que o Railway e a
 Vercel geram (`*.up.railway.app` e `*.vercel.app`) e volte aqui depois.
 
-### Primeira subida: os planos e a sua conta
+### Primeira subida: não há nada a fazer
 
-O banco nasce vazio, e duas coisas precisam existir antes de qualquer pessoa
-conseguir entrar. Ambas pela aba **Console** do serviço no Railway — ela abre um
-terminal dentro do container, com a `DATABASE_URL` já no ambiente. Nada a
-configurar na sua máquina, nada de túnel.
+O banco nasce vazio, mas você não precisa rodar comando nenhum. O
+`startCommand` do [railway.json](../backend/railway.json) cuida disso a cada
+deploy:
 
-**1. Os planos**
-
-```bash
-npm run seed:plans
+```
+npx prisma migrate deploy && npm run seed:deploy && node dist/server.js
 ```
 
-Cria **apenas os três planos** — Starter, Pro e Premium. Nenhuma empresa,
-nenhum cliente, nenhum agendamento: o banco continua zerado no que interessa. É
-`upsert` por slug, então dá para rodar de novo depois se você ajustar um preço.
+- **`migrate deploy`** aplica as migrations pendentes
+- **`seed:deploy`** garante os três planos (Starter, Pro e Premium) e, se as
+  variáveis do super admin estiverem definidas, cria a sua conta
 
-Não é opcional: sem plano ativo o cadastro recusa a primeira empresa
-(`auth.service.ts`, "Nenhum plano disponível para assinatura"), e a tela que
-criaria um plano é do super admin — que também não existe num banco vazio.
+As duas etapas são idempotentes — os planos são `upsert` por slug, o super admin
+só nasce se ainda não existir. Repetir a cada subida não muda nada, e uma
+repetição custa menos de dois segundos.
 
-**2. A sua conta de super admin**
+Isso está no start, e não num comando manual, porque etapa obrigatória que
+depende de alguém lembrar de abrir um console não é obrigatória — é armadilha.
+Sem os planos, o cadastro da primeira empresa é recusado
+(`auth.service.ts`, "Nenhum plano disponível para assinatura").
 
-É a que abre `/admin`: métricas da plataforma, MRR, empresas e catálogo de
-planos. Não dá para criar pela tela — o super admin não tem empresa, e o
-cadastro só sabe criar empresa.
+> Se um dia quiser ajustar preços, edite o `prisma/seed.ts` e faça deploy: o
+> `upsert` atualiza os planos existentes sem tocar em quem já assinou.
 
-Defina nas **Variables** do serviço:
+### O super admin (opcional)
+
+É a conta que abre `/admin`: métricas da plataforma, MRR, empresas e catálogo de
+planos. **O sistema funciona inteiro sem ela** — empresas se cadastram e operam
+normalmente. Ela existe para você, não para os clientes.
+
+Não dá para criar pela tela: o super admin não tem empresa, e o cadastro só sabe
+criar empresa. Então defina nas **Variables** do serviço e faça deploy:
 
 ```
 SUPERADMIN_EMAIL=voce@seu-dominio.com.br
@@ -127,20 +133,22 @@ SUPERADMIN_PASSWORD=<uma senha forte e só sua>
 SUPERADMIN_NAME=Seu Nome
 ```
 
-E no Console:
+A conta nasce sozinha na próxima subida. Depois **apague as três variáveis**:
+nada mais as lê, e senha guardada em variável é senha que qualquer pessoa com
+acesso ao projeto consegue ler — sendo essa a conta mais poderosa que existe
+aqui.
+
+A senha passa pela mesma regra de todo mundo: 8 a 72 caracteres, e recusada se
+já apareceu em vazamento conhecido. Um deploy posterior **não** troca a senha de
+uma conta existente; para isso use "Esqueci minha senha" no painel (o que exige
+SMTP configurado).
+
+Se preferir rodar na mão, pela aba **Console** do serviço `clinicaSaaS` (não a
+do Postgres, que não tem Node):
 
 ```bash
 npm run seed:admin
 ```
-
-Depois **apague as três variáveis**. Nada no sistema as lê depois que a conta
-existe, e senha guardada em variável é senha que qualquer pessoa com acesso ao
-projeto lê — sendo essa a conta mais poderosa que existe aqui.
-
-A senha passa pela mesma regra de todo mundo: 8 a 72 caracteres, e recusada se
-já apareceu em vazamento conhecido. Rodar o comando de novo **não** troca a
-senha de uma conta existente — para isso, use "Esqueci minha senha" no painel
-(o que exige SMTP configurado).
 
 > **Nunca rode `npm run seed`** (sem sufixo) contra produção: ele cria as
 > empresas e contas de demonstração, cujas senhas estão publicadas neste

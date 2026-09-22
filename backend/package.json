@@ -24,7 +24,8 @@
     "test:reset": "prisma migrate reset --force --skip-generate",
     "test:shared-space": "node tests/shared-space.mjs",
     "test:smoke": "node tests/smoke.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "seed:deploy": "tsx prisma/seed.ts --deploy"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
