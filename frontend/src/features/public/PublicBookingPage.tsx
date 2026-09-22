@@ -154,26 +154,67 @@ export function PublicBookingPage() {
       {/* Capa. Sem foto, nada é renderizado — uma faixa cinza vazia seria pior
           do que não ter capa nenhuma. */}
       {company.publicCoverUrl ? (
-        <div className="relative h-40 w-full overflow-hidden sm:h-56">
+        /*
+          Altura livre, acompanhando a imagem.
+          
+          Com altura fixa e `object-cover`, o banner era cortado em cima e
+          embaixo: a casa subia uma arte inteira e a cliente via só a faixa do
+          meio. Deixando a altura seguir a proporção da foto, aparece o que foi
+          enviado — que é o ponto de ter capa.
+          
+          O teto de 70vh é o freio para uma foto em pé: sem ele, uma imagem
+          vertical empurraria a escolha de serviço para fora da tela.
+        */
+        <div className="relative w-full overflow-hidden bg-muted/30">
+          {/* `max-h` limita a altura e `w-auto max-w-full` deixa a largura
+              acompanhar: a imagem encolhe inteira, sem cortar nada, e fica
+              centrada quando sobra espaço dos lados. */}
           <img
             src={company.publicCoverUrl}
             alt=""
-            className="size-full object-cover"
+            className="mx-auto max-h-[30vh] w-auto max-w-full object-contain sm:max-h-[38vh]"
             loading="eager"
           />
-          {/* Véu escuro na base: a logo e o nome ficam por cima da foto logo
-              abaixo, e sem isto uma capa clara os deixaria ilegíveis. */}
-          <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-background to-transparent" />
+
+          {/* Desfoque na base, esmaecendo para cima.
+              
+              `backdrop-blur` borra o que está atrás; a máscara em gradiente faz
+              esse borrão nascer do nada no meio da faixa e chegar cheio na
+              borda de baixo. É o que dissolve o corte reto entre a foto e o
+              cabeçalho, em vez de uma linha dura. */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-20 backdrop-blur-md [mask-image:linear-gradient(to_top,black_10%,transparent)]"
+          />
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-background via-background/60 to-transparent"
+          />
         </div>
       ) : null}
 
       <header className="border-b border-border/60 bg-card/80 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center gap-3 px-5 py-4">
-          <div className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-primary text-primary-foreground">
+          {/*
+            O fundo colorido é só para quando NÃO há imagem.
+
+            Ele existe para o ícone genérico não flutuar no branco. Com foto por
+            cima, virava uma moldura colorida em volta dela — e numa logo com
+            fundo transparente a cor vazava por dentro do desenho, que foi o que
+            apareceu na Clínica Bella.
+          */}
+          <div
+            className={cn(
+              'flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl',
+              host?.avatarUrl || company.logoUrl
+                ? ''
+                : 'bg-primary text-primary-foreground',
+            )}
+          >
             {host?.avatarUrl ? (
-              <img src={host.avatarUrl} alt="" className="size-full object-cover" />
+              <img src={host.avatarUrl} alt="" className="size-full object-contain" />
             ) : company.logoUrl ? (
-              <img src={company.logoUrl} alt="" className="size-full object-cover" />
+              <img src={company.logoUrl} alt="" className="size-full object-contain" />
             ) : (
               <Sparkles className="size-5" />
             )}
@@ -346,15 +387,33 @@ export function PublicBookingPage() {
                         setStep('slot');
                       }}
                       className={cn(
-                        'flex flex-col items-center gap-0.5 rounded-xl border border-border/70 bg-card p-3 transition-all hover:border-primary',
-                        isSameDay(day, date) && 'border-primary ring-1 ring-primary',
+                        'flex flex-col items-center gap-0.5 rounded-xl border p-3 transition-all',
+                        // Selecionado se pinta por inteiro.
+                        //
+                        // Só o contorno se perdia entre catorze cartões iguais:
+                        // a diferença era uma linha de 1px, e a pessoa voltava
+                        // para conferir qual dia tinha escolhido. Preenchido,
+                        // ela vê de relance.
+                        isSameDay(day, date)
+                          ? 'border-primary bg-primary text-primary-foreground shadow-sm'
+                          : 'border-border/70 bg-card hover:border-primary',
                       )}
                     >
-                      <span className="text-[11px] uppercase text-muted-foreground">
+                      <span
+                        className={cn(
+                          'text-[11px] uppercase',
+                          isSameDay(day, date) ? 'text-primary-foreground/80' : 'text-muted-foreground',
+                        )}
+                      >
                         {format(day, 'EEE', { locale: ptBR }).replace('.', '').slice(0, 3)}
                       </span>
                       <span className="text-lg font-semibold">{day.getDate()}</span>
-                      <span className="text-[10px] text-muted-foreground">
+                      <span
+                        className={cn(
+                          'text-[10px]',
+                          isSameDay(day, date) ? 'text-primary-foreground/80' : 'text-muted-foreground',
+                        )}
+                      >
                         {format(day, 'MMM', { locale: ptBR })}
                       </span>
                     </button>

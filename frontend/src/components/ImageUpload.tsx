@@ -20,12 +20,21 @@ export function ImageUpload({
   onChange,
   hint,
   rounded = 'xl',
+  formato = 'quadrado',
 }: {
   label: string;
   value: string | null;
   onChange: (url: string | null) => void;
   hint?: string;
   rounded?: 'xl' | 'full';
+  /**
+   * `capa` mostra a prévia larga, na proporção em que a imagem vai aparecer.
+   *
+   * No quadradinho de 80px a foto de capa ficava idêntica à da logo, e quem
+   * chegava na tela não tinha como saber qual era qual — dois campos com a
+   * mesma cara, um acima do outro. Larga, a prévia já diz o que é.
+   */
+  formato?: 'quadrado' | 'capa';
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [sending, setSending] = useState(false);
@@ -55,11 +64,12 @@ export function ImageUpload({
     <div className="space-y-1.5">
       <Label>{label}</Label>
 
-      <div className="flex items-center gap-4">
+      <div className={cn('gap-4', formato === 'capa' ? 'space-y-3' : 'flex items-center')}>
         <div
           className={cn(
-            'flex size-20 shrink-0 items-center justify-center overflow-hidden border bg-muted/40 text-muted-foreground',
-            rounded === 'full' ? 'rounded-full' : 'rounded-xl',
+            'flex items-center justify-center overflow-hidden border bg-muted/40 text-muted-foreground',
+            formato === 'capa' ? 'aspect-[3/1] w-full rounded-xl' : 'size-20 shrink-0',
+            formato === 'capa' ? '' : rounded === 'full' ? 'rounded-full' : 'rounded-xl',
           )}
         >
           {sending ? (
@@ -67,7 +77,7 @@ export function ImageUpload({
           ) : value ? (
             <img src={value} alt="" className="size-full object-cover" />
           ) : (
-            <ImagePlus className="size-5" />
+            <ImagePlus className={formato === 'capa' ? 'size-7' : 'size-5'} />
           )}
         </div>
 

@@ -194,10 +194,24 @@ export function SettingsPage() {
           leitor de tela ouve o mesmo de sempre e quem passa o dedo e segura vê
           a dica.
         */}
-        <TabsList className="flex-wrap">
+        {/* `TabsList` nasce `inline-flex h-10`: encolhe até o conteúdo e trava a
+            altura. No celular isso amontoava os sete ícones à esquerda, com o
+            resto da linha vazio. Aqui ela ocupa a largura toda e deixa a altura
+            livre; no desktop volta ao normal, colada ao texto das abas. */}
+        <TabsList className="flex h-auto w-full flex-wrap sm:inline-flex sm:h-10 sm:w-auto">
           {ABAS.filter((aba) => !aba.somenteAdmin || isAdmin).map((aba) => (
-            <TabsTrigger key={aba.valor} value={aba.valor} title={aba.rotulo} aria-label={aba.rotulo}>
-              <aba.icone className="size-4 shrink-0" />
+            <TabsTrigger
+              key={aba.valor}
+              value={aba.valor}
+              title={aba.rotulo}
+              aria-label={aba.rotulo}
+              /* `[&_svg]:size-5` sobrescreve o `size-4` que o TabsTrigger impõe
+                 a todo ícone. Sozinho no botão, 16px era pequeno demais para
+                 identificar a aba de relance — e o alvo de toque acompanha,
+                 com mais altura só no celular. */
+              className="flex-1 px-2 py-2.5 sm:flex-none sm:px-3 sm:py-1.5 [&_svg]:size-5"
+            >
+              <aba.icone className="shrink-0" />
               <span className="hidden sm:inline">{aba.rotulo}</span>
             </TabsTrigger>
           ))}
@@ -409,7 +423,8 @@ export function SettingsPage() {
 
               <ImageUpload
                 label="Foto de capa"
-                hint="A faixa larga no topo do link. Uma foto do espaço funciona melhor que a logo — escolha uma deitada, porque na tela ela é bem mais larga que alta."
+                formato="capa"
+                hint="A faixa larga no topo do link, mostrada inteira — o que você vê aqui é o que a cliente vê. Uma foto deitada funciona melhor que a logo."
                 value={publicSettings.publicCoverUrl}
                 onChange={(url) => setPublicSettings((p) => ({ ...p, publicCoverUrl: url }))}
               />
