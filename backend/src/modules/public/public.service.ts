@@ -25,7 +25,7 @@ interface Window {
 
 /** Vitrine da empresa: o que a cliente vê ao abrir o link. */
 export async function getStorefront(companyId: string) {
-  const [company, categories, services, professionals] = await Promise.all([
+  const [company, categories, services, professionals, businessHours] = await Promise.all([
     tenantContext.runAsSystem(() =>
       prisma.company.findUnique({
         where: { id: companyId },
@@ -35,12 +35,16 @@ export async function getStorefront(companyId: string) {
           logoUrl: true,
           primaryColor: true,
           publicDescription: true,
+          publicCoverUrl: true,
+          publicNotice: true,
+          publicNoticeEnabled: true,
           phone: true,
           whatsapp: true,
           addressStreet: true,
           addressNumber: true,
           addressCity: true,
           addressState: true,
+          addressZip: true,
         },
       }),
     ),
@@ -66,6 +70,12 @@ export async function getStorefront(companyId: string) {
       orderBy: { name: 'asc' },
       select: { id: true, name: true, avatarUrl: true, color: true, specialties: true, bio: true },
     }),
+    // Para o rodapé. A cliente que abre o link fora do expediente precisa
+    // saber quando a casa atende — hoje ela só descobria tentando marcar.
+    prisma.businessHour.findMany({
+      orderBy: { weekday: 'asc' },
+      select: { weekday: true, opensAt: true, closesAt: true, isClosed: true },
+    }),
   ]);
 
   if (!company) throw new NotFoundError('Empresa');
@@ -85,6 +95,7 @@ export async function getStorefront(companyId: string) {
 
   return {
     company,
+    businessHours,
     categories: categories.filter((category) => bookable.some((s) => s.categoryId === category.id)),
     services: bookable,
     professionals,
@@ -126,6 +137,9 @@ export async function getProfessionalStorefront(companyId: string, publicSlug: s
 
   return {
     company: storefront.company,
+    // O rodapé é da casa, não de quem divulga o link: quem abre o link da
+    // locatária atende no mesmo endereço e no mesmo horário de funcionamento.
+    businessHours: storefront.businessHours,
     professional,
     categories: storefront.categories.filter((category) =>
       services.some((service) => service.categoryId === category.id),

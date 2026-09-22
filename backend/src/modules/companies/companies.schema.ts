@@ -25,6 +25,11 @@ export const updateCompanySchema = z.object({
   publicBookingEnabled: z.boolean().optional(),
   publicDescription: z.string().max(600).nullable().optional(),
   publicRequiresApproval: z.boolean().optional(),
+  publicCoverUrl: z.string().url().nullable().optional(),
+  // 180 caracteres: recado é uma frase. Mais do que isso vira parágrafo, e
+  // parágrafo no topo de uma faixa colorida ninguém lê.
+  publicNotice: z.string().max(180).nullable().optional(),
+  publicNoticeEnabled: z.boolean().optional(),
 });
 
 export const businessHoursSchema = z.object({

@@ -93,6 +93,9 @@ export function SettingsPage() {
     publicBookingEnabled: false,
     publicRequiresApproval: false,
     publicDescription: '',
+    publicCoverUrl: null as string | null,
+    publicNotice: '',
+    publicNoticeEnabled: false,
   });
 
   const [userDialog, setUserDialog] = useState(false);
@@ -130,6 +133,9 @@ export function SettingsPage() {
       publicBookingEnabled: Boolean(company.publicBookingEnabled),
       publicRequiresApproval: Boolean(company.publicRequiresApproval),
       publicDescription: company.publicDescription ?? '',
+      publicCoverUrl: company.publicCoverUrl ?? null,
+      publicNotice: company.publicNotice ?? '',
+      publicNoticeEnabled: Boolean(company.publicNoticeEnabled),
     });
 
     if (company.businessHours?.length) {
@@ -366,6 +372,44 @@ export function SettingsPage() {
                 />
               </div>
 
+              <ImageUpload
+                label="Foto de capa"
+                hint="A faixa larga no topo do link. Uma foto do espaço funciona melhor que a logo — escolha uma deitada, porque na tela ela é bem mais larga que alta."
+                value={publicSettings.publicCoverUrl}
+                onChange={(url) => setPublicSettings((p) => ({ ...p, publicCoverUrl: url }))}
+              />
+
+              {/* Recado e liga-desliga juntos, num bloco só: são a mesma
+                  decisão. Separados, a pessoa desligaria sem entender que o
+                  texto continua guardado para a próxima vez. */}
+              <div className="space-y-3 rounded-lg border p-3">
+                <label className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium">Mostrar recado no topo</p>
+                    <p className="text-xs text-muted-foreground">
+                      Desligar não apaga o texto — ele fica guardado para quando você quiser
+                      de novo.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={publicSettings.publicNoticeEnabled}
+                    disabled={!isAdmin}
+                    onCheckedChange={(checked) =>
+                      setPublicSettings((p) => ({ ...p, publicNoticeEnabled: checked }))
+                    }
+                  />
+                </label>
+
+                <Input
+                  maxLength={180}
+                  placeholder="Fechado dia 30 · Promoção de setembro · Novo endereço"
+                  value={publicSettings.publicNotice}
+                  onChange={(e) =>
+                    setPublicSettings((p) => ({ ...p, publicNotice: e.target.value }))
+                  }
+                />
+              </div>
+
               {company?.slug ? (
                 <div className="space-y-1.5">
                   <Label>Endereço do link</Label>
@@ -405,6 +449,7 @@ export function SettingsPage() {
                       .mutateAsync({
                         ...publicSettings,
                         publicDescription: publicSettings.publicDescription || null,
+                        publicNotice: publicSettings.publicNotice || null,
                       })
                       .catch(() => undefined);
                     await refreshContext().catch(() => undefined);

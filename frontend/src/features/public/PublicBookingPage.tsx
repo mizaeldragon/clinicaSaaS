@@ -66,8 +66,8 @@ export function PublicBookingPage() {
   const data: Storefront | undefined = useMemo(() => {
     if (!solo) return space.data;
     if (!individual.data) return undefined;
-    const { company, categories, services, professional } = individual.data;
-    return { company, categories, services, professionals: [professional] };
+    const { company, businessHours, categories, services, professional } = individual.data;
+    return { company, businessHours, categories, services, professionals: [professional] };
   }, [solo, space.data, individual.data]);
 
   const host = solo ? individual.data?.professional : null;
@@ -141,7 +141,32 @@ export function PublicBookingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-primary/10 via-background to-background">
+    <div className="flex min-h-screen flex-col bg-gradient-to-b from-primary/10 via-background to-background">
+      {/* Recado da casa, acima de tudo. Fica antes da capa de propósito: é
+          informação que muda a decisão ("fechado dia 30") e precisa ser lida
+          antes de a pessoa começar a escolher serviço. */}
+      {company.publicNoticeEnabled && company.publicNotice ? (
+        <div className="bg-primary px-5 py-2.5 text-center text-sm font-medium text-primary-foreground">
+          {company.publicNotice}
+        </div>
+      ) : null}
+
+      {/* Capa. Sem foto, nada é renderizado — uma faixa cinza vazia seria pior
+          do que não ter capa nenhuma. */}
+      {company.publicCoverUrl ? (
+        <div className="relative h-40 w-full overflow-hidden sm:h-56">
+          <img
+            src={company.publicCoverUrl}
+            alt=""
+            className="size-full object-cover"
+            loading="eager"
+          />
+          {/* Véu escuro na base: a logo e o nome ficam por cima da foto logo
+              abaixo, e sem isto uma capa clara os deixaria ilegíveis. */}
+          <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-background to-transparent" />
+        </div>
+      ) : null}
+
       <header className="border-b border-border/60 bg-card/80 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-5 py-4">
           <div className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-primary text-primary-foreground">
@@ -506,7 +531,130 @@ export function PublicBookingPage() {
           </>
         )}
       </main>
+
+      <RodapeDaCasa company={company} businessHours={data.businessHours} />
     </div>
+  );
+}
+
+const DIAS_CURTOS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+
+/**
+ * Endereço, contato e horário de funcionamento no pé da página.
+ *
+ * Tudo isto já estava no cadastro da empresa e não aparecia em lugar nenhum do
+ * link. A cliente que abria fora do expediente só descobria que estava fechado
+ * depois de escolher serviço, data e esbarrar em "nenhum horário livre".
+ *
+ * `mt-auto` gruda o rodapé embaixo: nas telas curtas do fluxo — a escolha de
+ * data, por exemplo — sobrava meia tela branca no desktop.
+ */
+function RodapeDaCasa({
+  company,
+  businessHours,
+}: {
+  company: Storefront['company'];
+  businessHours: Storefront['businessHours'];
+}) {
+  const endereco = [
+    [company.addressStreet, company.addressNumber].filter(Boolean).join(', '),
+    [company.addressCity, company.addressState].filter(Boolean).join(' - '),
+    company.addressZip,
+  ].filter(Boolean);
+
+  /*
+   * Dias seguidos com o mesmo horário viram uma linha só.
+   *
+   * Sete linhas para uma casa que abre igual de segunda a sexta é ruído: a
+   * pessoa lê "Segunda a Sexta · 09:00 às 19:00" de relance, e sete linhas
+   * quase idênticas ela não lê.
+   */
+  const faixas = businessHours.reduce<
+    { de: number; ate: number; texto: string }[]
+  >((acc, hora) => {
+    const texto = hora.isClosed ? 'Fechado' : `${hora.opensAt} às ${hora.closesAt}`;
+    const ultima = acc[acc.length - 1];
+    if (ultima && ultima.texto === texto && ultima.ate === hora.weekday - 1) {
+      ultima.ate = hora.weekday;
+      return acc;
+    }
+    acc.push({ de: hora.weekday, ate: hora.weekday, texto });
+    return acc;
+  }, []);
+
+  const temContato = company.phone || company.whatsapp;
+  if (!endereco.length && !temContato && !faixas.length) return null;
+
+  return (
+    <footer className="mt-auto border-t border-border/60 bg-card/50">
+      <div className="mx-auto grid max-w-3xl gap-6 px-5 py-8 text-sm sm:grid-cols-3">
+        {endereco.length ? (
+          <div>
+            <h2 className="mb-2 flex items-center gap-1.5 font-semibold">
+              <MapPin className="size-3.5 text-primary" />
+              Onde fica
+            </h2>
+            <address className="not-italic leading-relaxed text-muted-foreground">
+              {endereco.map((linha) => (
+                <div key={linha}>{linha}</div>
+              ))}
+            </address>
+          </div>
+        ) : null}
+
+        {faixas.length ? (
+          <div>
+            <h2 className="mb-2 flex items-center gap-1.5 font-semibold">
+              <Clock className="size-3.5 text-primary" />
+              Horário
+            </h2>
+            <dl className="space-y-0.5 text-muted-foreground">
+              {faixas.map((faixa) => (
+                <div key={faixa.de} className="flex justify-between gap-3">
+                  <dt>
+                    {faixa.de === faixa.ate
+                      ? DIAS_CURTOS[faixa.de]
+                      : `${DIAS_CURTOS[faixa.de]} a ${DIAS_CURTOS[faixa.ate]}`}
+                  </dt>
+                  <dd className="shrink-0 tabular-nums">{faixa.texto}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        ) : null}
+
+        {temContato ? (
+          <div>
+            <h2 className="mb-2 flex items-center gap-1.5 font-semibold">
+              <Phone className="size-3.5 text-primary" />
+              Falar com a gente
+            </h2>
+            <div className="space-y-1.5 text-muted-foreground">
+              {company.phone ? (
+                <a href={`tel:${company.phone.replace(/\D/g, '')}`} className="block hover:text-primary">
+                  {company.phone}
+                </a>
+              ) : null}
+              {company.whatsapp ? (
+                <a
+                  href={`https://wa.me/55${company.whatsapp.replace(/\D/g, '')}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-1.5 hover:text-primary"
+                >
+                  <MessageCircle className="size-3.5" />
+                  WhatsApp
+                </a>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="border-t border-border/60 px-5 py-3 text-center text-xs text-muted-foreground">
+        {company.name}
+      </div>
+    </footer>
   );
 }
 

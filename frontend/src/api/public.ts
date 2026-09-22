@@ -8,13 +8,23 @@ export interface Storefront {
     logoUrl: string | null;
     primaryColor: string;
     publicDescription: string | null;
+    publicCoverUrl: string | null;
+    publicNotice: string | null;
+    publicNoticeEnabled: boolean;
     phone: string | null;
     whatsapp: string | null;
     addressStreet: string | null;
     addressNumber: string | null;
     addressCity: string | null;
     addressState: string | null;
+    addressZip: string | null;
   };
+  businessHours: {
+    weekday: number;
+    opensAt: string;
+    closesAt: string;
+    isClosed: boolean;
+  }[];
   categories: { id: string; name: string; color: string }[];
   services: {
     id: string;
@@ -47,6 +57,7 @@ export interface PublicProfessional {
 /** Vitrine individual: o link que cada profissional divulga. */
 export interface ProfessionalStorefront {
   company: Storefront['company'];
+  businessHours: Storefront['businessHours'];
   professional: PublicProfessional;
   categories: Storefront['categories'];
   services: Storefront['services'];

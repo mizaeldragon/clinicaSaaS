@@ -236,6 +236,17 @@ model Company {
   publicDescription      String?
   publicRequiresApproval Boolean @default(false)
 
+  /// Foto de capa do link público — a faixa larga no topo, atrás da logo.
+  publicCoverUrl String?
+
+  /// Recado no topo da página pública: "fechado dia 30", "novo endereço".
+  ///
+  /// O texto e o liga-desliga são separados de propósito: quem escreveu o aviso
+  /// de uma promoção que acabou desliga hoje e liga de novo no mês que vem sem
+  /// redigitar nada.
+  publicNotice        String?
+  publicNoticeEnabled Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
