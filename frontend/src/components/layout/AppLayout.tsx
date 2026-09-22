@@ -91,12 +91,14 @@ export function AppLayout() {
                 // `flex-1` com `min-w-0`: todos dividem a largura por igual e
                 // nenhum empurra a barra para fora da tela.
                 'flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors',
-                cabeRotulo ? 'py-2' : 'py-3',
+                // Sem rótulo sobra altura para o ícone respirar; com rótulo o
+                // texto já ocupa a linha de baixo e o espaço vem dele.
+                cabeRotulo ? 'py-2.5' : 'py-4',
                 isActive ? 'text-primary' : 'text-muted-foreground',
               )
             }
           >
-            <item.icon className="size-5 shrink-0" />
+            <item.icon className="size-6 shrink-0" />
             {cabeRotulo ? <span className="truncate px-1">{item.label}</span> : null}
           </NavLink>
         ))}
