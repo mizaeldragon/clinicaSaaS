@@ -48,6 +48,7 @@ const SECRET_PATHS = [
   'REFRESH_TOKEN_SECRET',
   'SMTP_PASSWORD',
   'DATABASE_URL',
+  'SUPERADMIN_PASSWORD',
 ];
 
 export const logger = pino({

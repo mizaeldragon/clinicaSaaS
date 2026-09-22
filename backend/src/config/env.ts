@@ -55,6 +55,22 @@ const envSchema = z.object({
   /** Base do painel. Entra nos e-mails: link de redefinir senha, de pagar. */
   APP_URL: z.string().default('http://localhost:5173'),
 
+  /*
+   * A conta do dono do SaaS, criada uma vez por `npm run seed:admin`.
+   *
+   * Existe porque num banco novo não há como criá-la: o super admin não tem
+   * empresa, e a tela de cadastro só cria empresa. Sem ele não há painel do
+   * SaaS — nem métricas, nem MRR, nem gestão de planos.
+   *
+   * São variáveis de partida, não de funcionamento: nada no sistema as lê
+   * depois que a conta existe. Apague as duas do Railway assim que o seed
+   * rodar — senha guardada em variável é senha que qualquer pessoa com acesso
+   * ao projeto lê, e essa é a conta mais poderosa que existe aqui.
+   */
+  SUPERADMIN_EMAIL: z.string().email().toLowerCase().trim().optional(),
+  SUPERADMIN_PASSWORD: z.string().min(8).max(72).optional(),
+  SUPERADMIN_NAME: z.string().min(2).max(120).default('Super Admin'),
+
   /**
    * Chave da cifra dos segredos do segundo fator. Sem ela derivamos do
    * REFRESH_TOKEN_SECRET, e aí trocar aquele inutiliza os 2FA de todo mundo —

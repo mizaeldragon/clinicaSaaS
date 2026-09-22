@@ -12,14 +12,24 @@ quando um lado tiver que aprender o nome do outro.
 ## 1. Banco de dados (Railway)
 
 1. [railway.app](https://railway.app) → **New Project** → *Provision PostgreSQL*
-2. Na aba **Variables** do serviço, anote as duas:
-   - `DATABASE_URL` — a interna (`postgres.railway.internal`). É a que a API usa:
-     não sai da rede do Railway.
-   - `DATABASE_PUBLIC_URL` — a externa. Serve para você abrir no DBeaver e para
-     rodar o seed dos planos da sua máquina.
+2. Confira a **região** antes de criar qualquer coisa em cima. Volumes seguem a
+   região do serviço, e mudar depois — com dados dentro — vira migração manual.
+   Para clientes no Brasil, quanto mais perto melhor: a Califórnia custa uns
+   150–200ms em cada chamada.
+3. A `DATABASE_URL` da aba **Variables** é a interna
+   (`postgres.railway.internal`) e não sai da rede do Railway. É a que a API usa,
+   e você nunca precisa copiá-la à mão — veja a seção de variáveis da API.
 
-> A senha do banco é gerada pelo Railway. Não reaproveite a senha do seu
-> Postgres local — ela circula em texto puro no seu `.env` e no DBeaver.
+**Não habilite "Public Access"** em *Settings → Networking*. Ele expõe o banco na
+internet, como o próprio Railway avisa ("anyone with the string can connect"), e
+cobra o tráfego como egress. Nada neste guia precisa disso: os comandos de
+primeira subida rodam pela aba **Console**, já dentro do container.
+
+Se um dia precisar abrir o banco no DBeaver, use o túnel em vez da exposição:
+
+```bash
+railway connect Postgres --tunnel-only
+```
 
 ---
 
@@ -38,10 +48,16 @@ sozinha — e healthcheck em `/api/v1/health`.
 
 ### Volume para as imagens
 
-*Settings* → **Volumes** → **Mount path: `/app/uploads`**.
+O serviço precisa **já existir** (primeiro deploy feito) — antes disso a opção
+nem aparece. Depois, no canvas do projeto: botão **+ New** → **Volume** → escolha
+o serviço **clinicaSaaS** (não o Postgres, que já tem o seu) → **Mount path:
+`/app/uploads`**.
 
 Sem isso as logos e fotos que a Márcia subir **desaparecem a cada deploy** — o
-disco do container é recriado do zero toda vez.
+disco do container é recriado do zero toda vez. O caminho precisa bater exato: o
+`uploads.routes.ts` grava em `process.cwd()/uploads`, e `process.cwd()` no
+container é `/app`. Errado, o volume monta num lugar vazio e as imagens somem
+sem nenhum erro aparecer.
 
 ### Variáveis
 
@@ -76,20 +92,20 @@ do painel — em produção o curinga `*` é recusado de propósito.
 Ainda não tem domínio próprio? Use por enquanto os endereços que o Railway e a
 Vercel geram (`*.up.railway.app` e `*.vercel.app`) e volte aqui depois.
 
-### Primeira subida: criar os planos
+### Primeira subida: os planos e a sua conta
 
-O banco nasce vazio, e **sem planos o cadastro recusa a primeira empresa**. Uma
-vez só, da sua máquina:
+O banco nasce vazio, e duas coisas precisam existir antes de qualquer pessoa
+conseguir entrar. Ambas pela aba **Console** do serviço no Railway — ela abre um
+terminal dentro do container, com a `DATABASE_URL` já no ambiente. Nada a
+configurar na sua máquina, nada de túnel.
 
-```powershell
-$env:DATABASE_URL="<a DATABASE_PUBLIC_URL do Railway>"
-```
+**1. Os planos**
 
 ```bash
-cd backend && npm run seed:plans
+npm run seed:plans
 ```
 
-Isso cria **apenas os três planos** — Starter, Pro e Premium. Nenhuma empresa,
+Cria **apenas os três planos** — Starter, Pro e Premium. Nenhuma empresa,
 nenhum cliente, nenhum agendamento: o banco continua zerado no que interessa. É
 `upsert` por slug, então dá para rodar de novo depois se você ajustar um preço.
 
@@ -97,13 +113,42 @@ Não é opcional: sem plano ativo o cadastro recusa a primeira empresa
 (`auth.service.ts`, "Nenhum plano disponível para assinatura"), e a tela que
 criaria um plano é do super admin — que também não existe num banco vazio.
 
-Nunca rode `npm run seed` contra produção:
-ele cria as contas de demonstração, cujas senhas estão publicadas neste
-repositório.
+**2. A sua conta de super admin**
 
-Feche essa janela do PowerShell depois. Com a `DATABASE_URL` apontando para
-produção, um `npm run test:e2e` distraído roda `migrate reset --force` e
-**apaga o banco do cliente**.
+É a que abre `/admin`: métricas da plataforma, MRR, empresas e catálogo de
+planos. Não dá para criar pela tela — o super admin não tem empresa, e o
+cadastro só sabe criar empresa.
+
+Defina nas **Variables** do serviço:
+
+```
+SUPERADMIN_EMAIL=voce@seu-dominio.com.br
+SUPERADMIN_PASSWORD=<uma senha forte e só sua>
+SUPERADMIN_NAME=Seu Nome
+```
+
+E no Console:
+
+```bash
+npm run seed:admin
+```
+
+Depois **apague as três variáveis**. Nada no sistema as lê depois que a conta
+existe, e senha guardada em variável é senha que qualquer pessoa com acesso ao
+projeto lê — sendo essa a conta mais poderosa que existe aqui.
+
+A senha passa pela mesma regra de todo mundo: 8 a 72 caracteres, e recusada se
+já apareceu em vazamento conhecido. Rodar o comando de novo **não** troca a
+senha de uma conta existente — para isso, use "Esqueci minha senha" no painel
+(o que exige SMTP configurado).
+
+> **Nunca rode `npm run seed`** (sem sufixo) contra produção: ele cria as
+> empresas e contas de demonstração, cujas senhas estão publicadas neste
+> repositório.
+
+E se algum dia você apontar a `DATABASE_URL` da sua máquina para produção,
+feche a janela depois: um `npm run test:e2e` distraído roda
+`migrate reset --force` e **apaga o banco do cliente**.
 
 ---
 

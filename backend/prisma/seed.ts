@@ -2,6 +2,7 @@
 import { PrismaClient, ModuleKey, CommissionType, Prisma } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { slugify } from '../src/shared/utils/slug';
+import { checkBreachedPassword } from '../src/shared/services/breachedPassword.service';
 
 const prisma = new PrismaClient();
 
@@ -138,6 +139,62 @@ async function seedSuperAdmin() {
   });
 
   console.log('✔ Super admin criado (admin@saas.com / admin@12345)');
+}
+
+/**
+ * O super admin de produção, a partir de SUPERADMIN_EMAIL / SUPERADMIN_PASSWORD.
+ *
+ * Separado do `seedSuperAdmin` acima de propósito: aquele cria a conta de
+ * demonstração, de senha conhecida e publicada neste repositório. Esta cria a
+ * sua, com a senha que você escolher.
+ *
+ * Só existe porque num banco novo não há outro caminho: o super admin não tem
+ * empresa, e a tela de cadastro só sabe criar empresa. Sem ele não há painel
+ * do SaaS.
+ */
+async function seedSuperAdminDeProducao() {
+  const email = process.env.SUPERADMIN_EMAIL?.toLowerCase().trim();
+  const senha = process.env.SUPERADMIN_PASSWORD;
+  const nome = process.env.SUPERADMIN_NAME?.trim() || 'Super Admin';
+
+  if (!email || !senha) {
+    throw new ErroDeUso(
+      'Defina SUPERADMIN_EMAIL e SUPERADMIN_PASSWORD antes de rodar este comando.',
+    );
+  }
+
+  if (senha.length < 8 || senha.length > 72) {
+    throw new ErroDeUso('A senha precisa ter entre 8 e 72 caracteres.');
+  }
+
+  // A conta mais poderosa do sistema não pode ser a única isenta da regra que
+  // vale para todo mundo: senha que já vazou não entra. Mesma checagem do
+  // cadastro, do troca-senha e do redefinir.
+  const vazamento = await checkBreachedPassword(senha);
+  if (vazamento.breached) {
+    throw new ErroDeUso(
+      `Esta senha aparece em ${vazamento.count} vazamento(s) conhecido(s). Escolha outra.`,
+    );
+  }
+
+  const existente = await prisma.user.findFirst({ where: { email, companyId: null } });
+  if (existente) {
+    console.log(`✔ Super admin ${email} já existe — nada foi alterado.`);
+    console.log('  Para trocar a senha, use "Esqueci minha senha" no painel.');
+    return;
+  }
+
+  await prisma.user.create({
+    data: {
+      name: nome,
+      email,
+      passwordHash: await bcrypt.hash(senha, 10),
+      role: 'SUPER_ADMIN',
+      companyId: null,
+    },
+  });
+
+  console.log(`✔ Super admin criado: ${email}`);
 }
 
 const BUSINESS_HOURS = [
@@ -1077,6 +1134,17 @@ async function main() {
     return;
   }
 
+  if (process.argv.includes('--admin')) {
+    console.log('\n🔑 Criando o super admin (modo produção)...\n');
+    await seedSuperAdminDeProducao();
+    console.log(
+      '\n✅ Pronto. Agora APAGUE SUPERADMIN_EMAIL e SUPERADMIN_PASSWORD das variáveis:\n' +
+        '   nada mais as lê, e senha guardada em variável é senha que qualquer\n' +
+        '   pessoa com acesso ao projeto consegue ler.\n',
+    );
+    return;
+  }
+
   console.log('\n🌱 Populando o banco...\n');
   await seedPlans();
   await seedSuperAdmin();
@@ -1086,9 +1154,23 @@ async function main() {
   console.log('\n✅ Seed concluído\n');
 }
 
+/**
+ * Erro que é recado, não defeito.
+ *
+ * "Faltou definir a variável" e "essa senha já vazou" são respostas previstas,
+ * e quem as recebe está num console de produção, não depurando código. O rastro
+ * de pilha só esconde a frase que interessa. Defeito de verdade continua vindo
+ * inteiro.
+ */
+class ErroDeUso extends Error {}
+
 main()
   .catch((error) => {
-    console.error('❌ Erro no seed:', error);
+    if (error instanceof ErroDeUso) {
+      console.error(`\n❌ ${error.message}\n`);
+    } else {
+      console.error('❌ Erro no seed:', error);
+    }
     process.exit(1);
   })
   .finally(async () => {
