@@ -21,7 +21,6 @@ export const companiesController = {
       entityId: company.id,
       before: { name: before.name, primaryColor: before.primaryColor },
       after: req.body,
-      userName: req.user?.id,
       ip: req.ip,
     });
     res.json(serialize(company));
