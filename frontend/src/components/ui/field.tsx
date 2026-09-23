@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { Input, type InputProps } from './input';
-import { documentTyping, phoneTyping } from '@/lib/format';
+import { cepTyping, documentTyping, phoneTyping } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 /**
@@ -69,6 +69,23 @@ export const DocumentInput = React.forwardRef<HTMLInputElement, ControlledProps>
   ),
 );
 DocumentInput.displayName = 'DocumentInput';
+
+/** CEP com máscara e teclado numérico. */
+export const CepInput = React.forwardRef<HTMLInputElement, ControlledProps>(
+  ({ value, onChange, ...props }, ref) => (
+    <Input
+      ref={ref}
+      inputMode="numeric"
+      autoComplete="postal-code"
+      placeholder="00000-000"
+      maxLength={9}
+      value={cepTyping(value ?? '')}
+      onChange={(event) => onChange(cepTyping(event.target.value))}
+      {...props}
+    />
+  ),
+);
+CepInput.displayName = 'CepInput';
 
 /**
  * Senha com o olho para revelar.

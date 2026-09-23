@@ -138,6 +138,12 @@ export function documentTyping(value: string): string {
   return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
 }
 
+/** CEP com o traço no lugar enquanto a pessoa digita: 00000-000. */
+export function cepTyping(value: string): string {
+  const d = value.replace(/\D/g, '').slice(0, 8);
+  return d.length <= 5 ? d : `${d.slice(0, 5)}-${d.slice(5)}`;
+}
+
 export function phoneMask(value?: string | null): string {
   if (!value) return '—';
   const digits = value.replace(/\D/g, '');

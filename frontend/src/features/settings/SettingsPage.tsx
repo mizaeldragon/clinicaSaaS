@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Building2,
@@ -7,6 +7,7 @@ import {
   Copy,
   CreditCard,
   ExternalLink,
+  Loader2,
   Plus,
   Save,
   ShieldCheck,
@@ -20,7 +21,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input, Textarea } from '@/components/ui/input';
-import { DocumentInput, PhoneInput } from '@/components/ui/field';
+import { CepInput, DocumentInput, PhoneInput } from '@/components/ui/field';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader, TBody, TD, TH, THead, TR, Table } from '@/components/ui/data';
 import { EmptyState, PageLoader } from '@/components/ui/feedback';
@@ -66,6 +67,7 @@ import { BillingCard } from './BillingCard';
 import { ChangePasswordCard, SessionsCard } from './ChangePasswordCard';
 import { TwoFactorCard } from './TwoFactorCard';
 import { dateTimeLabel, weekdayName } from '@/lib/format';
+import { buscarCep } from '@/lib/viacep';
 import type { UserRole } from '@/types';
 
 const DEFAULT_HOURS = Array.from({ length: 7 }, (_, weekday) => ({
@@ -109,7 +111,9 @@ export function SettingsPage() {
     email: '',
     phone: '',
     whatsapp: '',
+    addressZip: '',
     addressStreet: '',
+    addressNumber: '',
     addressCity: '',
     addressState: '',
     primaryColor: '#7C3AED',
@@ -149,7 +153,9 @@ export function SettingsPage() {
       email: company.email ?? '',
       phone: company.phone ?? '',
       whatsapp: company.whatsapp ?? '',
+      addressZip: company.addressZip ?? '',
       addressStreet: company.addressStreet ?? '',
+      addressNumber: company.addressNumber ?? '',
       addressCity: company.addressCity ?? '',
       addressState: company.addressState ?? '',
       primaryColor: company.primaryColor ?? '#7C3AED',
@@ -174,6 +180,62 @@ export function SettingsPage() {
       setHours(DEFAULT_HOURS.map((base) => ({ ...base, ...(map.get(base.weekday) ?? {}) })));
     }
   }, [company]);
+
+  /*
+   * Endereço pelo CEP.
+   *
+   * Dispara no oitavo dígito, dentro do próprio onChange — e não num efeito que
+   * observa o campo. Num efeito, abrir a tela de uma empresa que já tem CEP
+   * salvo consultaria o ViaCEP de novo e sobrescreveria a rua que a pessoa
+   * corrigiu à mão.
+   */
+  const [buscandoCep, setBuscandoCep] = useState(false);
+  const ultimoCepPedido = useRef('');
+  const campoNumero = useRef<HTMLInputElement>(null);
+
+  async function aoMudarCep(valor: string) {
+    setForm((f) => ({ ...f, addressZip: valor }));
+
+    const digitos = valor.replace(/\D/g, '');
+    if (digitos.length !== 8) {
+      // Apagou um dígito com a consulta no ar: a resposta que chegar depois é
+      // de um CEP que não está mais no campo, e não pode preencher nada.
+      ultimoCepPedido.current = '';
+      setBuscandoCep(false);
+      return;
+    }
+
+    ultimoCepPedido.current = digitos;
+    setBuscandoCep(true);
+    const resultado = await buscarCep(digitos);
+
+    // Quem digita rápido pode ter trocado o CEP enquanto a resposta vinha: a
+    // resposta velha não pode passar por cima do endereço do CEP novo.
+    if (ultimoCepPedido.current !== digitos) return;
+    setBuscandoCep(false);
+
+    if (!resultado.ok) {
+      toast.error(
+        resultado.motivo === 'nao-encontrado'
+          ? 'CEP não encontrado. Confira os números ou preencha o endereço à mão.'
+          : 'Não deu para consultar o CEP agora. Preencha o endereço à mão.',
+      );
+      return;
+    }
+
+    const { rua, cidade, uf } = resultado.endereco;
+    setForm((f) => ({
+      ...f,
+      // Cidade pequena tem CEP único, sem rua: aí mantém o que já estava
+      // escrito em vez de apagar.
+      addressStreet: rua || f.addressStreet,
+      addressCity: cidade || f.addressCity,
+      addressState: uf || f.addressState,
+    }));
+
+    // A única coisa que o CEP não sabe é o número — o cursor vai direto nele.
+    campoNumero.current?.focus();
+  }
 
   if (isLoading) return <PageLoader />;
 
@@ -292,30 +354,63 @@ export function SettingsPage() {
                 </div>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label>Endereço</Label>
+              {/* CEP primeiro: é ele que preenche o resto. Na ordem antiga, com o
+                  CEP no fim, a pessoa digitava rua e cidade à mão para só
+                  depois chegar no campo que faria isso por ela. */}
+              <div className="grid gap-4 sm:grid-cols-[10rem_1fr_7rem]">
+                <div className="space-y-1.5">
+                  <Label htmlFor="cep">CEP</Label>
+                  <div className="relative">
+                    <CepInput
+                      id="cep"
+                      value={form.addressZip}
+                      onChange={(v) => void aoMudarCep(v)}
+                    />
+                    {buscandoCep ? (
+                      <Loader2 className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+                    ) : null}
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="rua">Endereço</Label>
                   <Input
+                    id="rua"
+                    placeholder="Rua, avenida..."
                     value={form.addressStreet}
                     onChange={(e) => setForm((f) => ({ ...f, addressStreet: e.target.value }))}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Cidade / UF</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={form.addressCity}
-                      onChange={(e) => setForm((f) => ({ ...f, addressCity: e.target.value }))}
-                    />
-                    <Input
-                      className="w-16"
-                      maxLength={2}
-                      value={form.addressState}
-                      onChange={(e) =>
-                        setForm((f) => ({ ...f, addressState: e.target.value.toUpperCase() }))
-                      }
-                    />
-                  </div>
+                  <Label htmlFor="numero">Número</Label>
+                  <Input
+                    id="numero"
+                    ref={campoNumero}
+                    maxLength={20}
+                    value={form.addressNumber}
+                    onChange={(e) => setForm((f) => ({ ...f, addressNumber: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-[1fr_5rem] gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="cidade">Cidade</Label>
+                  <Input
+                    id="cidade"
+                    value={form.addressCity}
+                    onChange={(e) => setForm((f) => ({ ...f, addressCity: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="uf">UF</Label>
+                  <Input
+                    id="uf"
+                    maxLength={2}
+                    value={form.addressState}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, addressState: e.target.value.toUpperCase() }))
+                    }
+                  />
                 </div>
               </div>
 
