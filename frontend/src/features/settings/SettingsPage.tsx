@@ -68,6 +68,7 @@ import { ChangePasswordCard, SessionsCard } from './ChangePasswordCard';
 import { TwoFactorCard } from './TwoFactorCard';
 import { dateTimeLabel, weekdayName } from '@/lib/format';
 import { buscarCep } from '@/lib/viacep';
+import { descreverAcao, nomeDaArea } from '@/lib/auditoria';
 import type { UserRole } from '@/types';
 
 const DEFAULT_HOURS = Array.from({ length: 7 }, (_, weekday) => ({
@@ -841,19 +842,27 @@ export function SettingsPage() {
                 <Table>
                   <THead>
                     <TR>
-                      <TH>Data</TH>
-                      <TH>Usuário</TH>
-                      <TH>Ação</TH>
-                      <TH>Entidade</TH>
+                      <TH>Quando</TH>
+                      <TH>Quem</TH>
+                      <TH>O que foi feito</TH>
+                      <TH>Área</TH>
                     </TR>
                   </THead>
                   <TBody>
                     {auditLogs.data.map((log) => (
                       <TR key={log.id}>
                         <TD className="text-sm text-muted-foreground">{dateTimeLabel(log.createdAt)}</TD>
-                        <TD className="text-sm">{log.user?.name ?? log.userName ?? 'Sistema'}</TD>
-                        <TD className="text-sm font-medium">{log.action}</TD>
-                        <TD className="text-sm text-muted-foreground">{log.entity}</TD>
+                        {/* O nome gravado no registro vem antes do nome atual do
+                            usuário: se ele for excluído, a trilha ainda diz quem
+                            fez. "Sistema" fica para o que ninguém disparou —
+                            webhook de pagamento, rotina agendada. */}
+                        <TD className="text-sm">{log.userName ?? log.user?.name ?? 'Sistema'}</TD>
+                        <TD className="text-sm font-medium">
+                          {descreverAcao(log.action, log.entity, log.entityId)}
+                        </TD>
+                        <TD className="text-sm text-muted-foreground">
+                          {nomeDaArea(log.entity) || '—'}
+                        </TD>
                       </TR>
                     ))}
                   </TBody>
