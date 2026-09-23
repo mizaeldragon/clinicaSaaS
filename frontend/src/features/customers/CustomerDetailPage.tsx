@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger, UserAvatar } from '@/componen
 import { AppointmentStatusBadge, PaymentStatusBadge } from '@/components/StatusBadge';
 import { useCustomerProfile } from '@/api/queries';
 import { useAuthStore } from '@/stores/auth.store';
-import { currency, dateLabel, dateTimeLabel, fromNow, phoneMask, shortDate } from '@/lib/format';
+import { currency, dateLabel, dateTimeLabel, fromNow, phoneMask, shortDate, timeLabel } from '@/lib/format';
 import type { AppointmentStatus, PaymentStatus } from '@/types';
 
 export function CustomerDetailPage() {
@@ -82,8 +82,25 @@ export function CustomerDetailPage() {
         />
         <StatCard
           label="Próximo agendamento"
+          /*
+            Data e hora inteiras, quebrando de linha só se não couberem.
+
+            O StatCard corta o valor numa linha, e "24/09/2026 às 09:00" não
+            cabe no cartão: sobrava "às 09..." — justamente a hora, a metade
+            que diz quando a cliente chega. O bloco interno volta a permitir
+            quebra, e "às 09:00" fica sempre junto na mesma linha.
+          */
           value={
-            metrics.upcomingAppointment ? dateTimeLabel(metrics.upcomingAppointment.startsAt) : '—'
+            metrics.upcomingAppointment ? (
+              <span className="block whitespace-normal leading-tight">
+                {shortDate(metrics.upcomingAppointment.startsAt)}{' '}
+                <span className="whitespace-nowrap">
+                  às {timeLabel(metrics.upcomingAppointment.startsAt)}
+                </span>
+              </span>
+            ) : (
+              '—'
+            )
           }
           hint={
             metrics.upcomingAppointment
