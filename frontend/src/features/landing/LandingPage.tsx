@@ -263,8 +263,10 @@ export function LandingPage() {
               <a href="#planos" className="lp-btn lp-btn-cheio">
                 Começar grátis <span aria-hidden>→</span>
               </a>
-              <a href="#metodo" className="lp-btn lp-btn-vazio">
-                Ver o sistema
+              {/* Todo convite da landing termina nos planos: é lá que a pessoa
+                  escolhe entre assinar e testar. Só o "Entrar" leva ao login. */}
+              <a href="#planos" className="lp-btn lp-btn-vazio">
+                Ver os planos
               </a>
             </div>
 
