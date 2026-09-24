@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
+import { PaymentGate } from './PaymentGate';
 import { useRealtime } from '@/hooks/useRealtime';
 import { useAuthStore } from '@/stores/auth.store';
 
@@ -9,6 +10,13 @@ export function AppLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
   const refreshContext = useAuthStore((s) => s.refreshContext);
+  const subscriptionStatus = useAuthStore((s) => s.company?.subscriptionStatus);
+
+  // Assinou e ainda não pagou: o painel fica atrás da tela de pagamento. As
+  // configurações continuam abertas — é lá que se corrige um CPF/CNPJ que o
+  // Asaas recusou, e sem isso não haveria como gerar a fatura.
+  const awaitingPayment =
+    subscriptionStatus === 'INCOMPLETE' && !location.pathname.startsWith('/app/configuracoes');
 
   useRealtime();
 
@@ -50,7 +58,7 @@ export function AppLayout() {
             cabeçalho e o canto arredondado não tem onde aparecer. */}
         <main className="px-3 pb-6 pt-2 lg:px-5 lg:pt-3">
           <div className="mx-auto w-full max-w-[1400px] rounded-2xl bg-card p-4 shadow-panel sm:p-6 lg:p-7">
-            <Outlet />
+            {awaitingPayment ? <PaymentGate /> : <Outlet />}
           </div>
         </main>
       </div>

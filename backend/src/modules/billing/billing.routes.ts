@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { BillingType } from '@prisma/client';
 import { z } from 'zod';
 import { billingService } from './billing.service';
 import { validate } from '../../shared/middlewares/validate';
@@ -30,7 +29,6 @@ billingRoutes.post(
   validate({
     body: z.object({
       planSlug: z.string().min(1).optional(),
-      billingType: z.nativeEnum(BillingType),
     }),
   }),
   asyncHandler(async (req, res) => {

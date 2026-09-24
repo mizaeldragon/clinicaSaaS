@@ -1,16 +1,16 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Barcode, Check, Copy, CreditCard, ExternalLink, QrCode } from 'lucide-react';
+import { Barcode, Check, Copy, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/primitives';
 import { Skeleton } from '@/components/ui/feedback';
-import { useBilling, useBillingMutations, usePlans } from '@/api/queries';
+import { goToInvoice, useBilling, useBillingMutations, usePlans } from '@/api/queries';
 import { currency } from '@/lib/format';
-import type { AccessState, BillingType } from '@/types';
+import type { AccessState } from '@/types';
 
 /**
  * Mensalidade do SaaS.
@@ -20,25 +20,19 @@ import type { AccessState, BillingType } from '@/types';
  * única linha que a dona abre esta aba para ver. O que sobra só aparece quando
  * há algo a fazer: uma cobrança em aberto, ou a assinatura, quando o pagamento
  * está configurado nesta instalação.
+ *
+ * A forma de pagamento não é escolhida aqui. A fatura do Asaas já oferece PIX,
+ * boleto e cartão, e perguntar antes era uma decisão a mais entre a pessoa e o
+ * pagamento — além de amarrar a cobrança a um meio que ela talvez nem use.
  */
-
-const BILLING_LABEL: Record<BillingType, string> = {
-  PIX: 'PIX',
-  BOLETO: 'Boleto',
-  CREDIT_CARD: 'Cartão de crédito',
-};
-
-const BILLING_ICON: Record<BillingType, typeof QrCode> = {
-  PIX: QrCode,
-  BOLETO: Barcode,
-  CREDIT_CARD: CreditCard,
-};
 
 const day = (value: string) => format(new Date(value), "dd 'de' MMM 'de' yyyy", { locale: ptBR });
 
 /** O selo ao lado do nome do plano. Em dia não vira selo — é o esperado. */
 function accessBadge(access: AccessState): { variant: 'warning' | 'danger'; text: string } | null {
   switch (access.kind) {
+    case 'awaiting_payment':
+      return { variant: 'danger', text: 'Aguardando pagamento' };
     case 'trial':
       return {
         variant: 'warning',
@@ -63,7 +57,6 @@ export function BillingCard() {
   const { subscribe, cancel } = useBillingMutations();
 
   const [planSlug, setPlanSlug] = useState<string | null>(null);
-  const [billingType, setBillingType] = useState<BillingType>('PIX');
 
   if (isLoading) return <Skeleton className="h-20 w-72 max-w-full rounded-xl" />;
   if (!data) return null;
@@ -156,10 +149,11 @@ export function BillingCard() {
         <Card>
           <CardHeader>
             <CardTitle>
-              {data.subscription.active ? 'Mudar plano ou forma de pagamento' : 'Assinar'}
+              {data.subscription.active ? 'Mudar de plano' : 'Assinar'}
             </CardTitle>
             <CardDescription>
-              A cobrança é mensal e renova sozinha. Você pode cancelar quando quiser.
+              A cobrança é mensal e renova sozinha. PIX, boleto ou cartão: você escolhe na página
+              de pagamento. Pode cancelar quando quiser.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
@@ -201,37 +195,29 @@ export function BillingCard() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Forma de pagamento</Label>
-              <div className="grid gap-2 sm:grid-cols-3">
-                {(Object.keys(BILLING_LABEL) as BillingType[]).map((type) => {
-                  const Icon = BILLING_ICON[type];
-                  const selected = billingType === type;
-                  return (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => setBillingType(type)}
-                      className={`flex items-center gap-2 rounded-lg border p-3 text-sm transition ${
-                        selected ? 'border-primary ring-1 ring-primary' : 'hover:border-primary/50'
-                      }`}
-                    >
-                      <Icon className="size-4" />
-                      {BILLING_LABEL[type]}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
                 loading={subscribe.isPending}
                 disabled={!data.documentOnFile}
-                onClick={() => subscribe.mutate({ planSlug: chosenPlan, billingType })}
+                onClick={() =>
+                  subscribe.mutate(
+                    { planSlug: chosenPlan },
+                    {
+                      // Quem acabou de assinar vai direto para a fatura. Quem só
+                      // trocou de plano fica aqui: a próxima cobrança já sai com
+                      // o valor novo, não há o que pagar agora.
+                      onSuccess: (overview) => {
+                        if (data.subscription.active) toast.success('Plano atualizado');
+                        else if (!goToInvoice(overview)) {
+                          toast.success('Assinatura criada. A cobrança aparece aqui em instantes.');
+                        }
+                      },
+                    },
+                  )
+                }
               >
-                {data.subscription.active ? 'Salvar alterações' : 'Assinar agora'}
+                {data.subscription.active ? 'Salvar alterações' : 'Assinar e pagar'}
               </Button>
 
               {data.subscription.active ? (

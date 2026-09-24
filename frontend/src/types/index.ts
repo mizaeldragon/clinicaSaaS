@@ -378,6 +378,7 @@ export interface SubscriptionPayment {
  */
 export type AccessState =
   | { kind: 'ok' }
+  | { kind: 'awaiting_payment' }
   | { kind: 'trial'; endsAt: string; daysLeft: number }
   | { kind: 'trial_expired'; endsAt: string }
   | { kind: 'past_due'; dueAt: string; blocksAt: string; daysLeft: number }

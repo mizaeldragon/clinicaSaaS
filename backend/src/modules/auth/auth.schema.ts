@@ -25,7 +25,18 @@ export const registerCompanySchema = z.object({
     phone: z.string().max(20).optional(),
   }),
   planSlug: z.string().optional(),
-});
+  /**
+   * Por qual porta a pessoa entrou. `trial` é o "Começar teste grátis";
+   * `subscribe` é o "Assinar" de um cartão, que não ganha teste — vai direto
+   * para a fatura.
+   */
+  intent: z.enum(['trial', 'subscribe']).default('trial'),
+}).refine(
+  // A cobrança é emitida no nome do documento; sem ele o Asaas recusa e a
+  // pessoa ficaria com uma conta trancada e nada para pagar.
+  (dto) => dto.intent !== 'subscribe' || (dto.company.document?.replace(/\D/g, '').length ?? 0) >= 11,
+  { message: 'Informe o CPF ou CNPJ para assinar', path: ['company', 'document'] },
+);
 
 export const refreshSchema = z.object({
   refreshToken: z.string().min(10, 'Refresh token inválido'),

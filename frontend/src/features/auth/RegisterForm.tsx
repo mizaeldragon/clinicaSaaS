@@ -17,7 +17,9 @@ import { useAuthStore } from '@/stores/auth.store';
 import { usePublicPlans } from './usePublicPlans';
 import { COMPANY_TYPE } from '@/config/labels';
 import { currency } from '@/lib/format';
-import { ApiError } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
+import { goToInvoice } from '@/api/queries';
+import type { BillingOverview } from '@/types';
 
 /**
  * A metade "Criar conta" do cartão de autenticação.
@@ -35,8 +37,9 @@ import { ApiError } from '@/lib/api';
  * Duas portas levam a este formulário, e elas terminam em lugares diferentes:
  *
  * - `?plano=<slug>&assinar=1` — veio do "Assinar" de um cartão. A pessoa já
- *   decidiu pagar, então depois de criar a conta ela cai na tela de cobrança
- *   com o plano escolhido, não no painel.
+ *   decidiu pagar: não ganha teste, e depois de criar a conta vai direto para
+ *   a fatura do Asaas, onde escolhe PIX, boleto ou cartão. O painel abre
+ *   quando o pagamento for confirmado.
  * - sem parâmetro — veio do "Começar teste grátis", abaixo dos cartões. Entra
  *   no painel com o plano mais completo, porque é isso que o convite promete:
  *   todos os recursos por cinco dias.
@@ -98,6 +101,21 @@ export function RegisterForm({ onCreated }: { onCreated: (destino: string) => vo
   // primeiro caractere digitado seria acusar o óbvio.
   const naoConfere = form.confirmacao.length > 0 && form.confirmacao !== form.password;
 
+  /*
+   * A conta já existe quando isto roda. Se a fatura não sair — Asaas fora do
+   * ar, documento recusado —, a pessoa entra no painel e dá de cara com a
+   * tela de pagamento, que tenta de novo. Nada do cadastro se perde.
+   */
+  async function irParaPagamento() {
+    try {
+      const overview = await api.post<BillingOverview>('/billing/subscribe', { planSlug });
+      if (goToInvoice(overview)) return;
+    } catch (error) {
+      if (error instanceof ApiError) toast.error(error.message);
+    }
+    onCreated('/app');
+  }
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
 
@@ -122,10 +140,10 @@ export function RegisterForm({ onCreated }: { onCreated: (destino: string) => vo
           phone: form.phone || undefined,
         },
         planSlug,
+        intent: querAssinar ? 'subscribe' : 'trial',
       });
       if (querAssinar) {
-        toast.success('Conta criada! Agora é só escolher como pagar.');
-        onCreated('/app/configuracoes?tab=plano');
+        await irParaPagamento();
       } else {
         toast.success('Empresa criada! Seu teste começou.');
         onCreated('/app');
@@ -262,7 +280,8 @@ export function RegisterForm({ onCreated }: { onCreated: (destino: string) => vo
             <p className="mt-0.5 truncate text-sm font-semibold">
               {plan.name}
               <span className="font-normal text-muted-foreground">
-                {' '}· {currency(plan.price)}/mês · {plan.trialDays} dias grátis
+                {' '}· {currency(plan.price)}/mês
+                {querAssinar ? null : ` · ${plan.trialDays} dias grátis`}
               </span>
             </p>
           </div>
@@ -279,7 +298,7 @@ export function RegisterForm({ onCreated }: { onCreated: (destino: string) => vo
       ) : null}
 
       <Button type="submit" className="w-full" size="lg" loading={loading}>
-        Criar minha conta
+        {querAssinar ? 'Criar conta e ir para o pagamento' : 'Criar minha conta'}
       </Button>
     </form>
   );

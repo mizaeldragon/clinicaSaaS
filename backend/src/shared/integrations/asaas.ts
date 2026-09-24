@@ -172,7 +172,8 @@ export const asaas = {
     customer: string;
     value: number;
     nextDueDate: string;
-    billingType: Exclude<AsaasBillingType, 'UNDEFINED'>;
+    /** `UNDEFINED`: a pessoa escolhe PIX, boleto ou cartão na página da fatura. */
+    billingType: AsaasBillingType;
     description: string;
     externalReference: string;
   }): Promise<AsaasSubscription> {
@@ -189,7 +190,7 @@ export const asaas = {
 
   async updateSubscription(
     id: string,
-    input: { value?: number; billingType?: Exclude<AsaasBillingType, 'UNDEFINED'>; description?: string },
+    input: { value?: number; billingType?: AsaasBillingType; description?: string },
   ): Promise<AsaasSubscription> {
     return call<AsaasSubscription>('POST', `/subscriptions/${id}`, {
       value: input.value,

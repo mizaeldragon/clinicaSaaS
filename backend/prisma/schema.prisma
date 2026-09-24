@@ -58,6 +58,9 @@ enum CompanyType {
 }
 
 enum SubscriptionStatus {
+  /// Assinou pelo cartão da landing e ainda não pagou a primeira mensalidade.
+  /// Não tem teste: o painel só abre quando o Asaas confirmar o pagamento.
+  INCOMPLETE
   TRIALING
   ACTIVE
   PAST_DUE

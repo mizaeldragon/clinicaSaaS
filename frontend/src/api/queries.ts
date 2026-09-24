@@ -27,7 +27,7 @@ import type {
   Service,
   ServiceCategory,
 } from '@/types';
-import type { BillingOverview, BillingType } from '@/types';
+import type { BillingOverview } from '@/types';
 
 export const keys = {
   dashboard: ['dashboard'] as const,
@@ -1215,12 +1215,27 @@ export function useBookingMutations() {
 //  Cobrança da mensalidade
 // ===========================================================================
 
-export function useBilling(enabled = true) {
+export function useBilling(enabled = true, refetchInterval?: number) {
   return useQuery({
     queryKey: ['billing'],
     queryFn: () => api.get<BillingOverview>('/billing'),
     enabled,
+    refetchInterval,
   });
+}
+
+/**
+ * Leva à fatura do Asaas, onde a pessoa escolhe PIX, boleto ou cartão.
+ *
+ * Na mesma aba, não numa nova: é o próximo passo, não uma consulta ao lado — e
+ * uma aba aberta depois de uma chamada assíncrona o navegador bloqueia como
+ * pop-up. Devolve `false` quando ainda não há fatura para abrir.
+ */
+export function goToInvoice(overview: BillingOverview): boolean {
+  const url = overview.openPayment?.invoiceUrl;
+  if (!url) return false;
+  window.location.assign(url);
+  return true;
 }
 
 export function useBillingMutations() {
@@ -1235,12 +1250,9 @@ export function useBillingMutations() {
 
   return {
     subscribe: useMutation({
-      mutationFn: (body: { planSlug?: string; billingType: BillingType }) =>
+      mutationFn: (body: { planSlug?: string }) =>
         api.post<BillingOverview>('/billing/subscribe', body),
-      onSuccess: () => {
-        toast.success('Assinatura criada. A cobrança já está disponível abaixo.');
-        invalidate();
-      },
+      onSuccess: invalidate,
       onError: handleError,
     }),
     sync: useMutation({

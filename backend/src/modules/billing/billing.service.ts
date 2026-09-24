@@ -205,9 +205,11 @@ async function applyPaymentToSubscription(
       ]),
     );
   } else if (status === SubscriptionPaymentStatus.OVERDUE) {
+    // Quem nunca pagou continua INCOMPLETE: PAST_DUE sem período pago seria
+    // lido como "em dia" e abriria o painel a quem deixou a fatura vencer.
     await tenantContext.runAsSystem(() =>
-      prisma.subscription.update({
-        where: { companyId },
+      prisma.subscription.updateMany({
+        where: { companyId, status: { not: SubscriptionStatus.INCOMPLETE } },
         data: { status: SubscriptionStatus.PAST_DUE },
       }),
     );
@@ -271,9 +273,13 @@ export const billingService = {
 
   /**
    * Contrata (ou recontrata) a mensalidade. Idempotente: se já existe
-   * assinatura no Asaas, só ajusta a forma de pagamento e o valor do plano.
+   * assinatura no Asaas, só ajusta o valor do plano.
+   *
+   * A forma de pagamento não é escolhida aqui: a cobrança sai como `UNDEFINED`
+   * e a página da fatura do Asaas oferece PIX, boleto e cartão. Quem assina é
+   * levado direto para essa página — o `invoiceUrl` da cobrança em aberto.
    */
-  async subscribe(companyId: string, input: { planSlug?: string; billingType: BillingType }) {
+  async subscribe(companyId: string, input: { planSlug?: string }) {
     if (!asaas.isEnabled()) {
       throw new AppError(
         'Cobrança não configurada nesta instalação.',
@@ -298,13 +304,13 @@ export const billingService = {
     if (subscription.asaasSubscriptionId) {
       await asaas.updateSubscription(subscription.asaasSubscriptionId, {
         value,
-        billingType: input.billingType,
+        billingType: 'UNDEFINED',
         description,
       });
       await tenantContext.runAsSystem(() =>
         prisma.subscription.update({
           where: { companyId },
-          data: { billingType: input.billingType },
+          data: { billingType: null },
         }),
       );
     } else {
@@ -315,7 +321,7 @@ export const billingService = {
         customer: customerId,
         value,
         nextDueDate: toAsaasDate(firstDue),
-        billingType: input.billingType,
+        billingType: 'UNDEFINED',
         description,
         externalReference: companyId,
       });
@@ -323,7 +329,7 @@ export const billingService = {
       await tenantContext.runAsSystem(() =>
         prisma.subscription.update({
           where: { companyId },
-          data: { asaasSubscriptionId: created.id, billingType: input.billingType },
+          data: { asaasSubscriptionId: created.id, billingType: null },
         }),
       );
     }

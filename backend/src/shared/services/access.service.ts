@@ -16,6 +16,7 @@ import type { CompanyContext } from './companyContext.service';
 
 export type AccessState =
   | { kind: 'ok' }
+  | { kind: 'awaiting_payment' }
   | { kind: 'trial'; endsAt: Date; daysLeft: number }
   | { kind: 'trial_expired'; endsAt: Date }
   | { kind: 'past_due'; dueAt: Date; blocksAt: Date; daysLeft: number }
@@ -43,6 +44,10 @@ export function evaluateAccess(context: CompanyContext, now = new Date()): Acces
 
   if (status === 'CANCELED') return { kind: 'canceled' };
 
+  // Assinou pelo cartão da landing: não há teste para gastar, o painel abre
+  // quando a primeira mensalidade for confirmada.
+  if (status === 'INCOMPLETE') return { kind: 'awaiting_payment' };
+
   if (status === 'TRIALING') {
     const endsAt = context.trialEndsAt;
     if (!endsAt) return { kind: 'ok' };
@@ -67,6 +72,7 @@ export function evaluateAccess(context: CompanyContext, now = new Date()): Acces
 /** Os estados em que o painel fica somente-leitura (na prática, trancado). */
 export function blocksAccess(state: AccessState): boolean {
   return (
+    state.kind === 'awaiting_payment' ||
     state.kind === 'trial_expired' ||
     state.kind === 'past_due_blocked' ||
     state.kind === 'canceled'
@@ -76,6 +82,8 @@ export function blocksAccess(state: AccessState): boolean {
 /** O que a pessoa lê na tela quando bate na parede. */
 export function accessMessage(state: AccessState): string {
   switch (state.kind) {
+    case 'awaiting_payment':
+      return 'Falta só o pagamento da primeira mensalidade para liberar o sistema.';
     case 'trial_expired':
       return 'Seu período de teste terminou. Escolha um plano para continuar usando o sistema.';
     case 'past_due_blocked':

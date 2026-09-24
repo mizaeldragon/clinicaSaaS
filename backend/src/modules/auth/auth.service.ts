@@ -348,6 +348,11 @@ export const authService = {
         return Boolean(found);
       });
 
+      // O teste é do "Começar teste grátis". Quem clicou em "Assinar" já
+      // decidiu pagar: entra aguardando a primeira mensalidade, sem teste. Sem
+      // gateway configurado não haveria o que pagar, então vira teste.
+      const paysNow = dto.intent === 'subscribe' && env.billingEnabled;
+
       const trialEndsAt = new Date();
       trialEndsAt.setDate(trialEndsAt.getDate() + (plan.trialDays || env.DEFAULT_TRIAL_DAYS));
 
@@ -379,10 +384,10 @@ export const authService = {
           subscription: {
             create: {
               planId: plan.id,
-              status: SubscriptionStatus.TRIALING,
-              trialEndsAt,
+              status: paysNow ? SubscriptionStatus.INCOMPLETE : SubscriptionStatus.TRIALING,
+              trialEndsAt: paysNow ? null : trialEndsAt,
               currentPeriodStart: new Date(),
-              currentPeriodEnd: trialEndsAt,
+              currentPeriodEnd: paysNow ? null : trialEndsAt,
             },
           },
           modules: {

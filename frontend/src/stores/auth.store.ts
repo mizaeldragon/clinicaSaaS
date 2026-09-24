@@ -35,6 +35,8 @@ export interface RegisterPayload {
   company: { name: string; type: string; phone?: string; document?: string };
   admin: { name: string; email: string; password: string; phone?: string };
   planSlug?: string;
+  /** `subscribe` veio do "Assinar" de um cartão: sem teste, direto à fatura. */
+  intent?: 'trial' | 'subscribe';
 }
 
 export const useAuthStore = create<AuthState>()(
