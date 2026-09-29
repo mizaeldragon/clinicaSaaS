@@ -19,7 +19,15 @@ const ALL_MODULES: ModuleKey[] = [
   'notifications',
 ];
 
-async function seedPlans() {
+/**
+ * O catálogo inicial de planos.
+ *
+ * Em produção (`producao`) só cria o que falta: depois de existir, o plano é
+ * do painel do super admin. Sobrescrever a cada deploy desfazia em silêncio o
+ * preço editado lá — e desligava qualquer plano novo criado por ele, por não
+ * estar nesta lista. Em desenvolvimento a lista continua mandando.
+ */
+async function seedPlans({ producao = false }: { producao?: boolean } = {}) {
   const plans: Prisma.PlanUncheckedCreateInput[] = [
     {
       // Quem trabalha sozinha: manicure, designer de sobrancelha, esteticista
@@ -95,6 +103,14 @@ async function seedPlans() {
       sortOrder: 2,
     },
   ];
+
+  if (producao) {
+    for (const plan of plans) {
+      await prisma.plan.upsert({ where: { slug: plan.slug }, create: plan, update: {} });
+    }
+    console.log('✔ Planos conferidos (os existentes ficam como estão no painel)');
+    return;
+  }
 
   for (const plan of plans) {
     await prisma.plan.upsert({
@@ -1151,7 +1167,7 @@ async function seedSharedSpace() {
 async function main() {
   if (process.argv.includes('--plans')) {
     console.log('\n🌱 Criando os planos (modo produção)...\n');
-    await seedPlans();
+    await seedPlans({ producao: true });
     console.log('\n✅ Planos prontos. Nenhuma conta de demonstração foi criada.\n');
     return;
   }
@@ -1171,15 +1187,16 @@ async function main() {
    * O que toda subida de produção precisa ter feito antes de atender.
    *
    * Roda no `startCommand`, logo depois do `migrate deploy`. As duas etapas são
-   * idempotentes: os planos são `upsert` por slug, e o super admin só nasce se
-   * ainda não existir. Repetir a cada deploy não muda nada.
+   * idempotentes: um plano só é criado se o slug ainda não existir, e o super
+   * admin só nasce se ainda não existir. Repetir a cada deploy não muda nada —
+   * nem o preço que você editou no painel.
    *
    * Está aqui, e não num comando manual, porque etapa obrigatória que depende
    * de alguém lembrar de abrir um console não é obrigatória — é armadilha. Sem
    * os planos, o cadastro da primeira empresa é recusado.
    */
   if (process.argv.includes('--deploy')) {
-    await seedPlans();
+    await seedPlans({ producao: true });
     await seedSuperAdminDeProducao({ exigir: false });
     return;
   }

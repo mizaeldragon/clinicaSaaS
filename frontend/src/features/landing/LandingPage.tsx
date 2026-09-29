@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { BrandLogo } from '@/components/brand';
 import { useAuthStore } from '@/stores/auth.store';
+import { usePublicPlans } from '@/features/auth/usePublicPlans';
+import type { Plan } from '@/types';
 import './landing.css';
 
 /**
@@ -107,26 +109,35 @@ const INTELIGENCIA = [
   },
 ];
 
-const PLANOS = [
-  {
-    slug: 'starter',
-    nome: 'Starter',
+/**
+ * O texto de venda de cada plano. Preço e nome NÃO moram aqui: vêm do banco,
+ * que é o que o super admin edita em /admin/planos e o que o Asaas cobra. Com o
+ * preço escrito à mão, editar o plano mudava a cobrança e deixava a vitrine
+ * anunciando o valor antigo.
+ *
+ * Plano criado no painel e ausente daqui aparece com a descrição cadastrada.
+ */
+interface TextoPlano {
+  selo?: string;
+  desc: string;
+  itens: string[];
+  branco?: boolean;
+  navy?: boolean;
+}
+
+const TEXTO_PLANOS: Record<string, TextoPlano> = {
+  starter: {
     selo: 'Para começar',
     desc: 'Para quem atende sozinha e quer sair do caderno e da planilha.',
-    preco: '199,99',
-    precoMenor: true,
     itens: [
       'Agenda, clientes e serviços',
       'Link público de agendamento',
       'Controle de caixa do dia',
     ],
   },
-  {
-    slug: 'pro',
-    nome: 'Pro',
+  pro: {
     selo: 'Próprio espaço',
     desc: 'Para quem atende no próprio espaço e quer a operação inteira em ordem.',
-    preco: '300',
     branco: true,
     itens: [
       'Agenda, clientes e serviços',
@@ -135,12 +146,9 @@ const PLANOS = [
       'Link público de agendamento',
     ],
   },
-  {
-    slug: 'premium',
-    nome: 'Premium',
+  premium: {
     selo: 'Mais completo',
     desc: 'Para quem atende e também aluga espaço para outros profissionais.',
-    preco: '450',
     navy: true,
     itens: [
       'Tudo do Pro, inteligência inclusa',
@@ -149,7 +157,26 @@ const PLANOS = [
       'Login próprio para cada profissional',
     ],
   },
-];
+};
+
+/** `199,99` com centavos (em fonte menor, para caber), `300` quando é redondo. */
+function formatarPreco(price: number): { valor: string; menor: boolean } {
+  const redondo = Number.isInteger(price);
+  return {
+    valor: price.toLocaleString('pt-BR', {
+      minimumFractionDigits: redondo ? 0 : 2,
+      maximumFractionDigits: 2,
+    }),
+    menor: !redondo,
+  };
+}
+
+function montarVitrine(plans: Plan[]) {
+  return plans.map((plan) => {
+    const texto = TEXTO_PLANOS[plan.slug] ?? { desc: plan.description ?? '', itens: [] };
+    return { ...texto, slug: plan.slug, nome: plan.name, preco: formatarPreco(plan.price) };
+  });
+}
 
 const DUVIDAS = [
   [
@@ -202,6 +229,7 @@ export function LandingPage() {
   const token = useAuthStore((state) => state.accessToken);
   const [aberta, setAberta] = useState<number>(0);
   const rolou = useRolou();
+  const { data: planos } = usePublicPlans();
   const [params] = useSearchParams();
 
   // Temporário, enquanto a tipografia não está fechada: `?fonte=newsreader` e
@@ -486,7 +514,7 @@ export function LandingPage() {
           </h2>
 
           <div className="lp-planos-grid">
-            {PLANOS.map((plano) => (
+            {montarVitrine(planos ?? []).map((plano) => (
               <article
                 key={plano.slug}
                 className={[
@@ -501,14 +529,16 @@ export function LandingPage() {
 
                 <div className="lp-plano-topo">
                   <h3>{plano.nome}</h3>
-                  <span className="lp-plano-selo">{plano.selo}</span>
+                  {plano.selo ? <span className="lp-plano-selo">{plano.selo}</span> : null}
                 </div>
 
                 <p className="lp-plano-desc">{plano.desc}</p>
 
                 <div className="lp-plano-preco">
                   <span className="moeda">R$</span>
-                  <span className={plano.precoMenor ? 'valor menor' : 'valor'}>{plano.preco}</span>
+                  <span className={plano.preco.menor ? 'valor menor' : 'valor'}>
+                    {plano.preco.valor}
+                  </span>
                   <span className="mes">/ mês</span>
                 </div>
 
