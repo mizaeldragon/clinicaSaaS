@@ -77,9 +77,12 @@ export function BillingCard() {
           </CardTitle>
           <CardDescription className="text-xs">
             {currency(data.plan.price)} por mês
-            {data.subscription.currentPeriodEnd
-              ? ` · pago até ${day(data.subscription.currentPeriodEnd)}`
-              : ''}
+            {/* No teste o fim do período é o fim do teste, não algo pago. */}
+            {data.subscription.status === 'TRIALING' && data.subscription.trialEndsAt
+              ? ` · teste até ${day(data.subscription.trialEndsAt)}`
+              : data.subscription.currentPeriodEnd
+                ? ` · pago até ${day(data.subscription.currentPeriodEnd)}`
+                : ''}
           </CardDescription>
         </CardHeader>
       </Card>

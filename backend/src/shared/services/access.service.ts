@@ -42,7 +42,12 @@ export function evaluateAccess(context: CompanyContext, now = new Date()): Acces
   const status = context.subscriptionStatus;
   if (!status) return { kind: 'ok' };
 
-  if (status === 'CANCELED') return { kind: 'canceled' };
+  // Cancelar não tranca na hora: o que já foi pago vale até o fim do período.
+  if (status === 'CANCELED') {
+    const paidUntil = context.currentPeriodEnd;
+    if (paidUntil && paidUntil > now) return { kind: 'ok' };
+    return { kind: 'canceled' };
+  }
 
   // Assinou pelo cartão da landing: não há teste para gastar, o painel abre
   // quando a primeira mensalidade for confirmada.

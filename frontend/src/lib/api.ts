@@ -27,16 +27,20 @@ type LogoutHandler = () => void;
 let getTokens: TokenGetter = () => ({ accessToken: null, refreshToken: null });
 let setTokens: TokenSetter = () => undefined;
 let onLogout: LogoutHandler = () => undefined;
+let onSubscriptionRequired: () => void = () => undefined;
 
 /** Conecta o cliente HTTP ao store de autenticação (evita import circular). */
 export function configureApi(handlers: {
   getTokens: TokenGetter;
   setTokens: TokenSetter;
   onLogout: LogoutHandler;
+  /** A API recusou por assinatura: o painel relê o contexto e mostra o bloqueio. */
+  onSubscriptionRequired?: () => void;
 }) {
   getTokens = handlers.getTokens;
   setTokens = handlers.setTokens;
   onLogout = handlers.onLogout;
+  if (handlers.onSubscriptionRequired) onSubscriptionRequired = handlers.onSubscriptionRequired;
 }
 
 let refreshPromise: Promise<string | null> | null = null;
@@ -129,6 +133,9 @@ export async function request<T = unknown>(path: string, options: RequestOptions
     if (res.status === 403 && (code === 'COMPANY_NOT_FOUND' || code === 'COMPANY_BLOCKED')) {
       onLogout();
     }
+    // O teste venceu com o painel aberto: o contexto lido na entrada ainda diz
+    // "em teste". Reler faz o bloqueio aparecer no lugar do erro solto.
+    if (res.status === 402 && code === 'SUBSCRIPTION_REQUIRED') onSubscriptionRequired();
     throw new ApiError(
       res.status,
       payload?.error ?? { code: 'UNKNOWN', message: 'Erro inesperado ao comunicar com o servidor' },

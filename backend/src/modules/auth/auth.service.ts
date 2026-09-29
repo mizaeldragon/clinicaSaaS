@@ -22,7 +22,10 @@ import { PERMISSIONS, resolvePermissions } from '../../shared/middlewares/rbac';
 import { uniqueSlug } from '../../shared/utils/slug';
 import { env } from '../../config/env';
 import { DEFAULT_BUSINESS_HOURS } from '../companies/company.constants';
-import { getCompanyContext, invalidateCompanyContext } from '../../shared/services/companyContext.service';
+import {
+  getCompanyContextForClient,
+  invalidateCompanyContext,
+} from '../../shared/services/companyContext.service';
 import { mailer } from '../../shared/services/mailer.service';
 import {
   breachMessage,
@@ -71,7 +74,7 @@ interface AuthResult {
     /** Locatária: aluga um espaço da empresa e tem carteira própria. */
     isRenter: boolean;
   };
-  company: Awaited<ReturnType<typeof getCompanyContext>>;
+  company: Awaited<ReturnType<typeof getCompanyContextForClient>>;
 }
 
 /**
@@ -175,7 +178,7 @@ async function issueSession(
       professionalId: user.professional?.id ?? null,
       isRenter,
     },
-    company: user.companyId ? await getCompanyContext(user.companyId) : null,
+    company: user.companyId ? await getCompanyContextForClient(user.companyId) : null,
   };
 }
 
@@ -622,7 +625,7 @@ export const authService = {
 
     if (!user) throw new NotFoundError('Usuário');
 
-    const company = user.companyId ? await getCompanyContext(user.companyId) : null;
+    const company = user.companyId ? await getCompanyContextForClient(user.companyId) : null;
 
     return {
       user: {

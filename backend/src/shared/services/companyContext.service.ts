@@ -1,6 +1,7 @@
 import type { ModuleKey } from '@prisma/client';
 import { prisma } from '../database/prisma';
 import { tenantContext } from '../database/tenantContext';
+import { evaluateAccess, type AccessState } from './access.service';
 
 export interface CompanyContext {
   id: string;
@@ -31,6 +32,19 @@ const cache = new Map<string, { value: CompanyContext; expiresAt: number }>();
 
 export function invalidateCompanyContext(companyId: string): void {
   cache.delete(companyId);
+}
+
+/**
+ * O contexto como o painel o recebe: com o estado de acesso já avaliado.
+ *
+ * Avaliado aqui, a cada chamada, e não guardado no cache: depende do relógio.
+ * Um contexto cacheado às 23:59 diria "em teste" até meia-noite e meia.
+ */
+export async function getCompanyContextForClient(
+  companyId: string,
+): Promise<(CompanyContext & { access: AccessState }) | null> {
+  const context = await getCompanyContext(companyId);
+  return context ? { ...context, access: evaluateAccess(context) } : null;
 }
 
 export async function getCompanyContext(companyId: string): Promise<CompanyContext | null> {

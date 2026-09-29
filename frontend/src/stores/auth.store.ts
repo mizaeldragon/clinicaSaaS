@@ -161,4 +161,7 @@ configureApi({
     queryClient.clear();
     resetBrandColor();
   },
+  onSubscriptionRequired: () => {
+    useAuthStore.getState().refreshContext().catch(() => undefined);
+  },
 });

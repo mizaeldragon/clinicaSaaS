@@ -98,6 +98,8 @@ export interface CompanyContext {
   subscriptionStatus: string | null;
   trialEndsAt: string | null;
   currentPeriodEnd: string | null;
+  /** Opcional: uma sessão salva antes deste campo existir chega sem ele. */
+  access?: AccessState;
 }
 
 export interface AuthResponse {
@@ -384,6 +386,14 @@ export type AccessState =
   | { kind: 'past_due'; dueAt: string; blocksAt: string; daysLeft: number }
   | { kind: 'past_due_blocked'; dueAt: string }
   | { kind: 'canceled' };
+
+/** Os estados em que o painel fica trancado. Espelha `blocksAccess` do backend. */
+export const BLOCKING_ACCESS: ReadonlySet<AccessState['kind']> = new Set([
+  'awaiting_payment',
+  'trial_expired',
+  'past_due_blocked',
+  'canceled',
+]);
 
 export interface BillingOverview {
   gateway: { enabled: boolean; environment: 'sandbox' | 'production' };

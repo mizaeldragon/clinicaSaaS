@@ -122,11 +122,11 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           })}
         </nav>
 
-        {company?.subscriptionStatus === 'TRIALING' && company.trialEndsAt ? (
+        {company?.access?.kind === 'trial' ? (
           <div className="mx-3 mb-4 rounded-xl border border-sidebar-border bg-shell p-3">
             <p className="text-xs font-semibold text-sidebar-foreground">Período de teste</p>
             <p className="mt-0.5 text-[11px] text-sidebar-muted">
-              Termina em {new Date(company.trialEndsAt).toLocaleDateString('pt-BR')}
+              Termina em {new Date(company.access.endsAt).toLocaleDateString('pt-BR')}
             </p>
             <NavLink
               to="/app/configuracoes?tab=plano"
