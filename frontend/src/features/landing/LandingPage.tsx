@@ -29,16 +29,16 @@ const SEGMENTOS = [
 
 const PASSOS = [
   [
-    'Organize a agenda',
-    'Serviços, horários, equipe e recursos em uma visão clara — o dia inteiro resolvido antes de abrir a porta.',
+    'A cliente marca sozinha',
+    'Você coloca o seu link na bio e no WhatsApp. Ela escolhe o serviço e um horário livre pelo celular — a qualquer hora, sem esperar você responder.',
   ],
   [
-    'Atenda com contexto',
-    'Histórico, preferências e observações da cliente sempre à mão, para um atendimento que parece pessoal porque é.',
+    'A agenda se protege',
+    'Profissional, sala, maca e cadeira são conferidos juntos. O sistema simplesmente não deixa marcar duas clientes no mesmo lugar e horário.',
   ],
   [
-    'Feche o dia segura',
-    'Receitas, despesas, comissões e aluguéis fechados sem calculadora e sem dúvida no fim do mês.',
+    'O caixa fecha sozinho',
+    'Finalizou o atendimento, entrou no caixa. Despesas, comissões e o lucro do mês aparecem prontos — sem calculadora e sem planilha.',
   ],
 ];
 
@@ -46,35 +46,35 @@ const MODULOS = [
   {
     tag: 'Núcleo',
     nome: 'Agenda inteligente',
-    desc: 'Horário, sala, cadeira e profissional checados juntos — o conflito simplesmente não acontece.',
-    metrica: '0 conflitos',
-    metricaLabel: 'de sala ou equipamento',
+    desc: 'Horário, profissional, sala e cadeira conferidos de uma vez. Marcou, está garantido — nada de duas clientes esperando a mesma cadeira.',
+    metrica: '0 choques',
+    metricaLabel: 'de horário, sala ou cadeira',
   },
   {
     tag: 'Captação',
     nome: 'Link de agendamento',
-    desc: 'Cada profissional divulga o seu link. A cliente marca pelo navegador, sem instalar nada.',
+    desc: 'Um link para a bio do Instagram e para o WhatsApp. A cliente agenda pelo celular, sem baixar aplicativo e sem depender de você responder.',
     metrica: '24h',
-    metricaLabel: 'agenda aberta, todo dia',
+    metricaLabel: 'agenda aberta, até de madrugada',
   },
   {
     tag: 'Caixa',
     nome: 'Financeiro organizado',
-    desc: 'Entradas, saídas e resultado do mês em uma leitura só, com o que ainda está a receber.',
+    desc: 'Entradas, saídas, o que falta receber e o lucro do mês numa tela só. Você sabe quanto ganhou sem abrir planilha.',
     metrica: '1 tela',
     metricaLabel: 'para fechar o mês',
   },
   {
     tag: 'Equipe',
     nome: 'Comissões automáticas',
-    desc: 'Por serviço ou percentual: o acerto de cada profissional sai calculado no fechamento.',
+    desc: 'Percentual ou valor fixo por serviço: o acerto de cada profissional sai calculado, sem conta de cabeça e sem discussão no fim do mês.',
     metrica: 'Sem planilha',
-    metricaLabel: 'relatório pronto para pagar',
+    metricaLabel: 'acerto pronto para pagar',
   },
   {
     tag: 'Operação',
     nome: 'Recursos e salas',
-    desc: 'Salas, cadeiras e equipamentos com disponibilidade própria: livre, em uso ou em manutenção.',
+    desc: 'Salas, macas, cadeiras e equipamentos com agenda própria: você vê na hora o que está livre, em uso ou em manutenção.',
     metrica: 'Tempo real',
     metricaLabel: 'o que está livre agora',
   },
@@ -92,19 +92,19 @@ const INTELIGENCIA = [
   {
     tag: 'Antes de acontecer',
     nome: 'Risco de falta',
-    desc: 'Os atendimentos da semana ordenados por quem provavelmente não vem — com o motivo ao lado da nota, para a recepção saber para quem ligar.',
+    desc: 'Os atendimentos da semana em ordem de quem provavelmente não vem — com o motivo ao lado, para você saber para quem ligar antes da cadeira ficar vazia.',
     exemplo: 'Camila · 47% — faltou 4 das 11 vezes e não confirmou',
   },
   {
     tag: 'Buraco na agenda',
     nome: 'Encaixes possíveis',
-    desc: 'Os vãos entre um atendimento e outro, e quem já está marcada nos próximos dias e caberia ali. Sugere antecipar, sempre com a mesma profissional.',
+    desc: 'Os buracos entre um atendimento e outro, e quem já está marcada nos próximos dias e caberia ali. Horário vazio vira atendimento.',
     exemplo: '45 min livres às 14h · 3 clientes aceitariam antecipar',
   },
   {
     tag: 'Fim do mês',
     nome: 'Resumo em palavras',
-    desc: 'O mês contado em frases, não em gráfico: cresceu ou caiu, por causa do quê, e o que merece atenção — inclusive quem costumava vir e sumiu.',
+    desc: 'O mês contado em frases, não em gráfico: cresceu ou caiu, por causa do quê — e quais clientes fiéis sumiram e merecem uma mensagem.',
     exemplo: '+12% em setembro · 4 clientes frequentes não voltaram',
   },
 ];
@@ -128,32 +128,32 @@ interface TextoPlano {
 const TEXTO_PLANOS: Record<string, TextoPlano> = {
   starter: {
     selo: 'Para começar',
-    desc: 'Para quem atende sozinha e quer sair do caderno e da planilha.',
+    desc: 'Para quem atende sozinha e quer largar o caderno e a planilha de vez.',
     itens: [
-      'Agenda, clientes e serviços',
-      'Link público de agendamento',
-      'Controle de caixa do dia',
+      'Agenda online sem choque de horário',
+      'Link para a cliente marcar sozinha',
+      'Ficha das clientes e caixa do dia',
     ],
   },
   pro: {
     selo: 'Próprio espaço',
-    desc: 'Para quem atende no próprio espaço e quer a operação inteira em ordem.',
+    desc: 'Para o espaço com equipe que quer agenda, caixa e comissões rodando sem depender de você.',
     branco: true,
     itens: [
-      'Agenda, clientes e serviços',
-      'Financeiro, comissão e relatórios',
-      'Risco de falta, encaixes e resumo do mês',
-      'Link público de agendamento',
+      'Tudo do Starter, para a equipe inteira',
+      'Financeiro, comissões e relatórios',
+      'Aviso de falta, encaixes e resumo do mês',
+      'Salas e equipamentos sem conflito',
     ],
   },
   premium: {
     selo: 'Mais completo',
-    desc: 'Para quem atende e também aluga espaço para outros profissionais.',
+    desc: 'Para quem atende e também aluga sala ou cadeira para outras profissionais.',
     navy: true,
     itens: [
       'Tudo do Pro, inteligência inclusa',
       'Aluguel por turno, diária ou mês',
-      'Contratos, cobrança e logins separados',
+      'Contrato e cobrança de cada locatária',
       'Login próprio para cada profissional',
     ],
   },
@@ -180,6 +180,18 @@ function montarVitrine(plans: Plan[]) {
 
 const DUVIDAS = [
   [
+    'Preciso instalar alguma coisa?',
+    'Não. O CliniStudio abre no navegador do computador, do tablet ou do celular. Você assina, entra e já começa a montar a agenda.',
+  ],
+  [
+    'Como eu pago? Tem fidelidade?',
+    'Mensalidade no PIX, boleto ou cartão, sem fidelidade. Se cancelar, o acesso continua até o fim do período que você já pagou.',
+  ],
+  [
+    'As clientes precisam instalar um aplicativo?',
+    'Não. Elas agendam pelo seu link no navegador, em poucos toques, direto do Instagram ou do WhatsApp.',
+  ],
+  [
     'Quem aluga o espaço precisa pagar o sistema?',
     'Não. O acesso dos profissionais que alugam está incluído no plano Premium do espaço — cada um entra com o próprio login.',
   ],
@@ -198,10 +210,6 @@ const DUVIDAS = [
   [
     'A inteligência vem em qual plano?',
     'No Pro e no Premium. O Starter tem agenda, clientes, serviços e caixa; risco de falta, encaixes e resumo do mês entram junto com os relatórios, a partir do Pro.',
-  ],
-  [
-    'As clientes precisam instalar um aplicativo?',
-    'Não. Elas agendam pelo link no navegador, em poucos toques, direto do Instagram ou do WhatsApp.',
   ],
 ];
 
@@ -336,7 +344,7 @@ export function LandingPage() {
           </a>
 
           <nav className="lp-nav" aria-label="Navegação principal">
-            <a href="#metodo">Método</a>
+            <a href="#metodo">Como funciona</a>
             <a href="#sistema">Sistema</a>
             <a href="#inteligencia">Inteligência</a>
             <a href="#planos">Planos</a>
@@ -360,8 +368,8 @@ export function LandingPage() {
           <div className="lp-hero-texto">
             <p className="lp-eyebrow">
               <i />
-              <span>Gestão feita para beleza</span>
-              <span className="calado">· Beleza · Estética · Barbearia</span>
+              <span>Sistema de gestão para beleza</span>
+              <span className="calado">· Salões · Estética · Barbearias</span>
             </p>
 
             {/* Quebra escolhida, não calculada: "com as clientes" partido em
@@ -376,8 +384,9 @@ export function LandingPage() {
             </h1>
 
             <p className="lp-hero-sub">
-              Agenda, clientes, caixa e espaços operando como uma coisa só. Nada de cadernos, grupos
-              e planilhas disputando a sua atenção.
+              Agenda online, ficha das clientes, caixa e comissões num sistema só. A cliente marca
+              sozinha pelo seu link, a agenda não deixa marcar duas no mesmo horário e o mês fecha
+              sem planilha.
             </p>
 
             <div className="lp-hero-cta">
@@ -392,7 +401,7 @@ export function LandingPage() {
             </div>
 
             <p className="lp-hero-nota">
-              <i />5 dias gratuitos · sem cartão de crédito
+              <i />Pagamento mensal · sem fidelidade · cancele quando quiser
             </p>
           </div>
 
@@ -429,10 +438,11 @@ export function LandingPage() {
       <div className="lp-wrap lp-pad lp-metodo" id="metodo">
         <div className="lp-metodo-cabeca">
           <h2 className="lp-h2">
-            A gestão do espaço não precisa <span className="lp-it">tomar o seu dia.</span>
+            Chega de agenda no caderno e <span className="lp-it">cliente perdida no WhatsApp.</span>
           </h2>
           <p className="lp-lead">
-            Três movimentos simples que substituem a improvisação do dia a dia por um método.
+            O CliniStudio cuida da parte chata da rotina para o seu tempo ficar com quem paga as
+            contas: a cliente na cadeira.
           </p>
         </div>
 
@@ -454,15 +464,15 @@ export function LandingPage() {
             <div>
               <p className="lp-eyebrow">
                 <i />
-                <span>Seu espaço, no controle</span>
+                <span>O que você ganha</span>
               </p>
               <h2 className="lp-h2">
-                Tudo para atender bem e <span className="lp-it">decidir melhor.</span>
+                Tudo que o seu espaço precisa, <span className="lp-it">num sistema só.</span>
               </h2>
             </div>
             <p className="lp-sistema-lead">
-              Cinco módulos que conversam entre si — cada um resolvendo uma parte concreta do seu
-              dia.
+              Cada parte resolve um problema que hoje toma o seu tempo — e todas conversam entre
+              si: o que entra na agenda já aparece no caixa.
             </p>
           </div>
 
@@ -491,8 +501,8 @@ export function LandingPage() {
               </div>
               <h3>Aluguel sob controle</h3>
               <p>
-                Turno, diária ou mês: contratos, cobrança e logins separados — sem você virando
-                síndica.
+                Aluga sala ou cadeira? Contrato, cobrança e login de cada profissional por turno,
+                diária ou mês — sem você virar cobradora.
               </p>
               <a href="#planos" className="lp-btn-mini">
                 Ver plano Premium
@@ -511,18 +521,18 @@ export function LandingPage() {
               <span>Agendamento online</span>
             </p>
             <h2 className="lp-h2">
-              Uma agenda que parece <span className="lp-it">parte da sua marca.</span>
+              A cliente marca sozinha. <span className="lp-it">Você só atende.</span>
             </h2>
             <p className="lp-agenda-sub">
-              Cada profissional tem o seu próprio link. A cliente agenda direto com quem atende, no
-              horário em que ela está no espaço.
+              Cada profissional ganha um link próprio, com a cara da sua marca. A cliente vê só os
+              horários realmente livres e agenda em poucos toques — enquanto você atende, ou dorme.
             </p>
 
             <div className="lp-lista">
               {[
-                ['I', 'Link individual para divulgar'],
-                ['II', 'Disponibilidade baseada no uso do espaço'],
-                ['III', 'Sem conflito de sala, cadeira ou equipamento'],
+                ['I', 'Link próprio para a bio e o WhatsApp'],
+                ['II', 'Só aparecem horários realmente livres'],
+                ['III', 'Sem aplicativo para a cliente instalar'],
               ].map(([numero, texto]) => (
                 <div key={texto}>
                   <i>{numero}</i>
@@ -556,12 +566,12 @@ export function LandingPage() {
                 <span>Inteligência</span>
               </p>
               <h2 className="lp-h2">
-                O seu histórico <span className="lp-it">avisando antes.</span>
+                Saiba quem vai faltar <span className="lp-it">antes da cadeira ficar vazia.</span>
               </h2>
             </div>
             <p className="lp-ia-lead">
-              Cada atendimento que passou deixou uma pista. O sistema lê as suas e responde três
-              perguntas que ninguém tem tempo de calcular no meio do expediente.
+              O CliniStudio lê o histórico do seu próprio espaço e avisa o que nenhuma agenda de
+              papel avisa: quem tende a faltar, onde cabe um encaixe e como foi o seu mês.
             </p>
           </div>
 
@@ -603,7 +613,7 @@ export function LandingPage() {
             <span>Planos</span>
           </p>
           <h2 className="lp-h2">
-            Comece pelo que o seu <span className="lp-it">espaço precisa.</span>
+            Um plano para cada <span className="lp-it">fase do seu espaço.</span>
           </h2>
 
           <div className="lp-planos-grid">
@@ -652,7 +662,7 @@ export function LandingPage() {
                   Assinar {plano.nome}
                 </Link>
 
-                <p className="lp-plano-rodape">Pagamento mensal · cancele quando quiser</p>
+                <p className="lp-plano-rodape">Mensal · sem fidelidade · PIX, boleto ou cartão</p>
               </article>
             ))}
           </div>
@@ -664,8 +674,8 @@ export function LandingPage() {
               depois de ter lido os três preços. */}
           <div className="lp-planos-teste">
             <p>
-              Quer testar antes de assinar? Comece com <b>5 dias grátis</b>, com todos os recursos e
-              sem cartão de crédito.
+              Ainda em dúvida? Teste por <b>5 dias grátis</b>, com todos os recursos e sem cartão de
+              crédito.
             </p>
             <Link to="/cadastro" className="lp-planos-teste-btn">
               Começar teste grátis →
@@ -722,10 +732,10 @@ export function LandingPage() {
           <div>
             <span className="lp-cta-eyebrow">Comece hoje</span>
             <h2>
-              Menos tempo organizando. <em>Mais tempo fazendo seu espaço acontecer.</em>
+              Menos tempo organizando. <em>Mais tempo atendendo — e faturando.</em>
             </h2>
             <p>
-              Crie sua conta e teste a gestão do CliniStudio sem compromisso — 5 dias, sem cartão.
+              Assine em poucos minutos e pague como preferir: PIX, boleto ou cartão. Sem fidelidade.
             </p>
             <a href="#planos" className="lp-btn lp-btn-branco">
               Escolher meu plano <span aria-hidden>→</span>
@@ -742,14 +752,14 @@ export function LandingPage() {
             <div className="lp-rodape-marca">
               <BrandLogo className="lp-logo" />
               <p>
-                Agenda, clientes, caixa e aluguel de espaços num lugar só — para salões,
-                clínicas de estética, barbearias e espaços compartilhados de beleza.
+                O sistema de gestão para salões, clínicas de estética, studios e barbearias: agenda
+                online, clientes, caixa, comissões e aluguel de espaços num lugar só.
               </p>
             </div>
 
             <div className="lp-rodape-coluna">
               <h3>Produto</h3>
-              <a href="#metodo">Método</a>
+              <a href="#metodo">Como funciona</a>
               <a href="#sistema">Sistema</a>
               <a href="#inteligencia">Inteligência</a>
               <a href="#planos">Planos</a>
