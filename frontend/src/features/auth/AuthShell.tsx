@@ -91,7 +91,7 @@ export function AuthShell({
         />
 
         <a href="/" className="relative flex items-center" aria-label="CliniStudio, início">
-          <BrandLogo className="h-9" />
+          <BrandLogo className="h-14" />
         </a>
 
         <div className="relative max-w-md space-y-9">
@@ -129,7 +129,7 @@ export function AuthShell({
         <div className="w-full max-w-[420px] space-y-8">
           {/* No celular a coluna da esquerda some, então a marca reaparece aqui. */}
           <a href="/" className="flex items-center lg:hidden" aria-label="CliniStudio, início">
-            <BrandLogo className="h-9" />
+            <BrandLogo className="h-11" />
           </a>
 
           <div className="space-y-2">

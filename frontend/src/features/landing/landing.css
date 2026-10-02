@@ -110,6 +110,30 @@
   50% { opacity: 1; }
 }
 
+/*
+ * A subida ao rolar usa `translate`, não `transform`: os cartões já usam
+ * `transform` no hover, e as duas propriedades se somam em vez de uma apagar
+ * a outra. Pelo mesmo motivo é animação, não transição — a transição do
+ * hover continua sendo a do cartão.
+ */
+@keyframes lpRevelar {
+  from { opacity: 0; translate: 0 28px; }
+  to { opacity: 1; translate: 0 0; }
+}
+
+@keyframes lpFlutuar {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -10px; }
+}
+
+.lp-motion [data-reveal]:not(.is-visivel) {
+  opacity: 0;
+}
+
+.lp-motion [data-reveal].is-visivel {
+  animation: lpRevelar 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) var(--atraso, 0ms) both;
+}
+
 /* Quem pede menos movimento no sistema não recebe nenhum. */
 @media (prefers-reduced-motion: reduce) {
   .lp *,
@@ -397,7 +421,7 @@
  *
  * Fica na mesma família do principal, mas em contorno e fundo lavado: os dois
  * lado a lado com o mesmo peso brigariam, e quem chega para conhecer o produto
- * precisa ver "Começar grátis" primeiro.
+ * precisa ver "Assinar agora" primeiro.
  */
 .lp .lp-acoes a.lp-entrar {
   color: var(--rosa-escuro);
@@ -467,6 +491,22 @@
   margin-bottom: 28px;
 }
 
+/*
+ * O título do hero em quatro linhas fixas. Cada linha não quebra, então a
+ * fonte tem teto: "com as clientes." mede 7,85em em Poppins, e a coluna do
+ * hero tem 552px no máximo — 68px cabe com folga, os 72px de antes não. O
+ * piso de 32px mantém a linha inteira numa tela de 320px.
+ */
+.lp-h1-linhas {
+  font-size: clamp(32px, 4.4vw, 68px);
+  max-width: none;
+}
+
+.lp-h1-linhas > span {
+  display: block;
+  white-space: nowrap;
+}
+
 .lp-hero-sub {
   font-size: 16px;
   font-weight: 300;
@@ -506,6 +546,7 @@
   position: relative;
   display: flex;
   align-items: center;
+  animation: lpIn 1s 0.2s ease both;
 }
 
 .lp-hero-img img {
@@ -514,6 +555,8 @@
   display: block;
   border-radius: 26px;
   box-shadow: 0 36px 70px -44px rgba(27, 32, 68, 0.55);
+  /* Flutua devagar depois de entrar: o notebook parece pousado, não colado. */
+  animation: lpFlutuar 7s 1.2s ease-in-out infinite;
 }
 
 /* --------------------------------------------------------------- ticker */

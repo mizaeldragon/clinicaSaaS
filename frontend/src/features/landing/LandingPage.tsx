@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { BrandLogo } from '@/components/brand';
 import { useAuthStore } from '@/stores/auth.store';
@@ -225,11 +225,97 @@ function useRolou(limite = 24) {
   return rolou;
 }
 
+/*
+ * O que entra em cena ao rolar. Os blocos de abertura de cada seção sobem
+ * sozinhos; os cartões de uma mesma grade entram em cascata, um depois do
+ * outro, para o olho percorrer a fileira em vez de recebê-la de uma vez.
+ */
+const REVELA = [
+  '.lp-metodo-cabeca',
+  '.lp-sistema-cabeca',
+  '.lp-agenda-grid > *',
+  '.lp-ia-cabeca',
+  '.lp-ia-nota',
+  '.lp-planos .lp-eyebrow',
+  '.lp-planos .lp-h2',
+  '.lp-planos-teste',
+  '.lp-duvidas-grid > .lp-h2',
+  '.lp-cta',
+].join(',');
+
+const CASCATA = [
+  '.lp-passo',
+  '.lp-modulo',
+  '.lp-modulo-destaque',
+  '.lp-ia-cartao',
+  '.lp-plano',
+  '.lp-faq-item',
+].join(',');
+
+/**
+ * Revela os blocos da landing conforme entram na tela.
+ *
+ * Quem esconde é o JavaScript (a classe `lp-motion` na raiz), não o CSS
+ * sozinho: se o script falhar, ou o navegador não tiver IntersectionObserver,
+ * a página aparece inteira e parada — nunca em branco. Quem pede menos
+ * movimento no sistema também recebe a página parada.
+ *
+ * `refazer` muda quando chega conteúdo novo (os planos vêm da API depois da
+ * primeira pintura); cada elemento só é marcado uma vez.
+ */
+function useRevelar(refazer: unknown) {
+  const raiz = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = raiz.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    el.classList.add('lp-motion');
+
+    const observador = new IntersectionObserver(
+      (entradas) => {
+        for (const entrada of entradas) {
+          if (!entrada.isIntersecting) continue;
+          entrada.target.classList.add('is-visivel');
+          observador.unobserve(entrada.target);
+        }
+      },
+      // Dispara um pouco antes da borda de baixo, para a subida terminar
+      // enquanto o bloco ainda está entrando, e não depois de já estar lido.
+      { rootMargin: '0px 0px -8% 0px', threshold: 0.12 },
+    );
+
+    // Marca uma vez, mas observa de novo a cada rodada: a rodada anterior
+    // desligou o observador dela, e um bloco marcado que ainda não apareceu
+    // ficaria escondido para sempre se fosse pulado aqui.
+    const marcar = (alvo: Element, atraso: number) => {
+      if (!alvo.hasAttribute('data-reveal')) {
+        alvo.setAttribute('data-reveal', '');
+        (alvo as HTMLElement).style.setProperty('--atraso', `${atraso}ms`);
+      }
+      if (!alvo.classList.contains('is-visivel')) observador.observe(alvo);
+    };
+
+    el.querySelectorAll(REVELA).forEach((alvo) => marcar(alvo, 0));
+    el.querySelectorAll(CASCATA).forEach((alvo) => {
+      const irmaos = Array.from(alvo.parentElement?.children ?? []);
+      // Teto de 4 passos: numa lista longa o último esperaria demais.
+      marcar(alvo, Math.min(irmaos.indexOf(alvo), 4) * 90);
+    });
+
+    return () => observador.disconnect();
+  }, [refazer]);
+
+  return raiz;
+}
+
 export function LandingPage() {
   const token = useAuthStore((state) => state.accessToken);
   const [aberta, setAberta] = useState<number>(0);
   const rolou = useRolou();
   const { data: planos } = usePublicPlans();
+  const raiz = useRevelar(planos);
   const [params] = useSearchParams();
 
   // Temporário, enquanto a tipografia não está fechada: `?fonte=newsreader` e
@@ -241,7 +327,7 @@ export function LandingPage() {
   if (token) return <Navigate to="/app" replace />;
 
   return (
-    <div className="lp" data-fonte={fonte}>
+    <div className="lp" data-fonte={fonte} ref={raiz}>
       {/* ------------------------------------------------------- barra topo */}
       <div className={rolou ? 'lp-topo lp-topo--flutuante' : 'lp-topo'} id="top">
         <div className="lp-wrap lp-pad lp-topo-linha">
@@ -262,7 +348,7 @@ export function LandingPage() {
               Entrar
             </Link>
             <a href="#planos" className="lp-btn-topo">
-              Começar grátis
+              Assinar agora
             </a>
           </div>
         </div>
@@ -278,8 +364,15 @@ export function LandingPage() {
               <span className="calado">· Beleza · Estética · Barbearia</span>
             </p>
 
-            <h1 className="lp-h1">
-              Seu tempo com as clientes. <span className="lp-it">A ordem</span> com o CliniStudio.
+            {/* Quebra escolhida, não calculada: "com as clientes" partido em
+                duas linhas separava o que a frase quer dizer junto. */}
+            <h1 className="lp-h1 lp-h1-linhas">
+              <span>Seu tempo</span>
+              <span>com as clientes.</span>
+              <span>
+                <span className="lp-it">A ordem</span> com
+              </span>
+              <span>o CliniStudio.</span>
             </h1>
 
             <p className="lp-hero-sub">
@@ -289,7 +382,7 @@ export function LandingPage() {
 
             <div className="lp-hero-cta">
               <a href="#planos" className="lp-btn lp-btn-cheio">
-                Começar grátis <span aria-hidden>→</span>
+                Assinar agora <span aria-hidden>→</span>
               </a>
               {/* Todo convite da landing termina nos planos: é lá que a pessoa
                   escolhe entre assinar e testar. Só o "Entrar" leva ao login. */}
@@ -635,7 +728,7 @@ export function LandingPage() {
               Crie sua conta e teste a gestão do CliniStudio sem compromisso — 5 dias, sem cartão.
             </p>
             <a href="#planos" className="lp-btn lp-btn-branco">
-              Começar grátis <span aria-hidden>→</span>
+              Escolher meu plano <span aria-hidden>→</span>
             </a>
             </div>
           </div>
