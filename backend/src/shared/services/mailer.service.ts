@@ -38,6 +38,12 @@ function getTransporter(): Transporter | null {
       env.SMTP_USER && env.SMTP_PASSWORD
         ? { user: env.SMTP_USER, pass: env.SMTP_PASSWORD }
         : undefined,
+    // Os padrões do nodemailer esperam até 2 minutos por um SMTP que não
+    // responde. Quem espera junto é a requisição que pediu o e-mail — o
+    // "esqueci a senha", o agendamento da cliente — e ninguém espera 2 minutos.
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
   });
 
   return transporter;

@@ -433,7 +433,13 @@ export const billingService = {
       status,
       parseAsaasDate(payment.dueDate),
     );
-    await notifyCompany(subscription.companyId, status, payment);
+    // O e-mail sai depois da resposta, não antes. O Asaas espera poucos
+    // segundos: um SMTP lento fazia o webhook estourar o tempo (408), o Asaas
+    // penalizava a entrega e, após 15 falhas, pausava a fila inteira — e aí
+    // nenhum pagamento liberava painel nenhum.
+    void notifyCompany(subscription.companyId, status, payment).catch((error) =>
+      logger.error({ error, companyId: subscription.companyId }, 'Aviso de cobrança não enviado'),
+    );
 
     logger.info(
       { event: event.event, companyId: subscription.companyId, status },
