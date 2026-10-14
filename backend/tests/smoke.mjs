@@ -59,8 +59,11 @@ const run = async () => {
   const bella = await login('admin@clinicabella.com', 'bella@12345');
   check('login admin da Clínica Bella', Boolean(bella.accessToken));
   check(
-    'clínica no plano Pro fica sem o módulo de aluguel',
-    bella.company.modules.length === 9 && !bella.company.modules.includes('rentals'),
+    'clínica no plano Pro fica sem aluguel e sem salas',
+    bella.company.modules.length === 8 &&
+      !bella.company.modules.includes('rentals') &&
+      !bella.company.modules.includes('resources') &&
+      bella.company.modules.includes('reports'),
     JSON.stringify(bella.company.modules),
   );
 
@@ -107,6 +110,14 @@ const run = async () => {
     String(bellaRentals.status),
   );
 
+  // Salas e equipamentos são do Premium: o Pro não chega nelas nem pela API.
+  const bellaResources = await api('/resources', { token: bella.accessToken });
+  check(
+    'clínica no Pro não acessa salas e equipamentos pela API',
+    bellaResources.status === 403 && bellaResources.data.error.code === 'MODULE_DISABLED',
+    String(bellaResources.status),
+  );
+
   const marcia = await login('marcia@marciavaz.com.br', 'marcia@12345');
   const marciaRentals = await api('/rentals', { token: marcia.accessToken });
   check(
@@ -118,11 +129,9 @@ const run = async () => {
   console.log('\n=== 4. Agenda e prevenção de conflitos ===');
   const professionals = await api('/professionals', { token: bella.accessToken });
   const services = await api('/services', { token: bella.accessToken });
-  const resources = await api('/resources?onlyRooms=true', { token: bella.accessToken });
   const professionalId = professionals.data.data[0].id;
   const shortService = services.data.data.find((s) => s.durationMinutes <= 45);
   const serviceId = shortService.id;
-  const roomId = resources.data.data[0].id;
   const customerId = bellaCustomers.data.data[0].id;
 
   // Próxima terça-feira, no primeiro horário realmente livre do profissional.
@@ -130,10 +139,10 @@ const run = async () => {
   day.setDate(day.getDate() + ((9 - day.getDay()) % 7 || 7));
   day.setHours(12, 0, 0, 0);
 
-  // A sala entra na consulta: o slot precisa estar livre para o profissional
-  // *e* para a sala em que o atendimento vai acontecer.
+  // Sala na mesma conta (e o espaço alugado) é coberto pelo shared-space.mjs:
+  // a Bella está no Pro, que não tem salas.
   const grid = await api(
-    `/appointments/availability?professionalId=${professionalId}&roomId=${roomId}&date=${day.toISOString()}&durationMinutes=${shortService.durationMinutes}`,
+    `/appointments/availability?professionalId=${professionalId}&date=${day.toISOString()}&durationMinutes=${shortService.durationMinutes}`,
     { token: bella.accessToken },
   );
   const freeSlot = grid.data.find((slot) => slot.available);
@@ -146,7 +155,6 @@ const run = async () => {
     body: {
       customerId,
       professionalId,
-      roomId,
       startsAt: start.toISOString(),
       services: [{ serviceId, quantity: 1 }],
     },
@@ -167,23 +175,6 @@ const run = async () => {
     'bloqueia dois atendimentos do mesmo profissional no mesmo horário',
     conflict.status === 409 && conflict.data.error.code === 'SCHEDULE_CONFLICT',
     JSON.stringify(conflict.data),
-  );
-
-  const roomConflict = await api('/appointments', {
-    method: 'POST',
-    token: bella.accessToken,
-    body: {
-      customerId: bellaCustomers.data.data[1].id,
-      professionalId: professionals.data.data[1].id,
-      roomId,
-      startsAt: start.toISOString(),
-      services: [{ serviceId, quantity: 1 }],
-    },
-  });
-  check(
-    'bloqueia mesma sala em horários sobrepostos',
-    roomConflict.status === 409,
-    JSON.stringify(roomConflict.data),
   );
 
   const outsideHours = new Date(start);
@@ -343,8 +334,10 @@ const run = async () => {
   });
   check('nova empresa é criada', nova.status === 201, JSON.stringify(nova.data?.error));
   check(
-    'no Pro, ela já nasce com tudo do plano — e sem Aluguel',
-    nova.data.company.modules.length === 9 && !nova.data.company.modules.includes('rentals'),
+    'no Pro, ela já nasce com tudo do plano — e sem Aluguel nem salas',
+    nova.data.company.modules.length === 8 &&
+      !nova.data.company.modules.includes('rentals') &&
+      !nova.data.company.modules.includes('resources'),
     JSON.stringify(nova.data.company?.modules),
   );
   check(

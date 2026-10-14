@@ -3,7 +3,7 @@ import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { BrandLogo } from '@/components/brand';
 import { useAuthStore } from '@/stores/auth.store';
 import { usePublicPlans } from '@/features/auth/usePublicPlans';
-import type { Plan } from '@/types';
+import type { ModuleKey, Plan } from '@/types';
 import './landing.css';
 
 /**
@@ -34,7 +34,7 @@ const PASSOS = [
   ],
   [
     'A agenda se protege',
-    'Profissional, sala, maca e cadeira são conferidos juntos. O sistema simplesmente não deixa marcar duas clientes no mesmo lugar e horário.',
+    'Profissional e horário são conferidos juntos — e, no Premium, sala, maca e cadeira também. O sistema simplesmente não deixa marcar duas clientes no mesmo horário.',
   ],
   [
     'O caixa fecha sozinho',
@@ -46,9 +46,10 @@ const MODULOS = [
   {
     tag: 'Núcleo',
     nome: 'Agenda inteligente',
-    desc: 'Horário, profissional, sala e cadeira conferidos de uma vez. Marcou, está garantido — nada de duas clientes esperando a mesma cadeira.',
+    desc: 'Horário e profissional conferidos de uma vez. Marcou, está garantido — nada de duas clientes esperando a mesma pessoa.',
     metrica: '0 choques',
-    metricaLabel: 'de horário, sala ou cadeira',
+    metricaLabel: 'de horário na agenda',
+    plano: 'Todos os planos',
   },
   {
     tag: 'Captação',
@@ -56,6 +57,7 @@ const MODULOS = [
     desc: 'Um link para a bio do Instagram e para o WhatsApp. A cliente agenda pelo celular, sem baixar aplicativo e sem depender de você responder.',
     metrica: '24h',
     metricaLabel: 'agenda aberta, até de madrugada',
+    plano: 'Todos os planos',
   },
   {
     tag: 'Caixa',
@@ -63,6 +65,7 @@ const MODULOS = [
     desc: 'Entradas, saídas, o que falta receber e o lucro do mês numa tela só. Você sabe quanto ganhou sem abrir planilha.',
     metrica: '1 tela',
     metricaLabel: 'para fechar o mês',
+    plano: 'Todos os planos',
   },
   {
     tag: 'Equipe',
@@ -70,6 +73,7 @@ const MODULOS = [
     desc: 'Percentual ou valor fixo por serviço: o acerto de cada profissional sai calculado, sem conta de cabeça e sem discussão no fim do mês.',
     metrica: 'Sem planilha',
     metricaLabel: 'acerto pronto para pagar',
+    plano: 'Pro e Premium',
   },
   {
     tag: 'Operação',
@@ -77,6 +81,7 @@ const MODULOS = [
     desc: 'Salas, macas, cadeiras e equipamentos com agenda própria: você vê na hora o que está livre, em uso ou em manutenção.',
     metrica: 'Tempo real',
     metricaLabel: 'o que está livre agora',
+    plano: 'Premium',
   },
 ];
 
@@ -110,17 +115,16 @@ const INTELIGENCIA = [
 ];
 
 /**
- * O texto de venda de cada plano. Preço e nome NÃO moram aqui: vêm do banco,
- * que é o que o super admin edita em /admin/planos e o que o Asaas cobra. Com o
- * preço escrito à mão, editar o plano mudava a cobrança e deixava a vitrine
- * anunciando o valor antigo.
+ * O texto de venda de cada plano. Preço, nome, limites e o que está incluso NÃO
+ * moram aqui: vêm do banco, que é o que o super admin edita em /admin/planos,
+ * o que o Asaas cobra e o que o sistema libera. Escrito à mão, editar o plano
+ * deixava a vitrine anunciando o valor — ou o recurso — antigo.
  *
  * Plano criado no painel e ausente daqui aparece com a descrição cadastrada.
  */
 interface TextoPlano {
   selo?: string;
   desc: string;
-  itens: string[];
   branco?: boolean;
   navy?: boolean;
 }
@@ -129,35 +133,58 @@ const TEXTO_PLANOS: Record<string, TextoPlano> = {
   starter: {
     selo: 'Para começar',
     desc: 'Para quem atende sozinha e quer largar o caderno e a planilha de vez.',
-    itens: [
-      'Agenda online sem choque de horário',
-      'Link para a cliente marcar sozinha',
-      'Ficha das clientes e caixa do dia',
-    ],
   },
   pro: {
-    selo: 'Próprio espaço',
-    desc: 'Para o espaço com equipe que quer agenda, caixa e comissões rodando sem depender de você.',
+    selo: 'Com equipe',
+    desc: 'Para o espaço com equipe que quer caixa, comissões e a inteligência rodando sem depender de você.',
     branco: true,
-    itens: [
-      'Tudo do Starter, para a equipe inteira',
-      'Financeiro, comissões e relatórios',
-      'Aviso de falta, encaixes e resumo do mês',
-      'Salas e equipamentos sem conflito',
-    ],
   },
   premium: {
     selo: 'Mais completo',
-    desc: 'Para quem atende e também aluga sala ou cadeira para outras profissionais.',
+    desc: 'Para quem atende e também aluga sala, cadeira ou equipamento para outras profissionais.',
     navy: true,
-    itens: [
-      'Tudo do Pro, inteligência inclusa',
-      'Aluguel por turno, diária ou mês',
-      'Contrato e cobrança de cada locatária',
-      'Login próprio para cada profissional',
-    ],
   },
 };
+
+/**
+ * Tudo o que um plano pode ter, na língua de quem compra, e o módulo que libera
+ * cada linha.
+ *
+ * Todo cartão mostra a lista inteira, na mesma ordem: o que o plano tem vem
+ * marcado, o que não tem aparece apagado. Assim a comparação se faz olhando de
+ * um cartão para o outro, sem "Tudo do Pro" obrigando a voltar ao anterior para
+ * descobrir o que isso quer dizer. E como vem dos módulos do banco, o cartão
+ * nunca promete o que o sistema não libera.
+ */
+const RECURSOS: { modulo: ModuleKey; texto: string }[] = [
+  { modulo: 'appointments', texto: 'Agenda online sem choque de horário' },
+  { modulo: 'appointments', texto: 'Link para a cliente marcar sozinha' },
+  { modulo: 'customers', texto: 'Ficha e histórico de cada cliente' },
+  { modulo: 'services', texto: 'Serviços com preço e duração' },
+  { modulo: 'financial', texto: 'Caixa do dia, contas a pagar e a receber' },
+  { modulo: 'notifications', texto: 'Lembretes de horário' },
+  { modulo: 'commissions', texto: 'Comissões da equipe calculadas sozinhas' },
+  { modulo: 'reports', texto: 'Relatórios de faturamento e desempenho' },
+  { modulo: 'reports', texto: 'Inteligência: risco de falta, encaixes e resumo do mês' },
+  { modulo: 'resources', texto: 'Salas, cadeiras e equipamentos sem conflito' },
+  { modulo: 'rentals', texto: 'Aluguel de espaço por turno, diária ou mês' },
+  { modulo: 'rentals', texto: 'Contrato, cobrança e login de cada locatária' },
+];
+
+/** "1 profissional", "Até 10 profissionais", "Profissionais ilimitados". */
+function textoEquipe(limits: Plan['limits']): string {
+  const { professionals, users } = limits;
+  if (professionals === null && users === null) return 'Profissionais e acessos ilimitados';
+  const pessoas =
+    professionals === null
+      ? 'Profissionais ilimitados'
+      : professionals === 1
+        ? '1 profissional'
+        : `Até ${professionals} profissionais`;
+  const acessos =
+    users === null ? 'acessos ilimitados' : users === 1 ? '1 acesso' : `${users} acessos`;
+  return `${pessoas} · ${acessos}`;
+}
 
 /** `199,99` com centavos (em fonte menor, para caber), `300` quando é redondo. */
 function formatarPreco(price: number): { valor: string; menor: boolean } {
@@ -173,8 +200,15 @@ function formatarPreco(price: number): { valor: string; menor: boolean } {
 
 function montarVitrine(plans: Plan[]) {
   return plans.map((plan) => {
-    const texto = TEXTO_PLANOS[plan.slug] ?? { desc: plan.description ?? '', itens: [] };
-    return { ...texto, slug: plan.slug, nome: plan.name, preco: formatarPreco(plan.price) };
+    const texto = TEXTO_PLANOS[plan.slug] ?? { desc: plan.description ?? '' };
+    return {
+      ...texto,
+      slug: plan.slug,
+      nome: plan.name,
+      preco: formatarPreco(plan.price),
+      equipe: textoEquipe(plan.limits),
+      recursos: RECURSOS.map((r) => ({ texto: r.texto, incluso: plan.modules.includes(r.modulo) })),
+    };
   });
 }
 
@@ -201,7 +235,7 @@ const DUVIDAS = [
   ],
   [
     'O sistema evita conflito na mesma sala?',
-    'Sim. Salas, cadeiras e equipamentos são recursos com disponibilidade própria: se estiver ocupado, o horário não aparece.',
+    'Sim, no Premium. Salas, cadeiras e equipamentos são recursos com disponibilidade própria: se estiver ocupado — por um atendimento ou por quem alugou —, o horário não aparece.',
   ],
   [
     'Essa inteligência manda meus dados para algum lugar?',
@@ -356,7 +390,7 @@ export function LandingPage() {
               Entrar
             </Link>
             <a href="#planos" className="lp-btn-topo">
-              Assinar agora
+              Assinar<span className="lp-topo-extra"> agora</span>
             </a>
           </div>
         </div>
@@ -486,6 +520,7 @@ export function LandingPage() {
                 </div>
                 <h3>{modulo.nome}</h3>
                 <p>{modulo.desc}</p>
+                <span className="lp-modulo-plano">{modulo.plano}</span>
                 <div className="lp-modulo-rodape">
                   <b>{modulo.metrica}</b>
                   <span>{modulo.metricaLabel}</span>
@@ -645,14 +680,19 @@ export function LandingPage() {
                   <span className="mes">/ mês</span>
                 </div>
 
-                <div className="lp-plano-itens">
-                  {plano.itens.map((item) => (
-                    <div key={item}>
-                      <i aria-hidden>✓</i>
-                      <span>{item}</span>
-                    </div>
+                <p className="lp-plano-equipe">{plano.equipe}</p>
+
+                <ul className="lp-plano-itens">
+                  {plano.recursos.map((item) => (
+                    <li key={item.texto} className={item.incluso ? undefined : 'fora'}>
+                      <i aria-hidden>{item.incluso ? '✓' : '—'}</i>
+                      <span>
+                        {item.texto}
+                        {item.incluso ? null : <span className="sr-only"> (não incluso)</span>}
+                      </span>
+                    </li>
                   ))}
-                </div>
+                </ul>
 
                 {/* O plano escolhido viaja na URL: a decisão acontece aqui, na
                     comparação, e não no meio do formulário de cadastro.

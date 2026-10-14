@@ -457,6 +457,57 @@
   box-shadow: 0 12px 24px -14px rgba(27, 32, 68, 0.6);
 }
 
+/*
+ * No celular a barra é uma linha só: marca à esquerda, os dois botões à
+ * direita. Com o tamanho do computador ela quebrava em duas — a marca sozinha
+ * em cima, os botões embaixo — e a pílula flutuante virava um bloco alto
+ * cobrindo o começo de cada seção. Tudo encolhe junto, e o "agora" sai do
+ * botão: "Assinar" diz o mesmo em metade da largura.
+ */
+@media (max-width: 640px) {
+  .lp-topo-linha {
+    flex-wrap: nowrap;
+    gap: 10px;
+    padding-top: 14px;
+    padding-bottom: 14px;
+  }
+
+  .lp-topo--flutuante {
+    padding-top: 8px;
+  }
+
+  .lp-topo--flutuante .lp-topo-linha {
+    border-radius: 18px;
+    padding: 8px 10px 8px 14px;
+  }
+
+  .lp .lp-logo,
+  .lp-topo--flutuante .lp-logo {
+    height: 28px;
+  }
+
+  .lp-acoes {
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .lp .lp-acoes a.lp-entrar,
+  .lp .lp-btn-topo {
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    padding: 10px 14px;
+  }
+
+  /* A borda de 1px do "Entrar" o deixava 2px mais alto que o vizinho. */
+  .lp .lp-acoes a.lp-entrar {
+    padding: 9px 14px;
+  }
+
+  .lp-topo-extra {
+    display: none;
+  }
+}
+
 /* ----------------------------------------------------------------- hero */
 
 .lp-hero {
@@ -797,6 +848,22 @@
   line-height: 1.65;
   color: var(--cinza-texto);
   margin: 0 0 22px;
+}
+
+/* Em qual plano o módulo vem — para ninguém assinar o Starter achando que
+   leva comissão ou salas. */
+.lp-modulo-plano {
+  position: relative;
+  align-self: flex-start;
+  margin: -8px 0 22px;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--rosa-escuro);
+  border: 1px solid rgba(225, 58, 92, 0.3);
+  border-radius: 100px;
+  padding: 5px 11px;
 }
 
 .lp-modulo-rodape {
@@ -1225,7 +1292,9 @@
   line-height: 1.6;
   color: var(--cinza-2);
   margin: 12px 0 22px;
-  min-height: 44px;
+  /* Três linhas: com a descrição de alturas diferentes, as listas dos cartões
+     começavam desencontradas, e a comparação linha a linha se perdia. */
+  min-height: 4.8em;
 }
 
 .lp-plano-preco {
@@ -1263,18 +1332,42 @@
   padding-bottom: 9px;
 }
 
-.lp-plano-itens {
+/* Quantas pessoas cabem no plano — a primeira coisa que separa um do outro. */
+.lp-plano-equipe {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 22px 0 26px;
+  margin: 20px 0 0;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--rosa-escuro);
 }
 
-.lp-plano-itens div {
+.lp-plano-itens {
+  position: relative;
+  list-style: none;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 0 26px;
+}
+
+.lp-plano-itens li {
   display: flex;
   gap: 11px;
   align-items: flex-start;
+}
+
+/* O que o plano não tem continua na lista, apagado: é a comparação lado a lado
+   que mostra o que se ganha subindo de plano. */
+.lp-plano-itens li.fora {
+  opacity: 0.38;
+}
+
+.lp-plano-itens li.fora i {
+  color: inherit;
+  font-weight: 400;
 }
 
 .lp-plano-itens i {
@@ -1286,7 +1379,7 @@
 }
 
 .lp-plano-itens span {
-  font-size: 14.5px;
+  font-size: 14px;
   font-weight: 400;
   line-height: 1.45;
 }
@@ -1358,6 +1451,10 @@
 
 .lp-plano-navy .lp-plano-preco .valor {
   color: #fff;
+}
+
+.lp-plano-navy .lp-plano-equipe {
+  color: var(--rosa-claro);
 }
 
 .lp-plano-navy .lp-plano-itens i {

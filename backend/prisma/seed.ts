@@ -61,11 +61,14 @@ async function seedPlans({ producao = false }: { producao?: boolean } = {}) {
       sortOrder: 0,
     },
     {
-      // A clínica que atende as próprias clientes: equipe, salas, caixa e
-      // comissões. Não aluga espaço — e por isso nunca vê "Aluguel" no menu.
+      // A clínica que atende as próprias clientes: equipe, caixa, comissões,
+      // relatórios e a inteligência (que mora no módulo de relatórios). Salas
+      // e equipamentos ficam no Premium: controlar a ocupação de cada espaço
+      // é o que quem aluga precisa, e é o que separa um plano do outro.
       name: 'Pro',
       slug: 'pro',
-      description: 'A clínica completa: equipe, salas, financeiro, comissões e relatórios.',
+      description:
+        'Para a equipe: agenda, financeiro, comissões, relatórios e inteligência (risco de falta, encaixes e resumo do mês).',
       price: 300,
       trialDays: 5,
       maxUsers: 8,
@@ -79,7 +82,6 @@ async function seedPlans({ producao = false }: { producao?: boolean } = {}) {
         'customers',
         'services',
         'professionals',
-        'resources',
         'financial',
         'commissions',
         'reports',
@@ -88,12 +90,13 @@ async function seedPlans({ producao = false }: { producao?: boolean } = {}) {
       sortOrder: 1,
     },
     {
-      // O espaço compartilhado: além de atender, aluga sala/mesa/cadeira por
-      // turno ou diária, com link público para cada profissional.
+      // O espaço compartilhado: além de atender, controla salas, cadeiras e
+      // equipamentos e aluga cada um por turno, diária ou mês, com link
+      // público para cada profissional.
       name: 'Premium',
       slug: 'premium',
       description:
-        'Tudo do Pro mais o aluguel de espaços por turno ou diária, com link público para cada profissional.',
+        'Tudo do Pro mais salas e equipamentos sem conflito e o aluguel de espaços por turno, diária ou mês, com login e link para cada profissional.',
       price: 450,
       trialDays: 5,
       maxUsers: null,
@@ -258,7 +261,7 @@ function workingHours(companyId: string, professionalId: string) {
   }));
 }
 
-/** Empresa completa (plano Business) para demonstrar todos os módulos. */
+/** A clínica no Pro: equipe, caixa, comissões e relatórios — sem salas e sem aluguel. */
 async function seedDemoCompany() {
   const slug = 'clinica-bella';
   const existing = await prisma.company.findUnique({ where: { slug } });
@@ -290,7 +293,7 @@ async function seedDemoCompany() {
         serviceKeys: ['manicure', 'brows', 'facial', 'waxing'],
         hasProfessionals: true,
         usesCommission: true,
-        hasRooms: true,
+        hasRooms: false,
         rentsSpaces: false,
       },
       subscription: {
@@ -413,34 +416,6 @@ async function seedDemoCompany() {
     },
   });
 
-  // -------------------------------------------------------------- recursos
-  const roomCategory = await prisma.resourceCategory.create({
-    data: { companyId, name: 'Salas', isRoom: true },
-  });
-  const tableCategory = await prisma.resourceCategory.create({
-    data: { companyId, name: 'Mesas', isRoom: false },
-  });
-
-  const rooms = await Promise.all(
-    ['Sala 01', 'Sala 02'].map((name) =>
-      prisma.resource.create({ data: { companyId, name, categoryId: roomCategory.id } }),
-    ),
-  );
-
-  const tables = await Promise.all(
-    ['Mesa 01', 'Mesa 02'].map((name) =>
-      prisma.resource.create({
-        data: {
-          companyId,
-          name,
-          categoryId: tableCategory.id,
-          isRentable: true,
-          monthlyRate: 500,
-        },
-      }),
-    ),
-  );
-
   // -------------------------------------------------------------- clientes
   const customers = await Promise.all(
     [
@@ -505,7 +480,6 @@ async function seedDemoCompany() {
           companyId,
           customerId: customer.id,
           professionalId: professional.id,
-          roomId: rooms[i % rooms.length].id,
           startsAt,
           endsAt,
           durationMinutes: service.durationMinutes,
