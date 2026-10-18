@@ -1,5 +1,16 @@
 import { useState } from 'react';
-import { Ban, Building2, CalendarPlus, CheckCircle2, MoreHorizontal, Plus, Search } from 'lucide-react';
+import {
+  Ban,
+  Building2,
+  CalendarClock,
+  CheckCircle2,
+  KeyRound,
+  MoreHorizontal,
+  Plus,
+  Repeat,
+  Search,
+  Trash2,
+} from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,7 +36,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -33,12 +43,21 @@ import { CompanyStatusBadge } from '@/components/StatusBadge';
 import { useAdminCompanies, useAdminMutations, useAdminPlans } from '@/api/queries';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { shortDate } from '@/lib/format';
+import { CompanyActionDialogs, type CompanyAction } from './CompanyActionDialogs';
 
 export function AdminCompaniesPage() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
   const [page, setPage] = useState(1);
   const [dialogOpen, setDialogOpen] = useState(false);
+  // A ação fica guardada depois de fechar, para a janela sair animada com o
+  // conteúdo; `key` recria o formulário a cada abertura, sem resto da anterior.
+  const [acao, setAcao] = useState<{ kind: CompanyAction; company: any; key: number } | null>(null);
+  const [acaoAberta, setAcaoAberta] = useState(false);
+  const abrir = (kind: CompanyAction, company: any) => {
+    setAcao({ kind, company, key: Date.now() });
+    setAcaoAberta(true);
+  };
   const [form, setForm] = useState({
     name: '',
     planSlug: 'pro',
@@ -146,45 +165,40 @@ export function AdminCompaniesPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-52">
-                          <DropdownMenuLabel>Assinatura</DropdownMenuLabel>
-                          {plans?.map((plan) => (
-                            <DropdownMenuItem
-                              key={plan.id}
-                              onSelect={() =>
-                                mutations.setPlan.mutate({ id: company.id, planSlug: plan.slug })
-                              }
-                            >
-                              Mudar para {plan.name}
-                            </DropdownMenuItem>
-                          ))}
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onSelect={() => mutations.extendTrial.mutate({ id: company.id, days: 5 })}
-                          >
-                            <CalendarPlus />
-                            Estender teste (5 dias)
+                          <DropdownMenuItem onSelect={() => abrir('plan', company)}>
+                            <Repeat />
+                            Mudar plano
                           </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          {company.status !== 'SUSPENDED' ? (
-                            <DropdownMenuItem
-                              destructive
-                              onSelect={() =>
-                                mutations.setStatus.mutate({ id: company.id, status: 'SUSPENDED' })
-                              }
-                            >
-                              <Ban />
-                              Bloquear empresa
+                          {company.status === 'SUSPENDED' ? (
+                            <DropdownMenuItem onSelect={() => abrir('status', company)}>
+                              <CheckCircle2 />
+                              Reativar
                             </DropdownMenuItem>
                           ) : (
                             <DropdownMenuItem
-                              onSelect={() =>
-                                mutations.setStatus.mutate({ id: company.id, status: 'ACTIVE' })
-                              }
+                              destructive
+                              onSelect={() => abrir('status', company)}
                             >
-                              <CheckCircle2 />
-                              Reativar empresa
+                              <Ban />
+                              Desativar
                             </DropdownMenuItem>
                           )}
+                          <DropdownMenuItem onSelect={() => abrir('dueDate', company)}>
+                            <CalendarClock />
+                            Editar vencimento
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => abrir('password', company)}>
+                            <KeyRound />
+                            Resetar senha
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            destructive
+                            onSelect={() => abrir('delete', company)}
+                          >
+                            <Trash2 />
+                            Excluir empresa
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TD>
@@ -205,6 +219,14 @@ export function AdminCompaniesPage() {
           <EmptyState icon={Building2} title="Nenhuma empresa encontrada" />
         )}
       </Card>
+
+      <CompanyActionDialogs
+        key={acao?.key}
+        action={acao?.kind ?? null}
+        company={acao?.company ?? null}
+        open={acaoAberta}
+        onClose={() => setAcaoAberta(false)}
+      />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>

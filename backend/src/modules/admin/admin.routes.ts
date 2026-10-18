@@ -104,6 +104,47 @@ adminRoutes.patch(
   }),
 );
 
+adminRoutes.patch(
+  '/companies/:id/due-date',
+  validate({
+    params: idParamSchema,
+    body: z.object({ dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida') }),
+  }),
+  asyncHandler(async (req, res) => {
+    res.json(serialize(await adminService.setDueDate(req.params.id, req.body.dueDate)));
+  }),
+);
+
+adminRoutes.post(
+  '/companies/:id/reset-password',
+  validate({
+    params: idParamSchema,
+    body: z.object({
+      userId: z.string().uuid(),
+      newPassword: z
+        .string()
+        .min(8, 'A senha deve ter no mínimo 8 caracteres')
+        .max(72, 'A senha deve ter no máximo 72 caracteres'),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    res.json(
+      serialize(
+        await adminService.resetUserPassword(req.params.id, req.body.userId, req.body.newPassword),
+      ),
+    );
+  }),
+);
+
+adminRoutes.delete(
+  '/companies/:id',
+  validate({ params: idParamSchema, body: z.object({ confirmName: z.string().min(1) }) }),
+  asyncHandler(async (req, res) => {
+    await adminService.deleteCompany(req.params.id, req.body.confirmName);
+    res.status(204).send();
+  }),
+);
+
 // -------------------------------------------------------------------- planos
 const planSchema = z.object({
   name: z.string().min(2).max(80),

@@ -4,6 +4,8 @@ import { tenantContext } from '../../shared/database/tenantContext';
 import { BadRequestError, NotFoundError } from '../../shared/errors/AppError';
 import { getPagination, paginated } from '../../shared/utils/http';
 import { hashPassword } from '../../shared/utils/hash';
+import { asaas } from '../../shared/integrations/asaas';
+import { breachMessage, checkBreachedPassword } from '../../shared/services/breachedPassword.service';
 import { uniqueSlug } from '../../shared/utils/slug';
 import { invalidateCompanyContext } from '../../shared/services/companyContext.service';
 import { CORE_MODULES, DEFAULT_BUSINESS_HOURS } from '../companies/company.constants';
@@ -255,15 +257,39 @@ export const adminService = {
     });
   },
 
+  /**
+   * Troca o plano de uma empresa pelo painel.
+   *
+   * Faz o mesmo que a troca feita pela própria dona, e mais duas coisas que só
+   * o painel precisa: liga o que o plano novo trouxe (subir para o Premium sem
+   * ver Aluguel no menu deixaria a troca pela metade) e corrige o valor no
+   * Asaas — senão o painel diria Premium enquanto a cobrança seguia no Pro.
+   */
   async setCompanyPlan(id: string, planSlug: string) {
     return asSystem(async () => {
       const plan = await prisma.plan.findUnique({ where: { slug: planSlug } });
       if (!plan) throw new NotFoundError('Plano');
 
+      const subscription = await prisma.subscription.findUnique({
+        where: { companyId: id },
+        include: { plan: true },
+      });
+      if (!subscription) throw new NotFoundError('Assinatura');
+
+      // O Asaas primeiro: se ele recusar, nada muda aqui e o painel não fica
+      // anunciando um plano que não está sendo cobrado.
+      if (subscription.asaasSubscriptionId && asaas.isEnabled()) {
+        await asaas.updateSubscription(subscription.asaasSubscriptionId, {
+          value: Number(plan.price),
+          description: `CliniStudio — plano ${plan.name}`,
+        });
+      }
+
       const modules = await prisma.companyModule.findMany({ where: { companyId: id, enabled: true } });
       const toDisable = modules
         .map((m) => m.module)
         .filter((m) => !plan.modules.includes(m) && !CORE_MODULES.includes(m));
+      const toEnable = plan.modules.filter((m) => !subscription.plan.modules.includes(m));
 
       await prisma.$transaction([
         prisma.subscription.update({ where: { companyId: id }, data: { planId: plan.id } }),
@@ -271,10 +297,121 @@ export const adminService = {
           where: { companyId: id, module: { in: toDisable } },
           data: { enabled: false },
         }),
+        ...toEnable.map((module) =>
+          prisma.companyModule.upsert({
+            where: { companyId_module: { companyId: id, module } },
+            create: { companyId: id, module, enabled: true },
+            update: { enabled: true },
+          }),
+        ),
       ]);
 
       invalidateCompanyContext(id);
-      return { plan, disabledModules: toDisable };
+      return { plan, disabledModules: toDisable, enabledModules: toEnable };
+    });
+  },
+
+  /**
+   * Muda a data até quando a empresa pode usar o sistema.
+   *
+   * Em teste, é o fim do teste; assinando, é o fim do período pago — as duas
+   * datas que `evaluateAccess` lê para decidir se tranca. A data chega como dia
+   * (`2026-11-30`) e vale até o fim dele, no horário de Brasília: quem escolhe
+   * "dia 30" não espera ser trancado na madrugada do dia 30.
+   *
+   * Não mexe na data da próxima cobrança do Asaas; quando ela for paga, o
+   * webhook recalcula o período como sempre.
+   */
+  async setDueDate(id: string, day: string) {
+    return asSystem(async () => {
+      const subscription = await prisma.subscription.findUnique({ where: { companyId: id } });
+      if (!subscription) throw new NotFoundError('Assinatura');
+
+      const dueAt = new Date(`${day}T23:59:59-03:00`);
+      if (Number.isNaN(dueAt.getTime())) throw new BadRequestError('Data inválida');
+
+      const trialing = subscription.status === SubscriptionStatus.TRIALING;
+      const updated = await prisma.subscription.update({
+        where: { companyId: id },
+        data: trialing
+          ? { trialEndsAt: dueAt, currentPeriodEnd: dueAt }
+          : { currentPeriodEnd: dueAt },
+      });
+
+      invalidateCompanyContext(id);
+      return updated;
+    });
+  },
+
+  /**
+   * Define uma senha nova para um usuário da empresa — o caminho quando a dona
+   * liga dizendo que não consegue entrar e o e-mail de redefinição não chega.
+   *
+   * Passa pela mesma checagem de vazamento das outras portas, e derruba as
+   * sessões abertas: se alguém entrou com a senha antiga, sai agora.
+   */
+  async resetUserPassword(id: string, userId: string, newPassword: string) {
+    return asSystem(async () => {
+      const user = await prisma.user.findFirst({ where: { id: userId, companyId: id } });
+      if (!user) throw new NotFoundError('Usuário');
+
+      const breach = await checkBreachedPassword(newPassword);
+      if (breach.breached) throw new BadRequestError(breachMessage(breach.count));
+
+      await prisma.$transaction([
+        prisma.user.update({
+          where: { id: userId },
+          data: { passwordHash: await hashPassword(newPassword) },
+        }),
+        prisma.refreshToken.updateMany({
+          where: { userId, revokedAt: null },
+          data: { revokedAt: new Date() },
+        }),
+      ]);
+
+      return { userId, email: user.email };
+    });
+  },
+
+  /**
+   * Apaga a empresa e tudo o que é dela. Não tem volta.
+   *
+   * O nome digitado é conferido aqui também, não só na tela: é a última trava
+   * antes de sumir com a agenda e o caixa de alguém.
+   *
+   * A assinatura do Asaas é cancelada antes — empresa apagada com cobrança
+   * ativa seguiria gerando boleto para quem não tem mais conta.
+   *
+   * Atendimentos e aluguéis saem primeiro porque apontam para clientes,
+   * serviços e salas com RESTRICT; apagados juntos pela cascata da empresa, o
+   * Postgres pode chegar neles depois e recusar.
+   */
+  async deleteCompany(id: string, confirmName: string) {
+    return asSystem(async () => {
+      const company = await prisma.company.findUnique({
+        where: { id },
+        include: { subscription: true },
+      });
+      if (!company) throw new NotFoundError('Empresa');
+
+      if (confirmName.trim() !== company.name.trim()) {
+        throw new BadRequestError('O nome digitado não confere com o da empresa');
+      }
+
+      const asaasSubscriptionId = company.subscription?.asaasSubscriptionId;
+      if (asaasSubscriptionId && asaas.isEnabled()) {
+        await asaas.cancelSubscription(asaasSubscriptionId);
+      }
+
+      await prisma.$transaction([
+        prisma.appointment.deleteMany({ where: { companyId: id } }),
+        prisma.rentalBooking.deleteMany({ where: { companyId: id } }),
+        prisma.rental.deleteMany({ where: { companyId: id } }),
+        prisma.company.delete({ where: { id } }),
+      ]);
+
+      invalidateCompanyContext(id);
+      return { id, name: company.name };
     });
   },
 

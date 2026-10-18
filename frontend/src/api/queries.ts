@@ -65,6 +65,7 @@ export const keys = {
   adminMetrics: ['admin-metrics'] as const,
   adminCompanies: (params?: unknown) => ['admin-companies', params] as const,
   adminPlans: ['admin-plans'] as const,
+  adminCompany: (id: string) => ['admin-companies', 'detail', id] as const,
 };
 
 /** Trata erros de mutação com toast padronizado. */
@@ -780,6 +781,11 @@ export const useAdminMetrics = () => useApiQuery<any>(keys.adminMetrics, '/admin
 export const useAdminCompanies = (params: Record<string, unknown> = {}) =>
   useApiQuery<Paginated<any>>(keys.adminCompanies(params), '/admin/companies', params);
 export const useAdminPlans = () => useApiQuery<any[]>(keys.adminPlans, '/admin/plans');
+/** Uma empresa com os usuários dela — só busca quando `id` existe. */
+export const useAdminCompany = (id: string | null) =>
+  useApiQuery<any>(keys.adminCompany(id ?? ''), `/admin/companies/${id}`, undefined, {
+    enabled: Boolean(id),
+  });
 
 /* ------------------------------------------------- Mutations de empresa */
 export function useCompanyMutations() {
@@ -921,11 +927,26 @@ export function useAdminMutations() {
       },
       onError: handleError,
     }),
-    extendTrial: useMutation({
-      mutationFn: ({ id, days }: { id: string; days: number }) =>
-        api.post(`/admin/companies/${id}/extend-trial`, { days }),
+    setDueDate: useMutation({
+      mutationFn: ({ id, dueDate }: { id: string; dueDate: string }) =>
+        api.patch(`/admin/companies/${id}/due-date`, { dueDate }),
       onSuccess: () => {
-        toast.success('Período de teste estendido');
+        toast.success('Vencimento atualizado');
+        invalidate();
+      },
+      onError: handleError,
+    }),
+    resetPassword: useMutation({
+      mutationFn: ({ id, userId, newPassword }: { id: string; userId: string; newPassword: string }) =>
+        api.post(`/admin/companies/${id}/reset-password`, { userId, newPassword }),
+      onSuccess: () => toast.success('Senha redefinida — as sessões abertas foram encerradas'),
+      onError: handleError,
+    }),
+    removeCompany: useMutation({
+      mutationFn: ({ id, confirmName }: { id: string; confirmName: string }) =>
+        api.delete(`/admin/companies/${id}`, { confirmName }),
+      onSuccess: () => {
+        toast.success('Empresa excluída');
         invalidate();
       },
       onError: handleError,
