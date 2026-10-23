@@ -1,6 +1,7 @@
-import type { CSSProperties, ReactNode } from 'react';
+import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
 import { CalendarDays, Link2, Wallet } from 'lucide-react';
 import { BrandLogo } from '@/components/brand';
+import './auth-cartao.css';
 
 /**
  * Moldura das telas de entrada: login, cadastro, esqueci a senha e redefinir.
@@ -60,17 +61,50 @@ const THEME = {
   '--ring': '347 61% 54%',
 } as CSSProperties;
 
+/** Em que ponto da troca animada entre Entrar e Criar conta o cartão está. */
+export type FaseTroca = 'parado' | 'saindo' | 'juntando' | 'pulso' | 'entrando';
+
+/**
+ * Faz o cartão acompanhar a altura do conteúdo com transição.
+ *
+ * Sem isso, trocar Entrar (curto) por Criar conta (comprido) dava um salto: o
+ * cartão crescia de uma vez e a peça do canto de baixo pulava junto.
+ */
+function useAlturaSuave() {
+  const cartao = useRef<HTMLDivElement>(null);
+  const miolo = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const fora = cartao.current;
+    const dentro = miolo.current;
+    if (!fora || !dentro || typeof ResizeObserver === 'undefined') return;
+    const ajustar = () => {
+      fora.style.height = `${dentro.offsetHeight}px`;
+    };
+    ajustar();
+    const observador = new ResizeObserver(ajustar);
+    observador.observe(dentro);
+    return () => observador.disconnect();
+  }, []);
+
+  return { cartao, miolo };
+}
+
 export function AuthShell({
   title,
   subtitle,
   children,
   footer,
+  fase = 'parado',
 }: {
   title: string;
   subtitle: string;
   children: ReactNode;
   footer?: ReactNode;
+  fase?: FaseTroca;
 }) {
+  const { cartao, miolo } = useAlturaSuave();
+
   return (
     <div
       style={THEME}
@@ -126,22 +160,32 @@ export function AuthShell({
 
       {/* ------------------------------------------------------- coluna do form */}
       <div className="flex items-center justify-center px-5 py-12 sm:px-10">
-        <div className="w-full max-w-[420px] space-y-8">
+        <div className="w-full max-w-[488px] space-y-8">
           {/* No celular a coluna da esquerda some, então a marca reaparece aqui. */}
           <a href="/" className="flex items-center lg:hidden" aria-label="CliniStudio, início">
             <BrandLogo className="h-11" />
           </a>
 
-          <div className="space-y-2">
-            <h1 className="text-[2rem] font-bold leading-[1.1] tracking-[-0.05em]">{title}</h1>
-            <p className="text-[15px] leading-relaxed text-[#1d2340]/62">{subtitle}</p>
+          <div ref={cartao} className="ac-cartao" data-fase={fase}>
+            <span aria-hidden className="ac-peca ac-peca-a" />
+            <span aria-hidden className="ac-peca ac-peca-b" />
+            <span aria-hidden className="ac-anel" />
+
+            <div ref={miolo} className="ac-miolo">
+              <div className="ac-conteudo space-y-8">
+                <div className="space-y-2">
+                  <h1 className="text-[2rem] font-bold leading-[1.1] tracking-[-0.05em]">{title}</h1>
+                  <p className="text-[15px] leading-relaxed text-[#1d2340]/62">{subtitle}</p>
+                </div>
+
+                {children}
+
+                {footer ? (
+                  <div className="text-center text-sm font-medium text-[#1d2340]/62">{footer}</div>
+                ) : null}
+              </div>
+            </div>
           </div>
-
-          {children}
-
-          {footer ? (
-            <div className="text-center text-sm font-medium text-[#1d2340]/62">{footer}</div>
-          ) : null}
         </div>
       </div>
     </div>

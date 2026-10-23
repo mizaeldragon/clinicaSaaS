@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { AuthShell } from './AuthShell';
+import { AuthShell, type FaseTroca } from './AuthShell';
 import { LoginForm } from './LoginForm';
 import { RegisterForm } from './RegisterForm';
 import { Button } from '@/components/ui/button';
@@ -51,14 +51,56 @@ export function AuthSwitch() {
   const mode: Mode = location.pathname.startsWith('/cadastro') ? 'register' : 'login';
 
   /*
+   * O que está na tela segue o endereço com atraso: a troca passa pelas fases
+   * do cartão (ver auth-cartao.css) e o formulário só muda no meio delas,
+   * quando o conteúdo está escondido. O interruptor responde na hora — a
+   * pastilha já desliza com o clique —, o cartão anima em seguida.
+   *
+   * Vale também para o voltar do navegador, que muda o endereço sem clique.
+   */
+  const [mostrado, setMostrado] = useState<Mode>(mode);
+  const [fase, setFase] = useState<FaseTroca>('parado');
+  const mostradoRef = useRef(mostrado);
+  mostradoRef.current = mostrado;
+
+  useEffect(() => {
+    const timers: number[] = [];
+    const depois = (ms: number, fn: () => void) => timers.push(window.setTimeout(fn, ms));
+
+    if (mode === mostradoRef.current) {
+      // Voltou para a aba que ainda está na tela antes da troca terminar:
+      // só traz o conteúdo de volta.
+      setFase((atual) => (atual === 'parado' ? atual : 'entrando'));
+      depois(650, () => setFase('parado'));
+      return () => timers.forEach(clearTimeout);
+    }
+
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setMostrado(mode);
+      setFase('parado');
+      return undefined;
+    }
+
+    setFase('saindo');
+    depois(300, () => setFase('juntando'));
+    depois(800, () => {
+      setMostrado(mode);
+      setFase('pulso');
+    });
+    depois(1150, () => setFase('entrando'));
+    depois(1800, () => setFase('parado'));
+    return () => timers.forEach(clearTimeout);
+  }, [mode]);
+
+  /*
    * Quem chegou pelo "Assinar" de um cartão não está testando nada — prometer
    * "sem cartão de crédito" no cabeçalho de quem veio pagar é promessa trocada.
    */
   const querAssinar = new URLSearchParams(location.search).get('assinar') === '1';
   const subtitulo =
-    mode === 'register' && querAssinar
+    mostrado === 'register' && querAssinar
       ? 'Crie a conta da empresa para concluir a assinatura'
-      : COPY[mode].subtitle;
+      : COPY[mostrado].subtitle;
 
   // Preenchido quando a conta tem segundo fator: a senha passou, falta o código.
   const [challenge, setChallenge] = useState<string | null>(null);
@@ -139,7 +181,7 @@ export function AuthSwitch() {
   }
 
   return (
-    <AuthShell title={COPY[mode].title} subtitle={subtitulo}>
+    <AuthShell title={COPY[mostrado].title} subtitle={subtitulo} fase={fase}>
       <div className="space-y-6">
         {/* ----------------------------------------------------- interruptor */}
         <div
@@ -179,7 +221,7 @@ export function AuthSwitch() {
         </div>
 
         {/* -------------------------------------------------------- a metade ativa */}
-        {mode === 'login' ? (
+        {mostrado === 'login' ? (
           <LoginForm onTwoFactorRequired={setChallenge} onSignedIn={concluir} />
         ) : (
           <RegisterForm onCreated={(destino) => navigate(destino, { replace: true })} />

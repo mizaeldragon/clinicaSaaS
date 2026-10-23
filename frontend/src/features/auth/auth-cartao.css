@@ -1,0 +1,194 @@
+/*
+ * O cartão do formulário de entrada e a troca animada entre Entrar e Criar
+ * conta.
+ *
+ * A troca acontece em fases, ditadas pelo `data-fase` que o AuthSwitch põe no
+ * cartão:
+ *
+ *   saindo    o conteúdo desfoca e some
+ *   juntando  as duas peças dos cantos correm para o meio e viram um quadrado
+ *   pulso     o quadrado se desfaz num anel que se abre (o conteúdo troca aqui)
+ *   entrando  o conteúdo novo aparece e as peças voltam para os cantos
+ *
+ * As peças são dois triângulos que se completam: o de cima ocupa a metade
+ * superior esquerda de um quadrado e o de baixo, a inferior direita. Postos na
+ * mesma caixa, no centro, formam o quadrado inteiro.
+ */
+
+.ac-cartao {
+  --peca: 44px;
+  --margem: 12px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 28px;
+  border: 1px solid rgba(29, 35, 64, 0.08);
+  background:
+    radial-gradient(120% 80% at 0% 0%, rgba(248, 206, 215, 0.35), transparent 55%),
+    radial-gradient(90% 70% at 100% 100%, rgba(242, 216, 209, 0.4), transparent 60%),
+    rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(18px);
+  box-shadow:
+    0 40px 90px -50px rgba(184, 39, 70, 0.45),
+    0 2px 6px rgba(29, 35, 64, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transition: height 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ac-miolo {
+  padding: 48px 34px 50px;
+}
+
+@media (max-width: 480px) {
+  .ac-miolo {
+    padding: 44px 22px 46px;
+  }
+}
+
+/* ------------------------------------------------------------- conteúdo */
+
+.ac-conteudo {
+  transition:
+    opacity 0.5s ease,
+    filter 0.5s ease,
+    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ac-cartao[data-fase='saindo'] .ac-conteudo {
+  opacity: 0;
+  filter: blur(8px);
+  transform: scale(0.985);
+  transition-duration: 0.3s;
+}
+
+.ac-cartao[data-fase='juntando'] .ac-conteudo,
+.ac-cartao[data-fase='pulso'] .ac-conteudo {
+  opacity: 0;
+  filter: blur(8px);
+  transform: scale(0.985);
+  transition: none;
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------- as duas peças */
+
+.ac-peca {
+  position: absolute;
+  z-index: 2;
+  width: var(--peca);
+  height: var(--peca);
+  pointer-events: none;
+  filter: drop-shadow(0 6px 12px rgba(225, 58, 92, 0.35));
+  transition:
+    left 0.48s cubic-bezier(0.65, 0, 0.35, 1),
+    top 0.48s cubic-bezier(0.65, 0, 0.35, 1),
+    opacity 0.4s ease,
+    transform 0.48s cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+.ac-peca::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(135deg, #f0577a 0%, #e13a5c 50%, #b82746 100%);
+}
+
+.ac-peca-a {
+  left: var(--margem);
+  top: var(--margem);
+}
+
+.ac-peca-a::before {
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+  border-top-left-radius: 14px;
+}
+
+.ac-peca-b {
+  left: calc(100% - var(--margem) - var(--peca));
+  top: calc(100% - var(--margem) - var(--peca));
+}
+
+.ac-peca-b::before {
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+  border-bottom-right-radius: 14px;
+}
+
+/* Juntas no meio, as duas viram um quadrado só. */
+.ac-cartao[data-fase='juntando'] .ac-peca,
+.ac-cartao[data-fase='pulso'] .ac-peca {
+  left: calc(50% - var(--peca) / 2);
+  top: calc(50% - var(--peca) / 2);
+}
+
+.ac-cartao[data-fase='juntando'] .ac-peca::before,
+.ac-cartao[data-fase='pulso'] .ac-peca::before {
+  border-radius: 10px;
+}
+
+/* No pulso o quadrado incha e se dissolve no anel. */
+.ac-cartao[data-fase='pulso'] .ac-peca {
+  opacity: 0;
+  transform: scale(1.35);
+  transition:
+    opacity 0.35s ease 0.08s,
+    transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Voltando para os cantos: reaparecem pequenas e crescem no caminho. */
+.ac-cartao[data-fase='entrando'] .ac-peca {
+  transition:
+    left 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    top 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.45s ease,
+    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ---------------------------------------------------------------- o anel */
+
+.ac-anel {
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  top: 50%;
+  width: 150px;
+  height: 150px;
+  margin: -75px 0 0 -75px;
+  border-radius: 50%;
+  border: 2px solid rgba(225, 58, 92, 0.55);
+  background: radial-gradient(circle, rgba(240, 87, 122, 0.18), transparent 68%);
+  box-shadow:
+    0 0 40px rgba(225, 58, 92, 0.25),
+    inset 0 0 30px rgba(225, 58, 92, 0.18);
+  opacity: 0;
+  transform: scale(0.2);
+  pointer-events: none;
+}
+
+.ac-cartao[data-fase='pulso'] .ac-anel {
+  animation: ac-anel 0.75s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes ac-anel {
+  0% {
+    opacity: 0;
+    transform: scale(0.25);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ac-cartao,
+  .ac-conteudo,
+  .ac-peca {
+    transition: none !important;
+  }
+
+  .ac-anel {
+    display: none;
+  }
+}
