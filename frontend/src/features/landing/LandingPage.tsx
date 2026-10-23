@@ -28,6 +28,42 @@ const SEGMENTOS = [
   'Espaços compartilhados',
 ];
 
+/**
+ * Os segmentos apontados na imagem da hero. `x`/`y` são o canto esquerdo de
+ * cima do rótulo, em porcentagem do palco — ou `direita`, para o que fica na
+ * ponta e precisa ser medido pela borda direita: preso pela esquerda, o texto
+ * comprido dele vazava da tela quando a imagem encolhia. `lado` diz para onde
+ * sai a linha até o pontinho:
+ * `direita` desce à direita do texto, `esquerda` desce à esquerda e
+ * `esquerda-cima` sobe à esquerda (o de baixo, que aponta para cima).
+ */
+type LadoRotulo = 'direita' | 'esquerda' | 'esquerda-cima';
+
+const ROTULOS_HERO: {
+  texto: string[];
+  x?: string;
+  direita?: string;
+  y: string;
+  lado: LadoRotulo;
+}[] = [
+  { texto: ['Clínicas', 'de estética'], x: '0%', y: '-9%', lado: 'direita' },
+  { texto: ['Espaços', 'compartilhados'], x: '36%', y: '-17%', lado: 'esquerda' },
+  { texto: ['Salões'], x: '80%', y: '-4%', lado: 'esquerda' },
+  { texto: ['Studios', 'de beleza e de estética'], direita: '-2%', y: '93%', lado: 'esquerda-cima' },
+];
+
+const LINHA_ROTULO: Record<LadoRotulo, string> = {
+  direita: 'M2 9 Q 30 9 38 28',
+  esquerda: 'M42 9 Q 14 9 6 28',
+  'esquerda-cima': 'M42 25 Q 14 25 6 6',
+};
+
+const PONTO_ROTULO: Record<LadoRotulo, { cx: number; cy: number }> = {
+  direita: { cx: 38, cy: 28 },
+  esquerda: { cx: 6, cy: 28 },
+  'esquerda-cima': { cx: 6, cy: 6 },
+};
+
 const PASSOS = [
   [
     'A cliente marca sozinha',
@@ -440,12 +476,43 @@ export function LandingPage() {
           </div>
 
           <div className="lp-hero-img">
-            <img
-              src="/landing/hero.jpg"
-              alt="CliniStudio aberto em um notebook sobre a mesa"
-              width={1536}
-              height={1024}
-            />
+            {/* O palco tem o tamanho da imagem, e os rótulos são posicionados
+                em porcentagem dele: crescendo ou encolhendo com a tela, cada
+                pontinho continua apontando para o mesmo móvel. */}
+            <div className="lp-hero-palco">
+              <img
+                src="/landing/hero-espacos.webp"
+                alt="Maca de estética, cadeira de salão, bancada de maquiagem e itens de spa reunidos num espaço de beleza"
+                width={1440}
+                height={748}
+              />
+              {ROTULOS_HERO.map((rotulo, i) => (
+                <span
+                  key={rotulo.texto.join(' ')}
+                  className={`lp-rotulo lp-rotulo-${rotulo.lado}`}
+                  style={
+                    {
+                      left: rotulo.x,
+                      right: rotulo.direita,
+                      top: rotulo.y,
+                      '--atraso-rotulo': `${1.1 + i * 0.18}s`,
+                    } as React.CSSProperties
+                  }
+                >
+                  <svg viewBox="0 0 44 34" aria-hidden>
+                    <path d={LINHA_ROTULO[rotulo.lado]} />
+                    <circle {...PONTO_ROTULO[rotulo.lado]} r="3" />
+                  </svg>
+                  <span className="lp-rotulo-texto">
+                    {rotulo.texto.map((linha, j) => (
+                      <span key={linha} className={j ? 'menor' : undefined}>
+                        {linha}
+                      </span>
+                    ))}
+                  </span>
+                </span>
+              ))}
+            </div>
           </div>
         </div>
       </div>
