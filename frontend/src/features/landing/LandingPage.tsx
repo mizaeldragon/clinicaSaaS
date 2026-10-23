@@ -4,6 +4,7 @@ import { BrandLogo } from '@/components/brand';
 import { useAuthStore } from '@/stores/auth.store';
 import { usePublicPlans } from '@/features/auth/usePublicPlans';
 import type { ModuleKey, Plan } from '@/types';
+import { CaminhoPassos } from './CaminhoPassos';
 import './landing.css';
 
 /**
@@ -286,7 +287,6 @@ const REVELA = [
 ].join(',');
 
 const CASCATA = [
-  '.lp-passo',
   '.lp-modulo',
   '.lp-modulo-destaque',
   '.lp-ia-cartao',
@@ -480,15 +480,7 @@ export function LandingPage() {
           </p>
         </div>
 
-        <div className="lp-passos">
-          {PASSOS.map(([titulo, texto], i) => (
-            <div className="lp-passo" key={titulo}>
-              <span className="lp-passo-num">{String(i + 1).padStart(2, '0')}</span>
-              <h3 className="lp-h3">{titulo}</h3>
-              <p>{texto}</p>
-            </div>
-          ))}
-        </div>
+        <CaminhoPassos passos={PASSOS} />
       </div>
 
       {/* --------------------------------------------------------- sistema */}

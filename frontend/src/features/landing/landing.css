@@ -663,50 +663,189 @@
   margin-bottom: 56px;
 }
 
-.lp-passos {
+/*
+ * O caminho dos passos. Os círculos alternam entre duas colunas perto do meio
+ * e o texto fica do lado de fora de cada um; a curva que os liga é desenhada
+ * pelo CaminhoPassos.tsx a partir de onde os círculos caíram.
+ */
+.lp-caminho {
+  --no: 64px;
+  --col-esq: 37%;
+  --col-dir: 63%;
+  --vao: 30px;
+  position: relative;
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 90px 0 110px;
+}
+
+.lp-caminho-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.lp-caminho-svg path {
+  fill: none;
+  stroke-linecap: round;
+}
+
+/* O trilho é o caminho inteiro, apagado: mostra para onde a linha vai. */
+.lp-caminho-trilho {
+  stroke: rgba(225, 58, 92, 0.13);
+  stroke-width: 7;
+}
+
+.lp-caminho-traco {
+  stroke: var(--rosa);
+  stroke-width: 3;
+}
+
+.lp-caminho-lista {
+  position: relative;
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
+  gap: 64px;
 }
 
-.lp-passo {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 18px 40px;
-  align-items: baseline;
-  padding: 32px 8px;
-  border-top: 1px solid rgba(27, 32, 68, 0.14);
-  border-radius: 18px;
-  transition: background 0.3s ease;
+.lp-caminho-passo {
+  position: relative;
+  min-height: var(--no);
 }
 
-.lp-passo:hover {
-  background: rgba(225, 58, 92, 0.05);
-}
-
-.lp-passo:last-child {
-  border-bottom: 1px solid rgba(27, 32, 68, 0.14);
-}
-
-.lp-passo-num {
+.lp-caminho-no {
+  position: absolute;
+  top: 0;
+  left: var(--col-esq);
+  transform: translateX(-50%);
+  width: var(--no);
+  height: var(--no);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
   font-family: var(--serif);
-  font-size: 40px;
-  color: rgba(225, 58, 92, 0.4);
-  line-height: 1;
-  flex: 0 0 74px;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--rosa-escuro);
+  background: var(--creme-cartao);
+  border: 2px solid rgba(225, 58, 92, 0.22);
+  box-shadow:
+    0 0 0 7px var(--creme),
+    0 16px 30px -18px rgba(184, 39, 70, 0.55);
+  transition:
+    background 0.9s ease,
+    color 0.9s ease,
+    border-color 0.9s ease,
+    box-shadow 0.9s ease,
+    transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.lp-passo .lp-h3 {
-  flex: 1 1 240px;
+.lp-caminho-passo.direita .lp-caminho-no {
+  left: var(--col-dir);
 }
 
-.lp-passo p {
+/* Aceso: a linha chegou. Pega o mesmo degradê dos botões. */
+.lp-caminho-no.is-aceso {
+  color: #fff;
+  border-color: transparent;
+  background-image: linear-gradient(135deg, #f0577a 0%, #e13a5c 50%, #b82746 100%);
+  transform: translateX(-50%) scale(1.06);
+  box-shadow:
+    0 0 0 7px var(--creme),
+    0 0 0 13px rgba(225, 58, 92, 0.1),
+    0 18px 34px -16px rgba(184, 39, 70, 0.7);
+}
+
+.lp-caminho-texto {
+  padding-top: 6px;
+}
+
+.lp-caminho-passo.esquerda .lp-caminho-texto {
+  width: calc(var(--col-esq) - var(--no) / 2 - var(--vao));
+  text-align: right;
+}
+
+.lp-caminho-passo.direita .lp-caminho-texto {
+  margin-left: calc(var(--col-dir) + var(--no) / 2 + var(--vao));
+}
+
+.lp-caminho-texto .lp-h3 {
+  margin: 0 0 8px;
+}
+
+.lp-caminho-texto p {
   font-size: 15px;
   font-weight: 300;
   line-height: 1.7;
   color: var(--cinza-texto);
   margin: 0;
-  flex: 1 1 300px;
-  max-width: 440px;
+}
+
+/* Só esconde com o script rodando: sem ele, os passos ficam à vista. */
+.lp-caminho.is-animado .lp-caminho-texto {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 1.1s ease,
+    transform 1.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.lp-caminho.is-animado .lp-caminho-passo.esquerda .lp-caminho-texto {
+  transform: translateX(-34px);
+}
+
+.lp-caminho.is-animado .lp-caminho-passo.direita .lp-caminho-texto {
+  transform: translateX(34px);
+}
+
+/* O parágrafo chega um instante depois do título, e não junto com ele. */
+.lp-caminho.is-animado .lp-caminho-texto p {
+  opacity: 0;
+  transition: opacity 1.1s ease 0.25s;
+}
+
+.lp-caminho.is-animado .lp-caminho-lista .lp-caminho-passo.is-visivel .lp-caminho-texto p {
+  opacity: 1;
+}
+
+/* Um nível a mais de classe que as regras de lado (inclusive as do celular,
+   que vêm depois), para o texto visível sempre parar no lugar. */
+.lp-caminho.is-animado .lp-caminho-lista .lp-caminho-passo.is-visivel .lp-caminho-texto {
+  opacity: 1;
+  transform: none;
+}
+
+/* No celular não cabem duas colunas: os círculos descem por uma linha à
+   esquerda e o texto fica todo do lado direito. */
+@media (max-width: 720px) {
+  .lp-caminho {
+    --no: 52px;
+    --col-esq: 28px;
+    --col-dir: 28px;
+    --vao: 20px;
+    padding: 60px 0 80px;
+  }
+
+  .lp-caminho-lista {
+    gap: 48px;
+  }
+
+  .lp-caminho-passo.esquerda .lp-caminho-texto,
+  .lp-caminho-passo.direita .lp-caminho-texto {
+    width: auto;
+    text-align: left;
+    margin-left: calc(var(--col-esq) + var(--no) / 2 + var(--vao));
+  }
+
+  .lp-caminho.is-animado .lp-caminho-passo.esquerda .lp-caminho-texto {
+    transform: translateX(34px);
+  }
 }
 
 /* -------------------------------------------------------- sistema (navy) */
