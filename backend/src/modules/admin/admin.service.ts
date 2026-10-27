@@ -9,6 +9,9 @@ import { breachMessage, checkBreachedPassword } from '../../shared/services/brea
 import { uniqueSlug } from '../../shared/utils/slug';
 import { invalidateCompanyContext } from '../../shared/services/companyContext.service';
 import { CORE_MODULES, DEFAULT_BUSINESS_HOURS } from '../companies/company.constants';
+import { trocarPlano } from '../companies/planChange';
+import { billingService } from '../billing/billing.service';
+import { logger } from '../../shared/utils/logger';
 
 function num(value: unknown): number {
   if (value === null || value === undefined) return 0;
@@ -18,6 +21,22 @@ function num(value: unknown): number {
 /** Todas as operações do painel do SaaS rodam fora do escopo de tenant. */
 function asSystem<T>(fn: () => Promise<T>): Promise<T> {
   return tenantContext.runAsSystem(fn);
+}
+
+/**
+ * Puxa de novo as cobranças do Asaas para o espelho local. Depois de mudar o
+ * valor lá, a fatura em aberto da cliente só mostra o preço novo quando o
+ * espelho é refeito — o Asaas não manda webhook por uma edição de valor.
+ *
+ * Não derruba a operação se falhar: o valor no Asaas já está certo, e o
+ * espelho se acerta no próximo webhook ou no botão "atualizar".
+ */
+async function resincronizarCobrancas(companyId: string) {
+  try {
+    await billingService.syncPayments(companyId);
+  } catch (error) {
+    logger.warn({ error, companyId }, 'Não foi possível atualizar o espelho das cobranças');
+  }
 }
 
 export const adminService = {
@@ -266,49 +285,26 @@ export const adminService = {
    * Asaas — senão o painel diria Premium enquanto a cobrança seguia no Pro.
    */
   async setCompanyPlan(id: string, planSlug: string) {
-    return asSystem(async () => {
+    const { plan, subscription } = await asSystem(async () => {
       const plan = await prisma.plan.findUnique({ where: { slug: planSlug } });
       if (!plan) throw new NotFoundError('Plano');
-
-      const subscription = await prisma.subscription.findUnique({
-        where: { companyId: id },
-        include: { plan: true },
-      });
+      const subscription = await prisma.subscription.findUnique({ where: { companyId: id } });
       if (!subscription) throw new NotFoundError('Assinatura');
-
-      // O Asaas primeiro: se ele recusar, nada muda aqui e o painel não fica
-      // anunciando um plano que não está sendo cobrado.
-      if (subscription.asaasSubscriptionId && asaas.isEnabled()) {
-        await asaas.updateSubscription(subscription.asaasSubscriptionId, {
-          value: Number(plan.price),
-          description: `CliniStudio — plano ${plan.name}`,
-        });
-      }
-
-      const modules = await prisma.companyModule.findMany({ where: { companyId: id, enabled: true } });
-      const toDisable = modules
-        .map((m) => m.module)
-        .filter((m) => !plan.modules.includes(m) && !CORE_MODULES.includes(m));
-      const toEnable = plan.modules.filter((m) => !subscription.plan.modules.includes(m));
-
-      await prisma.$transaction([
-        prisma.subscription.update({ where: { companyId: id }, data: { planId: plan.id } }),
-        prisma.companyModule.updateMany({
-          where: { companyId: id, module: { in: toDisable } },
-          data: { enabled: false },
-        }),
-        ...toEnable.map((module) =>
-          prisma.companyModule.upsert({
-            where: { companyId_module: { companyId: id, module } },
-            create: { companyId: id, module, enabled: true },
-            update: { enabled: true },
-          }),
-        ),
-      ]);
-
-      invalidateCompanyContext(id);
-      return { plan, disabledModules: toDisable, enabledModules: toEnable };
+      return { plan, subscription };
     });
+
+    // O Asaas primeiro: se ele recusar, nada muda aqui e o painel não fica
+    // anunciando um plano que não está sendo cobrado.
+    if (subscription.asaasSubscriptionId && asaas.isEnabled()) {
+      await asaas.updateSubscription(subscription.asaasSubscriptionId, {
+        value: Number(plan.price),
+        description: `CliniStudio — plano ${plan.name}`,
+      });
+    }
+
+    const result = await trocarPlano(id, plan);
+    await resincronizarCobrancas(id);
+    return result;
   },
 
   /**
@@ -429,12 +425,60 @@ export const adminService = {
     return asSystem(() => prisma.plan.create({ data: dto }));
   },
 
+  /**
+   * Edita um plano e, se o preço ou o nome mudou, leva a mudança para quem já
+   * assina.
+   *
+   * Antes o preço novo valia só para quem assinasse dali em diante: as
+   * assinaturas abertas continuavam no Asaas com o valor antigo, e a fatura em
+   * aberto da cliente mostrava um preço que o painel já não anunciava.
+   *
+   * Uma assinatura que o Asaas recusar não desfaz a edição nem trava as
+   * outras: o plano é salvo, as demais são atualizadas, e as que falharam
+   * voltam na resposta (e no log) para serem tratadas uma a uma.
+   */
   async updatePlan(id: string, dto: Prisma.PlanUncheckedUpdateInput) {
-    return asSystem(async () => {
+    const updated = await asSystem(async () => {
       const plan = await prisma.plan.findUnique({ where: { id } });
       if (!plan) throw new NotFoundError('Plano');
       return prisma.plan.update({ where: { id }, data: dto });
     });
+
+    // `await` dentro do contexto: a consulta do Prisma só roda quando é
+    // aguardada, e aguardada lá fora ela perderia o contexto de sistema.
+    const assinaturas = await asSystem(async () =>
+      await prisma.subscription.findMany({
+        where: {
+          planId: id,
+          asaasSubscriptionId: { not: null },
+          status: { not: SubscriptionStatus.CANCELED },
+        },
+        select: { companyId: true, asaasSubscriptionId: true },
+      }),
+    );
+
+    const falhas: string[] = [];
+    let atualizadas = 0;
+    if (asaas.isEnabled() && (dto.price !== undefined || dto.name !== undefined)) {
+      for (const assinatura of assinaturas) {
+        try {
+          await asaas.updateSubscription(assinatura.asaasSubscriptionId!, {
+            value: Number(updated.price),
+            description: `CliniStudio — plano ${updated.name}`,
+          });
+          await resincronizarCobrancas(assinatura.companyId);
+          atualizadas += 1;
+        } catch (error) {
+          falhas.push(assinatura.companyId);
+          logger.error(
+            { error, companyId: assinatura.companyId, planId: id },
+            'Preço novo do plano não chegou à assinatura no Asaas',
+          );
+        }
+      }
+    }
+
+    return { ...updated, assinaturasAtualizadas: atualizadas, falhas };
   },
 
   async removePlan(id: string) {

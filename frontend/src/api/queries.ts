@@ -978,9 +978,20 @@ export function useAdminMutations() {
     }),
     updatePlan: useMutation({
       mutationFn: ({ id, ...body }: Record<string, unknown> & { id: string }) =>
-        api.patch(`/admin/plans/${id}`, body),
-      onSuccess: () => {
-        toast.success('Plano atualizado');
+        api.patch<{ assinaturasAtualizadas?: number; falhas?: string[] }>(`/admin/plans/${id}`, body),
+      onSuccess: (data) => {
+        const atualizadas = data?.assinaturasAtualizadas ?? 0;
+        const falhas = data?.falhas?.length ?? 0;
+        toast.success(
+          atualizadas
+            ? `Plano atualizado — ${atualizadas} assinatura(s) já cobram o valor novo`
+            : 'Plano atualizado',
+        );
+        if (falhas) {
+          toast.error(
+            `${falhas} assinatura(s) não aceitaram o valor novo no Asaas. Tente salvar o plano de novo.`,
+          );
+        }
         invalidate();
       },
       onError: handleError,

@@ -16,7 +16,7 @@ import {
 } from '../../shared/services/companyContext.service';
 import { mailer } from '../../shared/services/mailer.service';
 import { logger } from '../../shared/utils/logger';
-import { CORE_MODULES } from '../companies/company.constants';
+import { trocarPlano } from '../companies/planChange';
 
 /**
  * Mensalidade do SaaS, cobrada pelo Asaas.
@@ -340,30 +340,15 @@ export const billingService = {
   },
 
   /**
-   * Troca de plano sem mexer no gateway: recalcula os módulos. O que não existe
-   * no plano novo é desligado, menos os módulos essenciais.
+   * Troca de plano sem mexer no gateway: acerta os módulos (desliga o que saiu,
+   * liga o que entrou). O valor no Asaas é atualizado por quem chama.
    */
   async changePlanModules(companyId: string, planSlug: string) {
-    return tenantContext.runAsSystem(async () => {
-      const plan = await prisma.plan.findUnique({ where: { slug: planSlug } });
-      if (!plan || !plan.isActive) throw new NotFoundError('Plano');
-
-      const current = await prisma.companyModule.findMany({ where: { companyId, enabled: true } });
-      const toDisable = current
-        .map((m) => m.module)
-        .filter((m) => !plan.modules.includes(m) && !CORE_MODULES.includes(m));
-
-      await prisma.$transaction([
-        prisma.subscription.update({ where: { companyId }, data: { planId: plan.id } }),
-        prisma.companyModule.updateMany({
-          where: { companyId, module: { in: toDisable } },
-          data: { enabled: false },
-        }),
-      ]);
-
-      invalidateCompanyContext(companyId);
-      return { plan, disabledModules: toDisable };
-    });
+    const plan = await tenantContext.runAsSystem(
+      async () => await prisma.plan.findUnique({ where: { slug: planSlug } }),
+    );
+    if (!plan || !plan.isActive) throw new NotFoundError('Plano');
+    return trocarPlano(companyId, plan);
   },
 
   /** Puxa as cobranças do Asaas — usado após assinar e pelo botão "atualizar". */
