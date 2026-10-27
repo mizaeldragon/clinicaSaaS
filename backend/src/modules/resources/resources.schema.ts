@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { semDefaults } from '../../shared/utils/zod';
 import { ResourceStatus } from '@prisma/client';
 
 export const createResourceCategorySchema = z.object({
@@ -7,7 +8,7 @@ export const createResourceCategorySchema = z.object({
   icon: z.string().max(40).optional(),
 });
 
-export const updateResourceCategorySchema = createResourceCategorySchema.partial();
+export const updateResourceCategorySchema = semDefaults(createResourceCategorySchema).partial();
 
 export const createResourceSchema = z.object({
   name: z.string().min(1).max(80),
@@ -21,7 +22,7 @@ export const createResourceSchema = z.object({
   monthlyRate: z.coerce.number().min(0).nullable().optional(),
 });
 
-export const updateResourceSchema = createResourceSchema.partial().extend({
+export const updateResourceSchema = semDefaults(createResourceSchema).partial().extend({
   isActive: z.boolean().optional(),
 });
 

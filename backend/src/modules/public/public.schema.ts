@@ -58,9 +58,9 @@ export const createPublicAppointmentSchema = z.object({
     email: z
       .string()
       .email('E-mail inválido')
-      .optional()
       .or(z.literal(''))
-      .transform((v) => (v === '' ? undefined : v)),
+      .transform((v) => (v === '' ? undefined : v))
+      .optional(),
   }),
   notes: z.string().max(500).optional(),
 });

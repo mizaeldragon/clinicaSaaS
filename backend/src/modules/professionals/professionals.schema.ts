@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { semDefaults } from '../../shared/utils/zod';
 import { CommissionType } from '@prisma/client';
 
 const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -14,7 +15,12 @@ export const workingHourSchema = z.object({
 
 export const createProfessionalSchema = z.object({
   name: z.string().min(2).max(120),
-  email: z.string().email().optional().or(z.literal('')).transform((v) => (v === '' ? undefined : v)),
+  email: z
+    .string()
+    .email()
+    .or(z.literal(''))
+    .transform((v) => (v === '' ? undefined : v))
+    .optional(),
   phone: z.string().max(20).optional(),
   avatarUrl: z.string().url().nullable().optional(),
   bio: z.string().max(1000).optional(),
@@ -29,7 +35,7 @@ export const createProfessionalSchema = z.object({
   workingHours: z.array(workingHourSchema).optional(),
 });
 
-export const updateProfessionalSchema = createProfessionalSchema.partial().extend({
+export const updateProfessionalSchema = semDefaults(createProfessionalSchema).partial().extend({
   isActive: z.boolean().optional(),
 });
 

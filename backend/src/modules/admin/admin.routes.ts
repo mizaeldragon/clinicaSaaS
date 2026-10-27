@@ -5,6 +5,7 @@ import { adminService } from './admin.service';
 import { validate } from '../../shared/middlewares/validate';
 import { requireSuperAdmin } from '../../shared/middlewares/rbac';
 import { asyncHandler, serialize } from '../../shared/utils/http';
+import { semDefaults } from '../../shared/utils/zod';
 
 export const adminRoutes = Router();
 
@@ -183,7 +184,7 @@ adminRoutes.post(
 
 adminRoutes.patch(
   '/plans/:id',
-  validate({ params: idParamSchema, body: planSchema.partial() }),
+  validate({ params: idParamSchema, body: semDefaults(planSchema).partial() }),
   asyncHandler(async (req, res) => {
     res.json(serialize(await adminService.updatePlan(req.params.id, req.body)));
   }),

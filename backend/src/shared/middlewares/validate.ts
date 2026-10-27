@@ -1,11 +1,11 @@
 import { RequestHandler } from 'express';
-import { AnyZodObject, ZodError, ZodTypeAny } from 'zod';
+import { ZodError, ZodObject, ZodType } from 'zod';
 import { BadRequestError } from '../errors/AppError';
 
 interface ValidationSchemas {
-  body?: ZodTypeAny;
-  query?: AnyZodObject;
-  params?: AnyZodObject;
+  body?: ZodType;
+  query?: ZodObject;
+  params?: ZodObject;
 }
 
 function formatIssues(error: ZodError) {
@@ -19,7 +19,7 @@ function formatIssues(error: ZodError) {
 export function validate(schemas: ValidationSchemas): RequestHandler {
   return (req, _res, next) => {
     try {
-      if (schemas.params) req.params = schemas.params.parse(req.params);
+      if (schemas.params) req.params = schemas.params.parse(req.params) as typeof req.params;
       if (schemas.query) {
         const parsedQuery = schemas.query.parse(req.query);
         Object.defineProperty(req, 'query', { value: parsedQuery, writable: true });

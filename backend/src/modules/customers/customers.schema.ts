@@ -1,16 +1,22 @@
 import { z } from 'zod';
+import { semDefaults } from '../../shared/utils/zod';
 
 export const createCustomerSchema = z.object({
   name: z.string().min(2, 'Nome muito curto').max(120),
   phone: z.string().max(20).optional(),
   whatsapp: z.string().max(20).optional(),
-  email: z.string().email('E-mail inválido').optional().or(z.literal('')).transform((v) => (v === '' ? undefined : v)),
+  email: z
+    .string()
+    .email('E-mail inválido')
+    .or(z.literal(''))
+    .transform((v) => (v === '' ? undefined : v))
+    .optional(),
   birthDate: z.coerce.date().optional(),
   document: z.string().max(20).optional(),
   notes: z.string().max(2000).optional(),
 });
 
-export const updateCustomerSchema = createCustomerSchema.partial().extend({
+export const updateCustomerSchema = semDefaults(createCustomerSchema).partial().extend({
   isActive: z.boolean().optional(),
 });
 

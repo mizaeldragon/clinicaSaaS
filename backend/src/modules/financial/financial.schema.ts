@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { semDefaults } from '../../shared/utils/zod';
 import { PaymentMethod, PaymentStatus, TransactionOrigin, TransactionType } from '@prisma/client';
 
 export const createTransactionSchema = z.object({
@@ -18,7 +19,7 @@ export const createTransactionSchema = z.object({
   notes: z.string().max(1000).nullable().optional(),
 });
 
-export const updateTransactionSchema = createTransactionSchema.partial();
+export const updateTransactionSchema = semDefaults(createTransactionSchema).partial();
 
 export const payTransactionSchema = z.object({
   amount: z.coerce.number().min(0.01),

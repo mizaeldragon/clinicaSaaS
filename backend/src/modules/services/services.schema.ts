@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { semDefaults } from '../../shared/utils/zod';
 import { CommissionType } from '@prisma/client';
 
 export const createCategorySchema = z.object({
@@ -8,7 +9,7 @@ export const createCategorySchema = z.object({
   sortOrder: z.number().int().min(0).default(0),
 });
 
-export const updateCategorySchema = createCategorySchema.partial().extend({
+export const updateCategorySchema = semDefaults(createCategorySchema).partial().extend({
   isActive: z.boolean().optional(),
 });
 
@@ -25,7 +26,7 @@ export const createServiceSchema = z.object({
   professionalIds: z.array(z.string().uuid()).optional(),
 });
 
-export const updateServiceSchema = createServiceSchema.partial().extend({
+export const updateServiceSchema = semDefaults(createServiceSchema).partial().extend({
   isActive: z.boolean().optional(),
 });
 
