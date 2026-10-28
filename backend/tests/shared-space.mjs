@@ -477,7 +477,13 @@ const run = async () => {
     method: 'DELETE',
     token: marcia.accessToken,
   });
-  check('remover locatária responde ok', removed.status === 204, String(removed.status));
+  // Responde o desfecho, não 204: com histórico, a tela precisa dizer que ela
+  // foi inativada — senão a dona clica em "remover" de novo achando que falhou.
+  check(
+    'remover locatária com histórico responde que ela foi inativada',
+    removed.status === 200 && removed.data?.deactivated === true,
+    JSON.stringify({ status: removed.status, data: removed.data }),
+  );
 
   const stillThere = await api('/professionals?isActive=false', { token: marcia.accessToken });
   check(
@@ -750,11 +756,14 @@ const run = async () => {
   console.log('\n=== 12. A cliente mexe no próprio horário ===');
 
   // A disponibilidade é relida agora: os testes anteriores já ocuparam horários.
-  const freshDay = nextWeekday(4); // outra quinta da Ana, ainda intocada
+  // Só os LIVRES, como na seção 5. A quinta nem sempre está intocada: rodando
+  // na terça ou na quarta, o primeiro turno da Ana é essa quinta, e o seed já
+  // pôs um atendimento dela lá — que volta na lista, apagado.
+  const freshDay = nextWeekday(4);
   const fresh = await api(
     `/public/${SLUG}/availability?serviceId=${corte.id}&date=${freshDay.toISOString()}&professionalId=${anaSlots.professional.id}`,
   );
-  const freeSlots = fresh.data.professionals[0]?.slots ?? [];
+  const freeSlots = (fresh.data.professionals[0]?.slots ?? []).filter((s) => s.disponivel);
   check('há horário livre para a cliente marcar', freeSlots.length >= 2, String(freeSlots.length));
 
   const anaSlot = freeSlots[0];
@@ -899,8 +908,16 @@ const run = async () => {
 
   console.log('\n=== 14. Caixa da locatária ===');
 
+  // O painel olha o mês do atendimento, não o de hoje: a receita entra na data
+  // do atendimento (a terça da seção 5), e no fim do mês essa terça já cai no
+  // mês seguinte — o painel padrão, do mês corrente, viria zerado.
+  const tuesdayMonthStart = new Date(tuesday.getFullYear(), tuesday.getMonth(), 1);
+  const tuesdayMonthEnd = new Date(tuesday.getFullYear(), tuesday.getMonth() + 1, 0, 23, 59, 59, 999);
   const anaFinance = await login('ana@marciavaz.com.br', 'marcia@12345');
-  const anaCash = await api('/financial/dashboard', { token: anaFinance.accessToken });
+  const anaCash = await api(
+    `/financial/dashboard?from=${tuesdayMonthStart.toISOString()}&to=${tuesdayMonthEnd.toISOString()}`,
+    { token: anaFinance.accessToken },
+  );
   check('locatária tem caixa próprio', anaCash.status === 200, String(anaCash.status));
   check(
     'com a receita do atendimento dela',
